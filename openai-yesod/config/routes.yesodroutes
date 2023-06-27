@@ -1,0 +1,24 @@
+-- By default this file is used by `parseRoutesFile` in Foundation.hs
+-- Syntax for this file here: https://www.yesodweb.com/book/routing-and-handlers
+
+-- /static StaticR Static appStatic
+
+/chat/completions ChatCompletionsR POST
+/completions CompletionsR POST
+/edits EditsR POST
+/images/generations ImagesGenerationsR POST
+/images/edits ImagesEditsR POST
+/images/variations ImagesVariationsR POST
+/embeddings EmbeddingsR POST
+/audio/transcriptions AudioTranscriptionsR POST
+/audio/translations AudioTranslationsR POST
+/files FilesR GET POST
+/files/#Text FilesByTextR GET DELETE
+/files/#Text/content FilesByTextContentR GET
+/fine-tunes FineTunesR GET POST
+/fine-tunes/#Text FineTunesByTextR GET
+/fine-tunes/#Text/cancel FineTunesByTextCancelR POST
+/fine-tunes/#Text/events FineTunesByTextEventsR GET
+/models ModelsR GET
+/models/#Text ModelsByTextR GET DELETE
+/moderations ModerationsR POST
