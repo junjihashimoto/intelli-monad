@@ -49,7 +49,7 @@ chatCompletionFunctionsDescriptionL f ChatCompletionFunctions{..} = (\chatComple
 {-# INLINE chatCompletionFunctionsDescriptionL #-}
 
 -- | 'chatCompletionFunctionsParameters' Lens
-chatCompletionFunctionsParametersL :: Lens_' ChatCompletionFunctions (Maybe (Map.Map String A.Value))
+chatCompletionFunctionsParametersL :: Lens_' ChatCompletionFunctions ((Map.Map String A.Value))
 chatCompletionFunctionsParametersL f ChatCompletionFunctions{..} = (\chatCompletionFunctionsParameters -> ChatCompletionFunctions { chatCompletionFunctionsParameters, ..} ) <$> f chatCompletionFunctionsParameters
 {-# INLINE chatCompletionFunctionsParametersL #-}
 
@@ -63,7 +63,7 @@ chatCompletionRequestMessageRoleL f ChatCompletionRequestMessage{..} = (\chatCom
 {-# INLINE chatCompletionRequestMessageRoleL #-}
 
 -- | 'chatCompletionRequestMessageContent' Lens
-chatCompletionRequestMessageContentL :: Lens_' ChatCompletionRequestMessage (Maybe Text)
+chatCompletionRequestMessageContentL :: Lens_' ChatCompletionRequestMessage (Text)
 chatCompletionRequestMessageContentL f ChatCompletionRequestMessage{..} = (\chatCompletionRequestMessageContent -> ChatCompletionRequestMessage { chatCompletionRequestMessageContent, ..} ) <$> f chatCompletionRequestMessageContent
 {-# INLINE chatCompletionRequestMessageContentL #-}
 
@@ -82,12 +82,12 @@ chatCompletionRequestMessageFunctionCallL f ChatCompletionRequestMessage{..} = (
 -- * ChatCompletionRequestMessageFunctionCall
 
 -- | 'chatCompletionRequestMessageFunctionCallName' Lens
-chatCompletionRequestMessageFunctionCallNameL :: Lens_' ChatCompletionRequestMessageFunctionCall (Maybe Text)
+chatCompletionRequestMessageFunctionCallNameL :: Lens_' ChatCompletionRequestMessageFunctionCall (Text)
 chatCompletionRequestMessageFunctionCallNameL f ChatCompletionRequestMessageFunctionCall{..} = (\chatCompletionRequestMessageFunctionCallName -> ChatCompletionRequestMessageFunctionCall { chatCompletionRequestMessageFunctionCallName, ..} ) <$> f chatCompletionRequestMessageFunctionCallName
 {-# INLINE chatCompletionRequestMessageFunctionCallNameL #-}
 
 -- | 'chatCompletionRequestMessageFunctionCallArguments' Lens
-chatCompletionRequestMessageFunctionCallArgumentsL :: Lens_' ChatCompletionRequestMessageFunctionCall (Maybe Text)
+chatCompletionRequestMessageFunctionCallArgumentsL :: Lens_' ChatCompletionRequestMessageFunctionCall (Text)
 chatCompletionRequestMessageFunctionCallArgumentsL f ChatCompletionRequestMessageFunctionCall{..} = (\chatCompletionRequestMessageFunctionCallArguments -> ChatCompletionRequestMessageFunctionCall { chatCompletionRequestMessageFunctionCallArguments, ..} ) <$> f chatCompletionRequestMessageFunctionCallArguments
 {-# INLINE chatCompletionRequestMessageFunctionCallArgumentsL #-}
 
@@ -106,9 +106,23 @@ chatCompletionResponseMessageContentL f ChatCompletionResponseMessage{..} = (\ch
 {-# INLINE chatCompletionResponseMessageContentL #-}
 
 -- | 'chatCompletionResponseMessageFunctionCall' Lens
-chatCompletionResponseMessageFunctionCallL :: Lens_' ChatCompletionResponseMessage (Maybe ChatCompletionRequestMessageFunctionCall)
+chatCompletionResponseMessageFunctionCallL :: Lens_' ChatCompletionResponseMessage (Maybe ChatCompletionResponseMessageFunctionCall)
 chatCompletionResponseMessageFunctionCallL f ChatCompletionResponseMessage{..} = (\chatCompletionResponseMessageFunctionCall -> ChatCompletionResponseMessage { chatCompletionResponseMessageFunctionCall, ..} ) <$> f chatCompletionResponseMessageFunctionCall
 {-# INLINE chatCompletionResponseMessageFunctionCallL #-}
+
+
+
+-- * ChatCompletionResponseMessageFunctionCall
+
+-- | 'chatCompletionResponseMessageFunctionCallName' Lens
+chatCompletionResponseMessageFunctionCallNameL :: Lens_' ChatCompletionResponseMessageFunctionCall (Maybe Text)
+chatCompletionResponseMessageFunctionCallNameL f ChatCompletionResponseMessageFunctionCall{..} = (\chatCompletionResponseMessageFunctionCallName -> ChatCompletionResponseMessageFunctionCall { chatCompletionResponseMessageFunctionCallName, ..} ) <$> f chatCompletionResponseMessageFunctionCallName
+{-# INLINE chatCompletionResponseMessageFunctionCallNameL #-}
+
+-- | 'chatCompletionResponseMessageFunctionCallArguments' Lens
+chatCompletionResponseMessageFunctionCallArgumentsL :: Lens_' ChatCompletionResponseMessageFunctionCall (Maybe Text)
+chatCompletionResponseMessageFunctionCallArgumentsL f ChatCompletionResponseMessageFunctionCall{..} = (\chatCompletionResponseMessageFunctionCallArguments -> ChatCompletionResponseMessageFunctionCall { chatCompletionResponseMessageFunctionCallArguments, ..} ) <$> f chatCompletionResponseMessageFunctionCallArguments
+{-# INLINE chatCompletionResponseMessageFunctionCallArgumentsL #-}
 
 
 
@@ -125,7 +139,7 @@ chatCompletionStreamResponseDeltaContentL f ChatCompletionStreamResponseDelta{..
 {-# INLINE chatCompletionStreamResponseDeltaContentL #-}
 
 -- | 'chatCompletionStreamResponseDeltaFunctionCall' Lens
-chatCompletionStreamResponseDeltaFunctionCallL :: Lens_' ChatCompletionStreamResponseDelta (Maybe ChatCompletionRequestMessageFunctionCall)
+chatCompletionStreamResponseDeltaFunctionCallL :: Lens_' ChatCompletionStreamResponseDelta (Maybe ChatCompletionResponseMessageFunctionCall)
 chatCompletionStreamResponseDeltaFunctionCallL f ChatCompletionStreamResponseDelta{..} = (\chatCompletionStreamResponseDeltaFunctionCall -> ChatCompletionStreamResponseDelta { chatCompletionStreamResponseDeltaFunctionCall, ..} ) <$> f chatCompletionStreamResponseDeltaFunctionCall
 {-# INLINE chatCompletionStreamResponseDeltaFunctionCallL #-}
 

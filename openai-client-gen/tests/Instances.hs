@@ -121,7 +121,7 @@ genChatCompletionFunctions n =
   ChatCompletionFunctions
     <$> arbitrary -- chatCompletionFunctionsName :: Text
     <*> arbitraryReducedMaybe n -- chatCompletionFunctionsDescription :: Maybe Text
-    <*> arbitraryReducedMaybe n -- chatCompletionFunctionsParameters :: Maybe (Map.Map String AnyType)
+    <*> arbitraryReduced n -- chatCompletionFunctionsParameters :: (Map.Map String AnyType)
   
 instance Arbitrary ChatCompletionRequestMessage where
   arbitrary = sized genChatCompletionRequestMessage
@@ -130,7 +130,7 @@ genChatCompletionRequestMessage :: Int -> Gen ChatCompletionRequestMessage
 genChatCompletionRequestMessage n =
   ChatCompletionRequestMessage
     <$> arbitrary -- chatCompletionRequestMessageRole :: E'Role
-    <*> arbitraryReducedMaybe n -- chatCompletionRequestMessageContent :: Maybe Text
+    <*> arbitrary -- chatCompletionRequestMessageContent :: Text
     <*> arbitraryReducedMaybe n -- chatCompletionRequestMessageName :: Maybe Text
     <*> arbitraryReducedMaybe n -- chatCompletionRequestMessageFunctionCall :: Maybe ChatCompletionRequestMessageFunctionCall
   
@@ -140,8 +140,8 @@ instance Arbitrary ChatCompletionRequestMessageFunctionCall where
 genChatCompletionRequestMessageFunctionCall :: Int -> Gen ChatCompletionRequestMessageFunctionCall
 genChatCompletionRequestMessageFunctionCall n =
   ChatCompletionRequestMessageFunctionCall
-    <$> arbitraryReducedMaybe n -- chatCompletionRequestMessageFunctionCallName :: Maybe Text
-    <*> arbitraryReducedMaybe n -- chatCompletionRequestMessageFunctionCallArguments :: Maybe Text
+    <$> arbitrary -- chatCompletionRequestMessageFunctionCallName :: Text
+    <*> arbitrary -- chatCompletionRequestMessageFunctionCallArguments :: Text
   
 instance Arbitrary ChatCompletionResponseMessage where
   arbitrary = sized genChatCompletionResponseMessage
@@ -151,7 +151,16 @@ genChatCompletionResponseMessage n =
   ChatCompletionResponseMessage
     <$> arbitrary -- chatCompletionResponseMessageRole :: E'Role
     <*> arbitraryReducedMaybe n -- chatCompletionResponseMessageContent :: Maybe Text
-    <*> arbitraryReducedMaybe n -- chatCompletionResponseMessageFunctionCall :: Maybe ChatCompletionRequestMessageFunctionCall
+    <*> arbitraryReducedMaybe n -- chatCompletionResponseMessageFunctionCall :: Maybe ChatCompletionResponseMessageFunctionCall
+  
+instance Arbitrary ChatCompletionResponseMessageFunctionCall where
+  arbitrary = sized genChatCompletionResponseMessageFunctionCall
+
+genChatCompletionResponseMessageFunctionCall :: Int -> Gen ChatCompletionResponseMessageFunctionCall
+genChatCompletionResponseMessageFunctionCall n =
+  ChatCompletionResponseMessageFunctionCall
+    <$> arbitraryReducedMaybe n -- chatCompletionResponseMessageFunctionCallName :: Maybe Text
+    <*> arbitraryReducedMaybe n -- chatCompletionResponseMessageFunctionCallArguments :: Maybe Text
   
 instance Arbitrary ChatCompletionStreamResponseDelta where
   arbitrary = sized genChatCompletionStreamResponseDelta
@@ -161,7 +170,7 @@ genChatCompletionStreamResponseDelta n =
   ChatCompletionStreamResponseDelta
     <$> arbitraryReducedMaybe n -- chatCompletionStreamResponseDeltaRole :: Maybe E'Role
     <*> arbitraryReducedMaybe n -- chatCompletionStreamResponseDeltaContent :: Maybe Text
-    <*> arbitraryReducedMaybe n -- chatCompletionStreamResponseDeltaFunctionCall :: Maybe ChatCompletionRequestMessageFunctionCall
+    <*> arbitraryReducedMaybe n -- chatCompletionStreamResponseDeltaFunctionCall :: Maybe ChatCompletionResponseMessageFunctionCall
   
 instance Arbitrary CreateChatCompletionRequest where
   arbitrary = sized genCreateChatCompletionRequest
@@ -733,6 +742,24 @@ genOpenAIFile n =
 
 
 
+instance Arbitrary E'AnyOf1 where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary E'AnyOf2 where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary E'AnyOf3 where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary E'AnyOf4 where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary E'AnyOf5 where
+  arbitrary = arbitraryBoundedEnum
+
+instance Arbitrary E'AnyOf6 where
+  arbitrary = arbitraryBoundedEnum
+
 instance Arbitrary E'FinishReason where
   arbitrary = arbitraryBoundedEnum
 
@@ -740,24 +767,6 @@ instance Arbitrary E'FinishReason2 where
   arbitrary = arbitraryBoundedEnum
 
 instance Arbitrary E'OneOf0 where
-  arbitrary = arbitraryBoundedEnum
-
-instance Arbitrary E'OneOf1 where
-  arbitrary = arbitraryBoundedEnum
-
-instance Arbitrary E'OneOf2 where
-  arbitrary = arbitraryBoundedEnum
-
-instance Arbitrary E'OneOf3 where
-  arbitrary = arbitraryBoundedEnum
-
-instance Arbitrary E'OneOf4 where
-  arbitrary = arbitraryBoundedEnum
-
-instance Arbitrary E'OneOf5 where
-  arbitrary = arbitraryBoundedEnum
-
-instance Arbitrary E'OneOf6 where
   arbitrary = arbitraryBoundedEnum
 
 instance Arbitrary E'ResponseFormat where

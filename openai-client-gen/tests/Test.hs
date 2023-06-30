@@ -24,6 +24,7 @@ main =
       propMimeEq MimeJSON (Proxy :: Proxy ChatCompletionRequestMessage)
       propMimeEq MimeJSON (Proxy :: Proxy ChatCompletionRequestMessageFunctionCall)
       propMimeEq MimeJSON (Proxy :: Proxy ChatCompletionResponseMessage)
+      propMimeEq MimeJSON (Proxy :: Proxy ChatCompletionResponseMessageFunctionCall)
       propMimeEq MimeJSON (Proxy :: Proxy ChatCompletionStreamResponseDelta)
       propMimeEq MimeJSON (Proxy :: Proxy CreateChatCompletionRequest)
       propMimeEq MimeJSON (Proxy :: Proxy CreateChatCompletionRequestFunctionCall)

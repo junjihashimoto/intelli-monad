@@ -124,8 +124,8 @@ newtype User = User { unUser :: Text } deriving (P.Eq, P.Show)
 -- | ChatCompletionFunctions
 data ChatCompletionFunctions = ChatCompletionFunctions
   { chatCompletionFunctionsName :: !(Text) -- ^ /Required/ "name" - The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
-  , chatCompletionFunctionsDescription :: !(Maybe Text) -- ^ "description" - The description of what the function does.
-  , chatCompletionFunctionsParameters :: !(Maybe (Map.Map String A.Value)) -- ^ "parameters" - The parameters the functions accepts, described as a JSON Schema object. See the [guide](/docs/guides/gpt/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.
+  , chatCompletionFunctionsDescription :: !(Maybe Text) -- ^ "description" - A description of what the function does, used by the model to choose when and how to call the function.
+  , chatCompletionFunctionsParameters :: !((Map.Map String A.Value)) -- ^ /Required/ "parameters" - The parameters the functions accepts, described as a JSON Schema object. See the [guide](/docs/guides/gpt/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.  To describe a function that accepts no parameters, provide the value &#x60;{\&quot;type\&quot;: \&quot;object\&quot;, \&quot;properties\&quot;: {}}&#x60;.
   } deriving (P.Show, P.Eq, P.Typeable)
 
 -- | FromJSON ChatCompletionFunctions
@@ -134,7 +134,7 @@ instance A.FromJSON ChatCompletionFunctions where
     ChatCompletionFunctions
       <$> (o .:  "name")
       <*> (o .:? "description")
-      <*> (o .:? "parameters")
+      <*> (o .:  "parameters")
 
 -- | ToJSON ChatCompletionFunctions
 instance A.ToJSON ChatCompletionFunctions where
@@ -149,19 +149,20 @@ instance A.ToJSON ChatCompletionFunctions where
 -- | Construct a value of type 'ChatCompletionFunctions' (by applying it's required fields, if any)
 mkChatCompletionFunctions
   :: Text -- ^ 'chatCompletionFunctionsName': The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
+  -> (Map.Map String A.Value) -- ^ 'chatCompletionFunctionsParameters': The parameters the functions accepts, described as a JSON Schema object. See the [guide](/docs/guides/gpt/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.  To describe a function that accepts no parameters, provide the value `{\"type\": \"object\", \"properties\": {}}`.
   -> ChatCompletionFunctions
-mkChatCompletionFunctions chatCompletionFunctionsName =
+mkChatCompletionFunctions chatCompletionFunctionsName chatCompletionFunctionsParameters =
   ChatCompletionFunctions
   { chatCompletionFunctionsName
   , chatCompletionFunctionsDescription = Nothing
-  , chatCompletionFunctionsParameters = Nothing
+  , chatCompletionFunctionsParameters
   }
 
 -- ** ChatCompletionRequestMessage
 -- | ChatCompletionRequestMessage
 data ChatCompletionRequestMessage = ChatCompletionRequestMessage
   { chatCompletionRequestMessageRole :: !(E'Role) -- ^ /Required/ "role" - The role of the messages author. One of &#x60;system&#x60;, &#x60;user&#x60;, &#x60;assistant&#x60;, or &#x60;function&#x60;.
-  , chatCompletionRequestMessageContent :: !(Maybe Text) -- ^ "content" - The contents of the message. &#x60;content&#x60; is required for all messages except assistant messages with function calls.
+  , chatCompletionRequestMessageContent :: !(Text) -- ^ /Required/ "content" - The contents of the message. &#x60;content&#x60; is required for all messages, and may be null for assistant messages with function calls.
   , chatCompletionRequestMessageName :: !(Maybe Text) -- ^ "name" - The name of the author of this message. &#x60;name&#x60; is required if role is &#x60;function&#x60;, and it should be the name of the function whose response is in the &#x60;content&#x60;. May contain a-z, A-Z, 0-9, and underscores, with a maximum length of 64 characters.
   , chatCompletionRequestMessageFunctionCall :: !(Maybe ChatCompletionRequestMessageFunctionCall) -- ^ "function_call"
   } deriving (P.Show, P.Eq, P.Typeable)
@@ -171,7 +172,7 @@ instance A.FromJSON ChatCompletionRequestMessage where
   parseJSON = A.withObject "ChatCompletionRequestMessage" $ \o ->
     ChatCompletionRequestMessage
       <$> (o .:  "role")
-      <*> (o .:? "content")
+      <*> (o .:  "content")
       <*> (o .:? "name")
       <*> (o .:? "function_call")
 
@@ -189,11 +190,12 @@ instance A.ToJSON ChatCompletionRequestMessage where
 -- | Construct a value of type 'ChatCompletionRequestMessage' (by applying it's required fields, if any)
 mkChatCompletionRequestMessage
   :: E'Role -- ^ 'chatCompletionRequestMessageRole': The role of the messages author. One of `system`, `user`, `assistant`, or `function`.
+  -> Text -- ^ 'chatCompletionRequestMessageContent': The contents of the message. `content` is required for all messages, and may be null for assistant messages with function calls.
   -> ChatCompletionRequestMessage
-mkChatCompletionRequestMessage chatCompletionRequestMessageRole =
+mkChatCompletionRequestMessage chatCompletionRequestMessageRole chatCompletionRequestMessageContent =
   ChatCompletionRequestMessage
   { chatCompletionRequestMessageRole
-  , chatCompletionRequestMessageContent = Nothing
+  , chatCompletionRequestMessageContent
   , chatCompletionRequestMessageName = Nothing
   , chatCompletionRequestMessageFunctionCall = Nothing
   }
@@ -202,16 +204,16 @@ mkChatCompletionRequestMessage chatCompletionRequestMessageRole =
 -- | ChatCompletionRequestMessageFunctionCall
 -- The name and arguments of a function that should be called, as generated by the model.
 data ChatCompletionRequestMessageFunctionCall = ChatCompletionRequestMessageFunctionCall
-  { chatCompletionRequestMessageFunctionCallName :: !(Maybe Text) -- ^ "name" - The name of the function to call.
-  , chatCompletionRequestMessageFunctionCallArguments :: !(Maybe Text) -- ^ "arguments" - The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function.
+  { chatCompletionRequestMessageFunctionCallName :: !(Text) -- ^ /Required/ "name" - The name of the function to call.
+  , chatCompletionRequestMessageFunctionCallArguments :: !(Text) -- ^ /Required/ "arguments" - The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function.
   } deriving (P.Show, P.Eq, P.Typeable)
 
 -- | FromJSON ChatCompletionRequestMessageFunctionCall
 instance A.FromJSON ChatCompletionRequestMessageFunctionCall where
   parseJSON = A.withObject "ChatCompletionRequestMessageFunctionCall" $ \o ->
     ChatCompletionRequestMessageFunctionCall
-      <$> (o .:? "name")
-      <*> (o .:? "arguments")
+      <$> (o .:  "name")
+      <*> (o .:  "arguments")
 
 -- | ToJSON ChatCompletionRequestMessageFunctionCall
 instance A.ToJSON ChatCompletionRequestMessageFunctionCall where
@@ -224,11 +226,13 @@ instance A.ToJSON ChatCompletionRequestMessageFunctionCall where
 
 -- | Construct a value of type 'ChatCompletionRequestMessageFunctionCall' (by applying it's required fields, if any)
 mkChatCompletionRequestMessageFunctionCall
-  :: ChatCompletionRequestMessageFunctionCall
-mkChatCompletionRequestMessageFunctionCall =
+  :: Text -- ^ 'chatCompletionRequestMessageFunctionCallName': The name of the function to call.
+  -> Text -- ^ 'chatCompletionRequestMessageFunctionCallArguments': The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function.
+  -> ChatCompletionRequestMessageFunctionCall
+mkChatCompletionRequestMessageFunctionCall chatCompletionRequestMessageFunctionCallName chatCompletionRequestMessageFunctionCallArguments =
   ChatCompletionRequestMessageFunctionCall
-  { chatCompletionRequestMessageFunctionCallName = Nothing
-  , chatCompletionRequestMessageFunctionCallArguments = Nothing
+  { chatCompletionRequestMessageFunctionCallName
+  , chatCompletionRequestMessageFunctionCallArguments
   }
 
 -- ** ChatCompletionResponseMessage
@@ -236,7 +240,7 @@ mkChatCompletionRequestMessageFunctionCall =
 data ChatCompletionResponseMessage = ChatCompletionResponseMessage
   { chatCompletionResponseMessageRole :: !(E'Role) -- ^ /Required/ "role" - The role of the author of this message.
   , chatCompletionResponseMessageContent :: !(Maybe Text) -- ^ "content" - The contents of the message.
-  , chatCompletionResponseMessageFunctionCall :: !(Maybe ChatCompletionRequestMessageFunctionCall) -- ^ "function_call"
+  , chatCompletionResponseMessageFunctionCall :: !(Maybe ChatCompletionResponseMessageFunctionCall) -- ^ "function_call"
   } deriving (P.Show, P.Eq, P.Typeable)
 
 -- | FromJSON ChatCompletionResponseMessage
@@ -268,12 +272,45 @@ mkChatCompletionResponseMessage chatCompletionResponseMessageRole =
   , chatCompletionResponseMessageFunctionCall = Nothing
   }
 
+-- ** ChatCompletionResponseMessageFunctionCall
+-- | ChatCompletionResponseMessageFunctionCall
+-- The name and arguments of a function that should be called, as generated by the model.
+data ChatCompletionResponseMessageFunctionCall = ChatCompletionResponseMessageFunctionCall
+  { chatCompletionResponseMessageFunctionCallName :: !(Maybe Text) -- ^ "name" - The name of the function to call.
+  , chatCompletionResponseMessageFunctionCallArguments :: !(Maybe Text) -- ^ "arguments" - The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function.
+  } deriving (P.Show, P.Eq, P.Typeable)
+
+-- | FromJSON ChatCompletionResponseMessageFunctionCall
+instance A.FromJSON ChatCompletionResponseMessageFunctionCall where
+  parseJSON = A.withObject "ChatCompletionResponseMessageFunctionCall" $ \o ->
+    ChatCompletionResponseMessageFunctionCall
+      <$> (o .:? "name")
+      <*> (o .:? "arguments")
+
+-- | ToJSON ChatCompletionResponseMessageFunctionCall
+instance A.ToJSON ChatCompletionResponseMessageFunctionCall where
+  toJSON ChatCompletionResponseMessageFunctionCall {..} =
+   _omitNulls
+      [ "name" .= chatCompletionResponseMessageFunctionCallName
+      , "arguments" .= chatCompletionResponseMessageFunctionCallArguments
+      ]
+
+
+-- | Construct a value of type 'ChatCompletionResponseMessageFunctionCall' (by applying it's required fields, if any)
+mkChatCompletionResponseMessageFunctionCall
+  :: ChatCompletionResponseMessageFunctionCall
+mkChatCompletionResponseMessageFunctionCall =
+  ChatCompletionResponseMessageFunctionCall
+  { chatCompletionResponseMessageFunctionCallName = Nothing
+  , chatCompletionResponseMessageFunctionCallArguments = Nothing
+  }
+
 -- ** ChatCompletionStreamResponseDelta
 -- | ChatCompletionStreamResponseDelta
 data ChatCompletionStreamResponseDelta = ChatCompletionStreamResponseDelta
   { chatCompletionStreamResponseDeltaRole :: !(Maybe E'Role) -- ^ "role" - The role of the author of this message.
   , chatCompletionStreamResponseDeltaContent :: !(Maybe Text) -- ^ "content" - The contents of the chunk message.
-  , chatCompletionStreamResponseDeltaFunctionCall :: !(Maybe ChatCompletionRequestMessageFunctionCall) -- ^ "function_call"
+  , chatCompletionStreamResponseDeltaFunctionCall :: !(Maybe ChatCompletionResponseMessageFunctionCall) -- ^ "function_call"
   } deriving (P.Show, P.Eq, P.Typeable)
 
 -- | FromJSON ChatCompletionStreamResponseDelta
@@ -2501,6 +2538,219 @@ mkOpenAIFile openAIFileId openAIFileObject openAIFileBytes openAIFileCreatedAt o
 -- * Enums
 
 
+-- ** E'AnyOf1
+
+-- | Enum of 'Text'
+data E'AnyOf1
+  = E'AnyOf1'Text_davinci_003 -- ^ @"text-davinci-003"@
+  | E'AnyOf1'Text_davinci_002 -- ^ @"text-davinci-002"@
+  | E'AnyOf1'Text_davinci_001 -- ^ @"text-davinci-001"@
+  | E'AnyOf1'Code_davinci_002 -- ^ @"code-davinci-002"@
+  | E'AnyOf1'Text_curie_001 -- ^ @"text-curie-001"@
+  | E'AnyOf1'Text_babbage_001 -- ^ @"text-babbage-001"@
+  | E'AnyOf1'Text_ada_001 -- ^ @"text-ada-001"@
+  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
+
+instance A.ToJSON E'AnyOf1 where toJSON = A.toJSON . fromE'AnyOf1
+instance A.FromJSON E'AnyOf1 where parseJSON o = P.either P.fail (pure . P.id) . toE'AnyOf1 =<< A.parseJSON o
+instance WH.ToHttpApiData E'AnyOf1 where toQueryParam = WH.toQueryParam . fromE'AnyOf1
+instance WH.FromHttpApiData E'AnyOf1 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'AnyOf1
+instance MimeRender MimeMultipartFormData E'AnyOf1 where mimeRender _ = mimeRenderDefaultMultipartFormData
+
+-- | unwrap 'E'AnyOf1' enum
+fromE'AnyOf1 :: E'AnyOf1 -> Text
+fromE'AnyOf1 = \case
+  E'AnyOf1'Text_davinci_003 -> "text-davinci-003"
+  E'AnyOf1'Text_davinci_002 -> "text-davinci-002"
+  E'AnyOf1'Text_davinci_001 -> "text-davinci-001"
+  E'AnyOf1'Code_davinci_002 -> "code-davinci-002"
+  E'AnyOf1'Text_curie_001 -> "text-curie-001"
+  E'AnyOf1'Text_babbage_001 -> "text-babbage-001"
+  E'AnyOf1'Text_ada_001 -> "text-ada-001"
+
+-- | parse 'E'AnyOf1' enum
+toE'AnyOf1 :: Text -> P.Either String E'AnyOf1
+toE'AnyOf1 = \case
+  "text-davinci-003" -> P.Right E'AnyOf1'Text_davinci_003
+  "text-davinci-002" -> P.Right E'AnyOf1'Text_davinci_002
+  "text-davinci-001" -> P.Right E'AnyOf1'Text_davinci_001
+  "code-davinci-002" -> P.Right E'AnyOf1'Code_davinci_002
+  "text-curie-001" -> P.Right E'AnyOf1'Text_curie_001
+  "text-babbage-001" -> P.Right E'AnyOf1'Text_babbage_001
+  "text-ada-001" -> P.Right E'AnyOf1'Text_ada_001
+  s -> P.Left $ "toE'AnyOf1: enum parse failure: " P.++ P.show s
+
+
+-- ** E'AnyOf2
+
+-- | Enum of 'Text'
+data E'AnyOf2
+  = E'AnyOf2'4 -- ^ @"gpt-4"@
+  | E'AnyOf2'4_0314 -- ^ @"gpt-4-0314"@
+  | E'AnyOf2'4_0613 -- ^ @"gpt-4-0613"@
+  | E'AnyOf2'4_32k -- ^ @"gpt-4-32k"@
+  | E'AnyOf2'4_32k_0314 -- ^ @"gpt-4-32k-0314"@
+  | E'AnyOf2'4_32k_0613 -- ^ @"gpt-4-32k-0613"@
+  | E'AnyOf2'3_5_turbo -- ^ @"gpt-3.5-turbo"@
+  | E'AnyOf2'3_5_turbo_16k -- ^ @"gpt-3.5-turbo-16k"@
+  | E'AnyOf2'3_5_turbo_0301 -- ^ @"gpt-3.5-turbo-0301"@
+  | E'AnyOf2'3_5_turbo_0613 -- ^ @"gpt-3.5-turbo-0613"@
+  | E'AnyOf2'3_5_turbo_16k_0613 -- ^ @"gpt-3.5-turbo-16k-0613"@
+  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
+
+instance A.ToJSON E'AnyOf2 where toJSON = A.toJSON . fromE'AnyOf2
+instance A.FromJSON E'AnyOf2 where parseJSON o = P.either P.fail (pure . P.id) . toE'AnyOf2 =<< A.parseJSON o
+instance WH.ToHttpApiData E'AnyOf2 where toQueryParam = WH.toQueryParam . fromE'AnyOf2
+instance WH.FromHttpApiData E'AnyOf2 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'AnyOf2
+instance MimeRender MimeMultipartFormData E'AnyOf2 where mimeRender _ = mimeRenderDefaultMultipartFormData
+
+-- | unwrap 'E'AnyOf2' enum
+fromE'AnyOf2 :: E'AnyOf2 -> Text
+fromE'AnyOf2 = \case
+  E'AnyOf2'4 -> "gpt-4"
+  E'AnyOf2'4_0314 -> "gpt-4-0314"
+  E'AnyOf2'4_0613 -> "gpt-4-0613"
+  E'AnyOf2'4_32k -> "gpt-4-32k"
+  E'AnyOf2'4_32k_0314 -> "gpt-4-32k-0314"
+  E'AnyOf2'4_32k_0613 -> "gpt-4-32k-0613"
+  E'AnyOf2'3_5_turbo -> "gpt-3.5-turbo"
+  E'AnyOf2'3_5_turbo_16k -> "gpt-3.5-turbo-16k"
+  E'AnyOf2'3_5_turbo_0301 -> "gpt-3.5-turbo-0301"
+  E'AnyOf2'3_5_turbo_0613 -> "gpt-3.5-turbo-0613"
+  E'AnyOf2'3_5_turbo_16k_0613 -> "gpt-3.5-turbo-16k-0613"
+
+-- | parse 'E'AnyOf2' enum
+toE'AnyOf2 :: Text -> P.Either String E'AnyOf2
+toE'AnyOf2 = \case
+  "gpt-4" -> P.Right E'AnyOf2'4
+  "gpt-4-0314" -> P.Right E'AnyOf2'4_0314
+  "gpt-4-0613" -> P.Right E'AnyOf2'4_0613
+  "gpt-4-32k" -> P.Right E'AnyOf2'4_32k
+  "gpt-4-32k-0314" -> P.Right E'AnyOf2'4_32k_0314
+  "gpt-4-32k-0613" -> P.Right E'AnyOf2'4_32k_0613
+  "gpt-3.5-turbo" -> P.Right E'AnyOf2'3_5_turbo
+  "gpt-3.5-turbo-16k" -> P.Right E'AnyOf2'3_5_turbo_16k
+  "gpt-3.5-turbo-0301" -> P.Right E'AnyOf2'3_5_turbo_0301
+  "gpt-3.5-turbo-0613" -> P.Right E'AnyOf2'3_5_turbo_0613
+  "gpt-3.5-turbo-16k-0613" -> P.Right E'AnyOf2'3_5_turbo_16k_0613
+  s -> P.Left $ "toE'AnyOf2: enum parse failure: " P.++ P.show s
+
+
+-- ** E'AnyOf3
+
+-- | Enum of 'Text'
+data E'AnyOf3
+  = E'AnyOf3'Text_davinci_edit_001 -- ^ @"text-davinci-edit-001"@
+  | E'AnyOf3'Code_davinci_edit_001 -- ^ @"code-davinci-edit-001"@
+  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
+
+instance A.ToJSON E'AnyOf3 where toJSON = A.toJSON . fromE'AnyOf3
+instance A.FromJSON E'AnyOf3 where parseJSON o = P.either P.fail (pure . P.id) . toE'AnyOf3 =<< A.parseJSON o
+instance WH.ToHttpApiData E'AnyOf3 where toQueryParam = WH.toQueryParam . fromE'AnyOf3
+instance WH.FromHttpApiData E'AnyOf3 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'AnyOf3
+instance MimeRender MimeMultipartFormData E'AnyOf3 where mimeRender _ = mimeRenderDefaultMultipartFormData
+
+-- | unwrap 'E'AnyOf3' enum
+fromE'AnyOf3 :: E'AnyOf3 -> Text
+fromE'AnyOf3 = \case
+  E'AnyOf3'Text_davinci_edit_001 -> "text-davinci-edit-001"
+  E'AnyOf3'Code_davinci_edit_001 -> "code-davinci-edit-001"
+
+-- | parse 'E'AnyOf3' enum
+toE'AnyOf3 :: Text -> P.Either String E'AnyOf3
+toE'AnyOf3 = \case
+  "text-davinci-edit-001" -> P.Right E'AnyOf3'Text_davinci_edit_001
+  "code-davinci-edit-001" -> P.Right E'AnyOf3'Code_davinci_edit_001
+  s -> P.Left $ "toE'AnyOf3: enum parse failure: " P.++ P.show s
+
+
+-- ** E'AnyOf4
+
+-- | Enum of 'Text'
+data E'AnyOf4
+  = E'AnyOf4'Latest -- ^ @"text-moderation-latest"@
+  | E'AnyOf4'Stable -- ^ @"text-moderation-stable"@
+  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
+
+instance A.ToJSON E'AnyOf4 where toJSON = A.toJSON . fromE'AnyOf4
+instance A.FromJSON E'AnyOf4 where parseJSON o = P.either P.fail (pure . P.id) . toE'AnyOf4 =<< A.parseJSON o
+instance WH.ToHttpApiData E'AnyOf4 where toQueryParam = WH.toQueryParam . fromE'AnyOf4
+instance WH.FromHttpApiData E'AnyOf4 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'AnyOf4
+instance MimeRender MimeMultipartFormData E'AnyOf4 where mimeRender _ = mimeRenderDefaultMultipartFormData
+
+-- | unwrap 'E'AnyOf4' enum
+fromE'AnyOf4 :: E'AnyOf4 -> Text
+fromE'AnyOf4 = \case
+  E'AnyOf4'Latest -> "text-moderation-latest"
+  E'AnyOf4'Stable -> "text-moderation-stable"
+
+-- | parse 'E'AnyOf4' enum
+toE'AnyOf4 :: Text -> P.Either String E'AnyOf4
+toE'AnyOf4 = \case
+  "text-moderation-latest" -> P.Right E'AnyOf4'Latest
+  "text-moderation-stable" -> P.Right E'AnyOf4'Stable
+  s -> P.Left $ "toE'AnyOf4: enum parse failure: " P.++ P.show s
+
+
+-- ** E'AnyOf5
+
+-- | Enum of 'Text'
+data E'AnyOf5
+  = E'AnyOf5'Ada -- ^ @"ada"@
+  | E'AnyOf5'Babbage -- ^ @"babbage"@
+  | E'AnyOf5'Curie -- ^ @"curie"@
+  | E'AnyOf5'Davinci -- ^ @"davinci"@
+  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
+
+instance A.ToJSON E'AnyOf5 where toJSON = A.toJSON . fromE'AnyOf5
+instance A.FromJSON E'AnyOf5 where parseJSON o = P.either P.fail (pure . P.id) . toE'AnyOf5 =<< A.parseJSON o
+instance WH.ToHttpApiData E'AnyOf5 where toQueryParam = WH.toQueryParam . fromE'AnyOf5
+instance WH.FromHttpApiData E'AnyOf5 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'AnyOf5
+instance MimeRender MimeMultipartFormData E'AnyOf5 where mimeRender _ = mimeRenderDefaultMultipartFormData
+
+-- | unwrap 'E'AnyOf5' enum
+fromE'AnyOf5 :: E'AnyOf5 -> Text
+fromE'AnyOf5 = \case
+  E'AnyOf5'Ada -> "ada"
+  E'AnyOf5'Babbage -> "babbage"
+  E'AnyOf5'Curie -> "curie"
+  E'AnyOf5'Davinci -> "davinci"
+
+-- | parse 'E'AnyOf5' enum
+toE'AnyOf5 :: Text -> P.Either String E'AnyOf5
+toE'AnyOf5 = \case
+  "ada" -> P.Right E'AnyOf5'Ada
+  "babbage" -> P.Right E'AnyOf5'Babbage
+  "curie" -> P.Right E'AnyOf5'Curie
+  "davinci" -> P.Right E'AnyOf5'Davinci
+  s -> P.Left $ "toE'AnyOf5: enum parse failure: " P.++ P.show s
+
+
+-- ** E'AnyOf6
+
+-- | Enum of 'Text'
+data E'AnyOf6
+  = E'AnyOf6'Text_embedding_ada_002 -- ^ @"text-embedding-ada-002"@
+  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
+
+instance A.ToJSON E'AnyOf6 where toJSON = A.toJSON . fromE'AnyOf6
+instance A.FromJSON E'AnyOf6 where parseJSON o = P.either P.fail (pure . P.id) . toE'AnyOf6 =<< A.parseJSON o
+instance WH.ToHttpApiData E'AnyOf6 where toQueryParam = WH.toQueryParam . fromE'AnyOf6
+instance WH.FromHttpApiData E'AnyOf6 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'AnyOf6
+instance MimeRender MimeMultipartFormData E'AnyOf6 where mimeRender _ = mimeRenderDefaultMultipartFormData
+
+-- | unwrap 'E'AnyOf6' enum
+fromE'AnyOf6 :: E'AnyOf6 -> Text
+fromE'AnyOf6 = \case
+  E'AnyOf6'Text_embedding_ada_002 -> "text-embedding-ada-002"
+
+-- | parse 'E'AnyOf6' enum
+toE'AnyOf6 :: Text -> P.Either String E'AnyOf6
+toE'AnyOf6 = \case
+  "text-embedding-ada-002" -> P.Right E'AnyOf6'Text_embedding_ada_002
+  s -> P.Left $ "toE'AnyOf6: enum parse failure: " P.++ P.show s
+
+
 -- ** E'FinishReason
 
 -- | Enum of 'Text'
@@ -2586,210 +2836,6 @@ toE'OneOf0 = \case
   "none" -> P.Right E'OneOf0'None
   "auto" -> P.Right E'OneOf0'Auto
   s -> P.Left $ "toE'OneOf0: enum parse failure: " P.++ P.show s
-
-
--- ** E'OneOf1
-
--- | Enum of 'Text'
-data E'OneOf1
-  = E'OneOf1'Text_davinci_003 -- ^ @"text-davinci-003"@
-  | E'OneOf1'Text_davinci_002 -- ^ @"text-davinci-002"@
-  | E'OneOf1'Text_davinci_001 -- ^ @"text-davinci-001"@
-  | E'OneOf1'Code_davinci_002 -- ^ @"code-davinci-002"@
-  | E'OneOf1'Text_curie_001 -- ^ @"text-curie-001"@
-  | E'OneOf1'Text_babbage_001 -- ^ @"text-babbage-001"@
-  | E'OneOf1'Text_ada_001 -- ^ @"text-ada-001"@
-  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
-
-instance A.ToJSON E'OneOf1 where toJSON = A.toJSON . fromE'OneOf1
-instance A.FromJSON E'OneOf1 where parseJSON o = P.either P.fail (pure . P.id) . toE'OneOf1 =<< A.parseJSON o
-instance WH.ToHttpApiData E'OneOf1 where toQueryParam = WH.toQueryParam . fromE'OneOf1
-instance WH.FromHttpApiData E'OneOf1 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'OneOf1
-instance MimeRender MimeMultipartFormData E'OneOf1 where mimeRender _ = mimeRenderDefaultMultipartFormData
-
--- | unwrap 'E'OneOf1' enum
-fromE'OneOf1 :: E'OneOf1 -> Text
-fromE'OneOf1 = \case
-  E'OneOf1'Text_davinci_003 -> "text-davinci-003"
-  E'OneOf1'Text_davinci_002 -> "text-davinci-002"
-  E'OneOf1'Text_davinci_001 -> "text-davinci-001"
-  E'OneOf1'Code_davinci_002 -> "code-davinci-002"
-  E'OneOf1'Text_curie_001 -> "text-curie-001"
-  E'OneOf1'Text_babbage_001 -> "text-babbage-001"
-  E'OneOf1'Text_ada_001 -> "text-ada-001"
-
--- | parse 'E'OneOf1' enum
-toE'OneOf1 :: Text -> P.Either String E'OneOf1
-toE'OneOf1 = \case
-  "text-davinci-003" -> P.Right E'OneOf1'Text_davinci_003
-  "text-davinci-002" -> P.Right E'OneOf1'Text_davinci_002
-  "text-davinci-001" -> P.Right E'OneOf1'Text_davinci_001
-  "code-davinci-002" -> P.Right E'OneOf1'Code_davinci_002
-  "text-curie-001" -> P.Right E'OneOf1'Text_curie_001
-  "text-babbage-001" -> P.Right E'OneOf1'Text_babbage_001
-  "text-ada-001" -> P.Right E'OneOf1'Text_ada_001
-  s -> P.Left $ "toE'OneOf1: enum parse failure: " P.++ P.show s
-
-
--- ** E'OneOf2
-
--- | Enum of 'Text'
-data E'OneOf2
-  = E'OneOf2'4 -- ^ @"gpt-4"@
-  | E'OneOf2'4_0613 -- ^ @"gpt-4-0613"@
-  | E'OneOf2'4_32k -- ^ @"gpt-4-32k"@
-  | E'OneOf2'4_32k_0613 -- ^ @"gpt-4-32k-0613"@
-  | E'OneOf2'3_5_turbo -- ^ @"gpt-3.5-turbo"@
-  | E'OneOf2'3_5_turbo_16k -- ^ @"gpt-3.5-turbo-16k"@
-  | E'OneOf2'3_5_turbo_0613 -- ^ @"gpt-3.5-turbo-0613"@
-  | E'OneOf2'3_5_turbo_16k_0613 -- ^ @"gpt-3.5-turbo-16k-0613"@
-  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
-
-instance A.ToJSON E'OneOf2 where toJSON = A.toJSON . fromE'OneOf2
-instance A.FromJSON E'OneOf2 where parseJSON o = P.either P.fail (pure . P.id) . toE'OneOf2 =<< A.parseJSON o
-instance WH.ToHttpApiData E'OneOf2 where toQueryParam = WH.toQueryParam . fromE'OneOf2
-instance WH.FromHttpApiData E'OneOf2 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'OneOf2
-instance MimeRender MimeMultipartFormData E'OneOf2 where mimeRender _ = mimeRenderDefaultMultipartFormData
-
--- | unwrap 'E'OneOf2' enum
-fromE'OneOf2 :: E'OneOf2 -> Text
-fromE'OneOf2 = \case
-  E'OneOf2'4 -> "gpt-4"
-  E'OneOf2'4_0613 -> "gpt-4-0613"
-  E'OneOf2'4_32k -> "gpt-4-32k"
-  E'OneOf2'4_32k_0613 -> "gpt-4-32k-0613"
-  E'OneOf2'3_5_turbo -> "gpt-3.5-turbo"
-  E'OneOf2'3_5_turbo_16k -> "gpt-3.5-turbo-16k"
-  E'OneOf2'3_5_turbo_0613 -> "gpt-3.5-turbo-0613"
-  E'OneOf2'3_5_turbo_16k_0613 -> "gpt-3.5-turbo-16k-0613"
-
--- | parse 'E'OneOf2' enum
-toE'OneOf2 :: Text -> P.Either String E'OneOf2
-toE'OneOf2 = \case
-  "gpt-4" -> P.Right E'OneOf2'4
-  "gpt-4-0613" -> P.Right E'OneOf2'4_0613
-  "gpt-4-32k" -> P.Right E'OneOf2'4_32k
-  "gpt-4-32k-0613" -> P.Right E'OneOf2'4_32k_0613
-  "gpt-3.5-turbo" -> P.Right E'OneOf2'3_5_turbo
-  "gpt-3.5-turbo-16k" -> P.Right E'OneOf2'3_5_turbo_16k
-  "gpt-3.5-turbo-0613" -> P.Right E'OneOf2'3_5_turbo_0613
-  "gpt-3.5-turbo-16k-0613" -> P.Right E'OneOf2'3_5_turbo_16k_0613
-  s -> P.Left $ "toE'OneOf2: enum parse failure: " P.++ P.show s
-
-
--- ** E'OneOf3
-
--- | Enum of 'Text'
-data E'OneOf3
-  = E'OneOf3'Text_davinci_edit_001 -- ^ @"text-davinci-edit-001"@
-  | E'OneOf3'Code_davinci_edit_001 -- ^ @"code-davinci-edit-001"@
-  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
-
-instance A.ToJSON E'OneOf3 where toJSON = A.toJSON . fromE'OneOf3
-instance A.FromJSON E'OneOf3 where parseJSON o = P.either P.fail (pure . P.id) . toE'OneOf3 =<< A.parseJSON o
-instance WH.ToHttpApiData E'OneOf3 where toQueryParam = WH.toQueryParam . fromE'OneOf3
-instance WH.FromHttpApiData E'OneOf3 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'OneOf3
-instance MimeRender MimeMultipartFormData E'OneOf3 where mimeRender _ = mimeRenderDefaultMultipartFormData
-
--- | unwrap 'E'OneOf3' enum
-fromE'OneOf3 :: E'OneOf3 -> Text
-fromE'OneOf3 = \case
-  E'OneOf3'Text_davinci_edit_001 -> "text-davinci-edit-001"
-  E'OneOf3'Code_davinci_edit_001 -> "code-davinci-edit-001"
-
--- | parse 'E'OneOf3' enum
-toE'OneOf3 :: Text -> P.Either String E'OneOf3
-toE'OneOf3 = \case
-  "text-davinci-edit-001" -> P.Right E'OneOf3'Text_davinci_edit_001
-  "code-davinci-edit-001" -> P.Right E'OneOf3'Code_davinci_edit_001
-  s -> P.Left $ "toE'OneOf3: enum parse failure: " P.++ P.show s
-
-
--- ** E'OneOf4
-
--- | Enum of 'Text'
-data E'OneOf4
-  = E'OneOf4'Latest -- ^ @"text-moderation-latest"@
-  | E'OneOf4'Stable -- ^ @"text-moderation-stable"@
-  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
-
-instance A.ToJSON E'OneOf4 where toJSON = A.toJSON . fromE'OneOf4
-instance A.FromJSON E'OneOf4 where parseJSON o = P.either P.fail (pure . P.id) . toE'OneOf4 =<< A.parseJSON o
-instance WH.ToHttpApiData E'OneOf4 where toQueryParam = WH.toQueryParam . fromE'OneOf4
-instance WH.FromHttpApiData E'OneOf4 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'OneOf4
-instance MimeRender MimeMultipartFormData E'OneOf4 where mimeRender _ = mimeRenderDefaultMultipartFormData
-
--- | unwrap 'E'OneOf4' enum
-fromE'OneOf4 :: E'OneOf4 -> Text
-fromE'OneOf4 = \case
-  E'OneOf4'Latest -> "text-moderation-latest"
-  E'OneOf4'Stable -> "text-moderation-stable"
-
--- | parse 'E'OneOf4' enum
-toE'OneOf4 :: Text -> P.Either String E'OneOf4
-toE'OneOf4 = \case
-  "text-moderation-latest" -> P.Right E'OneOf4'Latest
-  "text-moderation-stable" -> P.Right E'OneOf4'Stable
-  s -> P.Left $ "toE'OneOf4: enum parse failure: " P.++ P.show s
-
-
--- ** E'OneOf5
-
--- | Enum of 'Text'
-data E'OneOf5
-  = E'OneOf5'Ada -- ^ @"ada"@
-  | E'OneOf5'Babbage -- ^ @"babbage"@
-  | E'OneOf5'Curie -- ^ @"curie"@
-  | E'OneOf5'Davinci -- ^ @"davinci"@
-  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
-
-instance A.ToJSON E'OneOf5 where toJSON = A.toJSON . fromE'OneOf5
-instance A.FromJSON E'OneOf5 where parseJSON o = P.either P.fail (pure . P.id) . toE'OneOf5 =<< A.parseJSON o
-instance WH.ToHttpApiData E'OneOf5 where toQueryParam = WH.toQueryParam . fromE'OneOf5
-instance WH.FromHttpApiData E'OneOf5 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'OneOf5
-instance MimeRender MimeMultipartFormData E'OneOf5 where mimeRender _ = mimeRenderDefaultMultipartFormData
-
--- | unwrap 'E'OneOf5' enum
-fromE'OneOf5 :: E'OneOf5 -> Text
-fromE'OneOf5 = \case
-  E'OneOf5'Ada -> "ada"
-  E'OneOf5'Babbage -> "babbage"
-  E'OneOf5'Curie -> "curie"
-  E'OneOf5'Davinci -> "davinci"
-
--- | parse 'E'OneOf5' enum
-toE'OneOf5 :: Text -> P.Either String E'OneOf5
-toE'OneOf5 = \case
-  "ada" -> P.Right E'OneOf5'Ada
-  "babbage" -> P.Right E'OneOf5'Babbage
-  "curie" -> P.Right E'OneOf5'Curie
-  "davinci" -> P.Right E'OneOf5'Davinci
-  s -> P.Left $ "toE'OneOf5: enum parse failure: " P.++ P.show s
-
-
--- ** E'OneOf6
-
--- | Enum of 'Text'
-data E'OneOf6
-  = E'OneOf6'Text_embedding_ada_002 -- ^ @"text-embedding-ada-002"@
-  deriving (P.Show, P.Eq, P.Typeable, P.Ord, P.Bounded, P.Enum)
-
-instance A.ToJSON E'OneOf6 where toJSON = A.toJSON . fromE'OneOf6
-instance A.FromJSON E'OneOf6 where parseJSON o = P.either P.fail (pure . P.id) . toE'OneOf6 =<< A.parseJSON o
-instance WH.ToHttpApiData E'OneOf6 where toQueryParam = WH.toQueryParam . fromE'OneOf6
-instance WH.FromHttpApiData E'OneOf6 where parseQueryParam o = WH.parseQueryParam o >>= P.left T.pack . toE'OneOf6
-instance MimeRender MimeMultipartFormData E'OneOf6 where mimeRender _ = mimeRenderDefaultMultipartFormData
-
--- | unwrap 'E'OneOf6' enum
-fromE'OneOf6 :: E'OneOf6 -> Text
-fromE'OneOf6 = \case
-  E'OneOf6'Text_embedding_ada_002 -> "text-embedding-ada-002"
-
--- | parse 'E'OneOf6' enum
-toE'OneOf6 :: Text -> P.Either String E'OneOf6
-toE'OneOf6 = \case
-  "text-embedding-ada-002" -> P.Right E'OneOf6'Text_embedding_ada_002
-  s -> P.Left $ "toE'OneOf6: enum parse failure: " P.++ P.show s
 
 
 -- ** E'ResponseFormat
