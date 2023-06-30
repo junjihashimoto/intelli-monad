@@ -1,5 +1,6 @@
 .dir-locals.el
 .gitignore
+.openapi-generator-ignore
 README.md
 app/DevelMain.hs
 app/devel.hs
@@ -20,5 +21,6 @@ src/Settings.hs
 src/Settings/StaticFiles.hs
 stack.yaml
 static/.gitkeep
+test/Handler/OpenAISpec.hs
 test/Spec.hs
 test/TestImport.hs

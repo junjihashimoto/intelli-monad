@@ -85,7 +85,7 @@ newtype Language = Language { unLanguage :: Text } deriving (P.Eq, P.Show)
 newtype Mask = Mask { unMask :: FilePath } deriving (P.Eq, P.Show)
 
 -- ** Model2
-newtype Model2 = Model2 { unModel2 :: CreateTranscriptionRequestModel } deriving (P.Eq, P.Show)
+newtype Model2 = Model2 { unModel2 :: String } deriving (P.Eq, P.Show)
 
 -- ** Model3
 newtype Model3 = Model3 { unModel3 :: Text } deriving (P.Eq, P.Show)
@@ -125,7 +125,7 @@ newtype User = User { unUser :: Text } deriving (P.Eq, P.Show)
 data ChatCompletionFunctions = ChatCompletionFunctions
   { chatCompletionFunctionsName :: !(Text) -- ^ /Required/ "name" - The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
   , chatCompletionFunctionsDescription :: !(Maybe Text) -- ^ "description" - The description of what the function does.
-  , chatCompletionFunctionsParameters :: !(Maybe (Map.Map String AnyType)) -- ^ "parameters" - The parameters the functions accepts, described as a JSON Schema object. See the [guide](/docs/guides/gpt/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.
+  , chatCompletionFunctionsParameters :: !(Maybe (Map.Map String A.Value)) -- ^ "parameters" - The parameters the functions accepts, described as a JSON Schema object. See the [guide](/docs/guides/gpt/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.
   } deriving (P.Show, P.Eq, P.Typeable)
 
 -- | FromJSON ChatCompletionFunctions

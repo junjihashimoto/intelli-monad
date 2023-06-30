@@ -64,11 +64,11 @@ module OpenAIAPI.Types (
   OpenAIFile (..),
   ) where
 
-import ClassyPrelude.Yesod
+import ClassyPrelude.Yesod hiding (ErrorResponse)
 import Data.Foldable (foldl)
 import Data.Maybe (fromMaybe)
 import Data.Aeson (Value, FromJSON(..), ToJSON(..), genericToJSON, genericParseJSON)
-import Data.Aeson.Types (Options(..), defaultOptions)
+import Data.Aeson.Types (Options(..), defaultOptions, Object)
 import qualified Data.Char as Char
 import qualified Data.Text as T
 import qualified Data.Map as Map

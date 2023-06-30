@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveGeneric     #-}
 module Error where
 
 import           ClassyPrelude.Yesod
@@ -9,20 +10,23 @@ import           Data.Aeson.TH
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding       as TE
 import qualified Data.Text.Encoding.Error as TEE
+import           GHC.Generics
+
 
 
 data ErrorResponseBody = ErrorResponseBody
     { title  :: T.Text
     , detail :: T.Text
-    }
+    } deriving (Generic, Show)
+
+instance ToJSON ErrorResponseBody where
+    toEncoding = genericToEncoding defaultOptions
 
 instance ToContent ErrorResponseBody where
     toContent = toContent . encode
 
 instance ToTypedContent ErrorResponseBody where
     toTypedContent = TypedContent "application/json" . toContent
-
-$(deriveJSON defaultOptions 'ErrorResponseBody)
 
 defaultErrorHandlerJson :: Yesod site => ErrorResponse -> HandlerFor site TypedContent
 -- 400

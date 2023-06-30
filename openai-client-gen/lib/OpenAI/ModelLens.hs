@@ -49,7 +49,7 @@ chatCompletionFunctionsDescriptionL f ChatCompletionFunctions{..} = (\chatComple
 {-# INLINE chatCompletionFunctionsDescriptionL #-}
 
 -- | 'chatCompletionFunctionsParameters' Lens
-chatCompletionFunctionsParametersL :: Lens_' ChatCompletionFunctions (Maybe (Map.Map String AnyType))
+chatCompletionFunctionsParametersL :: Lens_' ChatCompletionFunctions (Maybe (Map.Map String A.Value))
 chatCompletionFunctionsParametersL f ChatCompletionFunctions{..} = (\chatCompletionFunctionsParameters -> ChatCompletionFunctions { chatCompletionFunctionsParameters, ..} ) <$> f chatCompletionFunctionsParameters
 {-# INLINE chatCompletionFunctionsParametersL #-}
 

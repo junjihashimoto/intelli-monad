@@ -104,7 +104,7 @@ instance ToForm FormCreateImageVariation
 
 data FormCreateTranscription = FormCreateTranscription
   { createTranscriptionFile :: FilePath
-  , createTranscriptionModel :: CreateTranscriptionRequestModel
+  , createTranscriptionModel :: String
   , createTranscriptionPrompt :: Text
   , createTranscriptionResponseFormat :: Text
   , createTranscriptionTemperature :: Double
@@ -116,7 +116,7 @@ instance ToForm FormCreateTranscription
 
 data FormCreateTranslation = FormCreateTranslation
   { createTranslationFile :: FilePath
-  , createTranslationModel :: CreateTranscriptionRequestModel
+  , createTranslationModel :: String
   , createTranslationPrompt :: Text
   , createTranslationResponseFormat :: Text
   , createTranslationTemperature :: Double

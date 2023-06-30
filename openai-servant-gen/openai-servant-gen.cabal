@@ -1,11 +1,11 @@
-name:                openai
+name:                openai-servant-gen
 version:             0.1.0.0
 synopsis:            Auto-generated API bindings for openai
 description:         Please see README.md
 homepage:            https://openapi-generator.tech
-author:              Author Name Here
-maintainer:          author.name@email.com
-copyright:           YEAR - AUTHOR
+author:              Junji Hashimoto
+maintainer:          junji.hashimoto@gmail.com
+copyright:           2023 - Junji Hashimoto
 category:            Web
 build-type:          Simple
 cabal-version:       >=1.10

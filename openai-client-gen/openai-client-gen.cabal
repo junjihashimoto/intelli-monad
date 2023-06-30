@@ -1,4 +1,4 @@
-name:           openai
+name:           openai-client
 version:        0.1.0.0
 synopsis:       Auto-generated openai API Client
 description:    .
@@ -14,10 +14,10 @@ description:    .
                 .
 category:       Web
 homepage:       https://openapi-generator.tech
-author:         Author Name Here
-maintainer:     author.name@email.com
-copyright:      YEAR - AUTHOR
-license:        UnspecifiedLicense
+author:         Junji Hashimoto
+maintainer:     junji.hashimoto@gmail.com
+copyright:      2023 - Junji Hashimoto
+license:        MIT
 build-type:     Simple
 cabal-version:  >= 1.10
 
@@ -60,7 +60,7 @@ library
     , unordered-containers
     , vector >=0.10.9 && <0.13
   other-modules:
-      Paths_openai
+      
   exposed-modules:
       OpenAI
       OpenAI.API
