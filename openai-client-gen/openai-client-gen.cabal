@@ -1,5 +1,5 @@
-name:           openai-client
-version:        0.1.0.0
+name:           openai-client-gen
+version:        0.1.1.0
 synopsis:       Auto-generated openai API Client
 description:    .
                 Client library for calling the OpenAI API API based on http-client.

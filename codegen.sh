@@ -14,7 +14,7 @@ sed -i \
     -e 's/author.name@email.com/junji.hashimoto@gmail.com/g' \
     -e 's/YEAR - AUTHOR/2023 - Junji Hashimoto/g' \
     -e 's/UnspecifiedLicense/MIT/g' \
-    -e 's/name:\(.*openai\)$/name:\1-client/g' \
+    -e 's/name:\(.*openai\)$/name:\1-client-gen/g' \
     openai-client-gen/openai-client-gen.cabal
 
 sed -i \
