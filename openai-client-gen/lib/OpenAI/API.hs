@@ -1,7 +1,7 @@
 {-
    OpenAI API
 
-   APIs for sampling from and fine-tuning language models
+   The OpenAI REST API. Please see https://platform.openai.com/docs/api-reference for more details.
 
    OpenAPI Version: 3.0.0
    OpenAI API API version: 2.0.0
@@ -13,7 +13,25 @@ Module : OpenAI.API
 -}
 
 module OpenAI.API
-  ( module OpenAI.API.OpenAI
+  ( module OpenAI.API.Assistants
+  , module OpenAI.API.Audio
+  , module OpenAI.API.Chat
+  , module OpenAI.API.Completions
+  , module OpenAI.API.Embeddings
+  , module OpenAI.API.Files
+  , module OpenAI.API.FineTuning
+  , module OpenAI.API.Images
+  , module OpenAI.API.Models
+  , module OpenAI.API.Moderations
   ) where
 
-import OpenAI.API.OpenAI
+import OpenAI.API.Assistants
+import OpenAI.API.Audio
+import OpenAI.API.Chat
+import OpenAI.API.Completions
+import OpenAI.API.Embeddings
+import OpenAI.API.Files
+import OpenAI.API.FineTuning
+import OpenAI.API.Images
+import OpenAI.API.Models
+import OpenAI.API.Moderations

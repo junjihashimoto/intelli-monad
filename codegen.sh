@@ -30,5 +30,5 @@ sed -i -e 's/Paths_openai//g' openai-client-gen/openai-client-gen.cabal
 sed -i -e 's/CreateTranscriptionRequestModel/String/g' openai-client-gen/lib/OpenAI/Model.hs
 sed -i -e 's/AnyType/A.Value/g' openai-client-gen/lib/OpenAI/Model.hs openai-client-gen/lib/OpenAI/ModelLens.hs
 
-curl https://www.stackage.org/lts-20.26/cabal.config |\
+curl https://www.stackage.org/lts-22.12/cabal.config |\
 sed -e 's/with-compiler: .*$//g'  > cabal.project.freeze

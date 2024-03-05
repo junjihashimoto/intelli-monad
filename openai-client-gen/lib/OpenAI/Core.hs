@@ -1,7 +1,7 @@
 {-
    OpenAI API
 
-   APIs for sampling from and fine-tuning language models
+   The OpenAI REST API. Please see https://platform.openai.com/docs/api-reference for more details.
 
    OpenAPI Version: 3.0.0
    OpenAI API API version: 2.0.0
@@ -23,6 +23,7 @@ Module : OpenAI.Core
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-unused-binds -fno-warn-unused-imports #-}
 

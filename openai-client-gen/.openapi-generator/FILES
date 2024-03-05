@@ -5,7 +5,16 @@ Setup.hs
 git_push.sh
 lib/OpenAI.hs
 lib/OpenAI/API.hs
-lib/OpenAI/API/OpenAI.hs
+lib/OpenAI/API/Assistants.hs
+lib/OpenAI/API/Audio.hs
+lib/OpenAI/API/Chat.hs
+lib/OpenAI/API/Completions.hs
+lib/OpenAI/API/Embeddings.hs
+lib/OpenAI/API/Files.hs
+lib/OpenAI/API/FineTuning.hs
+lib/OpenAI/API/Images.hs
+lib/OpenAI/API/Models.hs
+lib/OpenAI/API/Moderations.hs
 lib/OpenAI/Client.hs
 lib/OpenAI/Core.hs
 lib/OpenAI/Logging.hs
