@@ -41,3 +41,40 @@ library
                      , bytestring
                      , wai-extra
   default-language:    Haskell2010
+
+test-suite openai-servant-gen-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , openai-servant-gen
+                     , hspec
+                     , hspec-wai
+                     , http-types
+                     , http-client
+                     , http-client-tls
+                     , wai
+                     , warp
+                     , aeson
+                     , text
+                     , containers
+                     , exceptions
+                     , network-uri
+                     , servant
+                     , http-api-data
+                     , servant
+                     , servant-client
+                     , servant-client-core
+                     , servant-server
+                     , servant
+                     , wai
+                     , warp
+                     , transformers
+                     , mtl
+                     , time
+                     , swagger2
+                     , uuid
+                     , bytestring
+                     , wai-extra
+  default-language:    Haskell2010

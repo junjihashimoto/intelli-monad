@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds -fno-warn-unused-imports #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module OpenAI.Types (
   AssistantFileObject (..),
@@ -519,6 +520,7 @@ data ChatCompletionRequestUserMessageContent = ChatCompletionRequestUserMessageC
 instance FromJSON ChatCompletionRequestUserMessageContent where
   parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestUserMessageContent")
 instance ToJSON ChatCompletionRequestUserMessageContent where
+  toJSON :: ChatCompletionRequestUserMessageContent -> Value
   toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestUserMessageContent")
 
 
@@ -695,7 +697,7 @@ instance ToJSON CreateChatCompletionFunctionResponse where
 
 -- | 
 data CreateChatCompletionFunctionResponseChoicesInner = CreateChatCompletionFunctionResponseChoicesInner
-  { createChatCompletionFunctionResponseChoicesInnerFinishUnderscorereason :: Maybe Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, or `function_call` if the model called a function. 
+  { createChatCompletionFunctionResponseChoicesInnerFinishUnderscorereason :: Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, or `function_call` if the model called a function. 
   , createChatCompletionFunctionResponseChoicesInnerIndex :: Int -- ^ The index of the choice in the list of choices.
   , createChatCompletionFunctionResponseChoicesInnerMessage :: ChatCompletionResponseMessage -- ^ 
   } deriving (Show, Eq, Generic, Data)
@@ -784,7 +786,7 @@ data CreateChatCompletionResponse = CreateChatCompletionResponse
   , createChatCompletionResponseChoices :: [CreateChatCompletionResponseChoicesInner] -- ^ A list of chat completion choices. Can be more than one if `n` is greater than 1.
   , createChatCompletionResponseCreated :: Int -- ^ The Unix timestamp (in seconds) of when the chat completion was created.
   , createChatCompletionResponseModel :: Text -- ^ The model used for the chat completion.
-  , createChatCompletionResponseSystemUnderscorefingerprint :: Maybe Text -- ^ This fingerprint represents the backend configuration that the model runs with.  Can be used in conjunction with the `seed` request parameter to understand when backend changes have been made that might impact determinism. 
+  , createChatCompletionResponseSystemUnderscorefingerprint :: Text -- ^ This fingerprint represents the backend configuration that the model runs with.  Can be used in conjunction with the `seed` request parameter to understand when backend changes have been made that might impact determinism. 
   , createChatCompletionResponseObject :: Text -- ^ The object type, which is always `chat.completion`.
   , createChatCompletionResponseUsage :: Maybe CompletionUsage -- ^ 
   } deriving (Show, Eq, Generic, Data)
@@ -797,7 +799,7 @@ instance ToJSON CreateChatCompletionResponse where
 
 -- | 
 data CreateChatCompletionResponseChoicesInner = CreateChatCompletionResponseChoicesInner
-  { createChatCompletionResponseChoicesInnerFinishUnderscorereason :: Maybe Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function. 
+  { createChatCompletionResponseChoicesInnerFinishUnderscorereason :: Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function. 
   , createChatCompletionResponseChoicesInnerIndex :: Int -- ^ The index of the choice in the list of choices.
   , createChatCompletionResponseChoicesInnerMessage :: ChatCompletionResponseMessage -- ^ 
   , createChatCompletionResponseChoicesInnerLogprobs :: Maybe CreateChatCompletionResponseChoicesInnerLogprobs -- ^ 
@@ -840,7 +842,7 @@ instance ToJSON CreateChatCompletionStreamResponse where
 data CreateChatCompletionStreamResponseChoicesInner = CreateChatCompletionStreamResponseChoicesInner
   { createChatCompletionStreamResponseChoicesInnerDelta :: ChatCompletionStreamResponseDelta -- ^ 
   , createChatCompletionStreamResponseChoicesInnerLogprobs :: Maybe CreateChatCompletionResponseChoicesInnerLogprobs -- ^ 
-  , createChatCompletionStreamResponseChoicesInnerFinishUnderscorereason :: Maybe Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function. 
+  , createChatCompletionStreamResponseChoicesInnerFinishUnderscorereason :: Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function. 
   , createChatCompletionStreamResponseChoicesInnerIndex :: Int -- ^ The index of the choice in the list of choices.
   } deriving (Show, Eq, Generic, Data)
 
@@ -929,7 +931,7 @@ instance ToJSON CreateCompletionResponse where
 
 -- | 
 data CreateCompletionResponseChoicesInner = CreateCompletionResponseChoicesInner
-  { createCompletionResponseChoicesInnerFinishUnderscorereason :: Maybe Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, or `content_filter` if content was omitted due to a flag from our content filters. 
+  { createCompletionResponseChoicesInnerFinishUnderscorereason :: Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, or `content_filter` if content was omitted due to a flag from our content filters. 
   , createCompletionResponseChoicesInnerIndex :: Int -- ^ 
   , createCompletionResponseChoicesInnerLogprobs :: Maybe CreateCompletionResponseChoicesInnerLogprobs -- ^ 
   , createCompletionResponseChoicesInnerText :: Text -- ^ 
@@ -2441,46 +2443,43 @@ removeFieldLabelPrefix forParsing prefix =
   where
     replaceSpecialChars field = foldl (&) field (map mkCharReplacement specialChars)
     specialChars =
-      [ ("$", "'Dollar")
-      , ("^", "'Caret")
-      , ("|", "'Pipe")
-      , ("=", "'Equal")
-      , ("*", "'Star")
-      , ("-", "'Dash")
-      , ("&", "'Ampersand")
-      , ("%", "'Percent")
-      , ("#", "'Hash")
-      , ("@", "'At")
-      , ("!", "'Exclamation")
-      , ("+", "'Plus")
-      , (":", "'Colon")
-      , (";", "'Semicolon")
-      , (">", "'GreaterThan")
-      , ("<", "'LessThan")
-      , (".", "'Period")
-      , ("_", "'Underscore")
-      , ("?", "'Question_Mark")
-      , (",", "'Comma")
-      , ("'", "'Quote")
-      , ("/", "'Slash")
-      , ("(", "'Left_Parenthesis")
-      , (")", "'Right_Parenthesis")
-      , ("{", "'Left_Curly_Bracket")
-      , ("}", "'Right_Curly_Bracket")
-      , ("[", "'Left_Square_Bracket")
-      , ("]", "'Right_Square_Bracket")
-      , ("~", "'Tilde")
-      , ("`", "'Backtick")
-      , ("<=", "'Less_Than_Or_Equal_To")
-      , (">=", "'Greater_Than_Or_Equal_To")
-      , ("!=", "'Not_Equal")
-      , ("<>", "'Not_Equal")
-      , ("~=", "'Tilde_Equal")
-      , ("\\", "'Back_Slash")
-      , ("\"", "'Double_Quote")
+      [ ("$", "Dollar")
+      , ("^", "Caret")
+      , ("|", "Pipe")
+      , ("=", "Equal")
+      , ("*", "Star")
+      , ("-", "Dash")
+      , ("&", "Ampersand")
+      , ("%", "Percent")
+      , ("#", "Hash")
+      , ("@", "At")
+      , ("!", "Exclamation")
+      , ("+", "Plus")
+      , (":", "Colon")
+      , (";", "Semicolon")
+      , (">", "GreaterThan")
+      , ("<", "LessThan")
+      , (".", "Period")
+      , ("_", "Underscore")
+      , ("?", "Question_Mark")
+      , (",", "Comma")
+      , ("'", "Quote")
+      , ("/", "Slash")
+      , ("(", "Left_Parenthesis")
+      , (")", "Right_Parenthesis")
+      , ("{", "Left_Curly_Bracket")
+      , ("}", "Right_Curly_Bracket")
+      , ("[", "Left_Square_Bracket")
+      , ("]", "Right_Square_Bracket")
+      , ("~", "Tilde")
+      , ("`", "Backtick")
+      , ("<=", "Less_Than_Or_Equal_To")
+      , (">=", "Greater_Than_Or_Equal_To")
+      , ("!=", "Not_Equal")
+      , ("<>", "Not_Equal")
+      , ("~=", "Tilde_Equal")
+      , ("\\", "Back_Slash")
+      , ("\"", "Double_Quote")
       ]
     mkCharReplacement (replaceStr, searchStr) = T.unpack . replacer (T.pack searchStr) (T.pack replaceStr) . T.pack
-    replacer =
-      if forParsing
-        then flip T.replace
-        else T.replace
+    replacer = T.replace
