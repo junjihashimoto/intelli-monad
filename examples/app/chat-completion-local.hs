@@ -37,7 +37,7 @@ main = do
   response <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key API.CreateChatCompletionRequest
     { createChatCompletionRequestMessages = [
         ChatCompletionRequestMessage
-        { chatCompletionRequestMessageContent =  "Hello"
+        { chatCompletionRequestMessageContent = API.ChatCompletionRequestMessageContentText "Hello"
         -- 'User' is not one of ['system', 'assistant', 'user', 'function']
         , chatCompletionRequestMessageRole = "user"
         , chatCompletionRequestMessageName = Nothing

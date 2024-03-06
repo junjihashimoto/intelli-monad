@@ -63,6 +63,8 @@ executable chat-completion
                     , servant-client
                     , openai-servant-gen
                     , text
+                    , aeson
+                    , bytestring
     hs-source-dirs:   app
     default-language: Haskell2010
 

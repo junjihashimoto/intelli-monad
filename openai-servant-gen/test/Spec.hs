@@ -92,6 +92,41 @@ main = hspec $ do
         let jsonData = "{\n  \"prompt_tokens\": 9,\n  \"completion_tokens\": 8,\n  \"total_tokens\": 17\n}"
         let response = eitherDecode jsonData :: Either String CompletionUsage
         response `shouldBe` (Right $ CompletionUsage 8 9 17)
+    it "Encode Request" $ do
+        let jsonData = "{\"messages\":[{\"content\":\"Hello\",\"role\":\"user\"}],\"model\":\"gpt-3.5-turbo\",\"seed\":0}"
+            request = eitherDecode jsonData :: Either String CreateChatCompletionRequest
+        request `shouldBe` Right (CreateChatCompletionRequest
+                                    { createChatCompletionRequestMessages = [
+                                        ChatCompletionRequestMessage
+                                        { chatCompletionRequestMessageContent = ChatCompletionRequestMessageContentText "Hello"
+                                        -- 'User' is not one of ['system', 'assistant', 'user', 'function']
+                                        , chatCompletionRequestMessageRole = "user"
+                                        , chatCompletionRequestMessageName = Nothing
+                                        , chatCompletionRequestMessageToolUnderscorecalls = Nothing
+                                        , chatCompletionRequestMessageFunctionUnderscorecall = Nothing
+                                        , chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
+                                        }
+                                        ]
+                                    , createChatCompletionRequestModel = CreateChatCompletionRequestModel "gpt-3.5-turbo"
+                                    , createChatCompletionRequestFrequencyUnderscorepenalty = Nothing
+                                    , createChatCompletionRequestLogitUnderscorebias = Nothing
+                                    , createChatCompletionRequestLogprobs = Nothing
+                                    , createChatCompletionRequestTopUnderscorelogprobs  = Nothing
+                                    , createChatCompletionRequestMaxUnderscoretokens  = Nothing
+                                    , createChatCompletionRequestN  = Nothing
+                                    , createChatCompletionRequestPresenceUnderscorepenalty  = Nothing
+                                    , createChatCompletionRequestResponseUnderscoreformat  = Nothing
+                                    , createChatCompletionRequestSeed = Just 0
+                                    , createChatCompletionRequestStop = Nothing
+                                    , createChatCompletionRequestStream = Nothing
+                                    , createChatCompletionRequestTemperature = Nothing
+                                    , createChatCompletionRequestTopUnderscorep = Nothing
+                                    , createChatCompletionRequestTools = Nothing
+                                    , createChatCompletionRequestToolUnderscorechoice = Nothing
+                                    , createChatCompletionRequestUser = Nothing
+                                    , createChatCompletionRequestFunctionUnderscorecall = Nothing
+                                    , createChatCompletionRequestFunctions = Nothing
+                                    } )
     it "Load and save response types" $ do
         let jsonData = "{\n  \"id\": \"chatcmpl-8zKzKZVra3d7t082fFoB8ZAFxLSWf\",\n  \"object\": \"chat.completion\",\n  \"created\": 1709629378,\n  \"model\": \"gpt-3.5-turbo-0125\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"Hello! How can I assist you today?\"\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 8,\n    \"completion_tokens\": 9,\n    \"total_tokens\": 17\n  },\n  \"system_fingerprint\": \"fp_b9d4cef803\"\n}\n"
         let response = eitherDecode jsonData :: Either String CreateChatCompletionResponse

@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds -fno-warn-unused-imports #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
 
 module OpenAI.Types (
   AssistantFileObject (..),
@@ -23,6 +24,7 @@ module OpenAI.Types (
   ChatCompletionRequestAssistantMessageFunctionCall (..),
   ChatCompletionRequestFunctionMessage (..),
   ChatCompletionRequestMessage (..),
+  ChatCompletionRequestMessageContent (..),
   ChatCompletionRequestMessageContentPart (..),
   ChatCompletionRequestMessageContentPartImage (..),
   ChatCompletionRequestMessageContentPartImageImageUrl (..),
@@ -178,8 +180,10 @@ import Data.List (stripPrefix)
 import Data.Maybe (fromMaybe)
 import Data.Aeson (Value, FromJSON(..), ToJSON(..), genericToJSON, genericParseJSON)
 import Data.Aeson.Types (Options(..), defaultOptions)
+import qualified Data.Aeson as Aeson
 import Data.Set (Set)
 import Data.Text (Text)
+import qualified Data.Vector as V
 import Data.Time
 import Data.Swagger (ToSchema, declareNamedSchema)
 import qualified Data.Swagger as Swagger
@@ -199,9 +203,9 @@ data AssistantFileObject = AssistantFileObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON AssistantFileObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "assistantFileObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantFileObject")
 instance ToJSON AssistantFileObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "assistantFileObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "assistantFileObject")
 
 
 -- | Represents an &#x60;assistant&#x60; that can call the model and use tools.
@@ -219,9 +223,9 @@ data AssistantObject = AssistantObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON AssistantObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "assistantObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantObject")
 instance ToJSON AssistantObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "assistantObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "assistantObject")
 
 
 -- | 
@@ -231,9 +235,9 @@ data AssistantObjectToolsInner = AssistantObjectToolsInner
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON AssistantObjectToolsInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "assistantObjectToolsInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantObjectToolsInner")
 instance ToJSON AssistantObjectToolsInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "assistantObjectToolsInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "assistantObjectToolsInner")
 
 
 -- | 
@@ -242,9 +246,9 @@ data AssistantToolsCode = AssistantToolsCode
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON AssistantToolsCode where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "assistantToolsCode")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantToolsCode")
 instance ToJSON AssistantToolsCode where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "assistantToolsCode")
+  toJSON = genericToJSON (removeFieldLabelPrefix "assistantToolsCode")
 
 
 -- | 
@@ -254,9 +258,9 @@ data AssistantToolsFunction = AssistantToolsFunction
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON AssistantToolsFunction where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "assistantToolsFunction")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantToolsFunction")
 instance ToJSON AssistantToolsFunction where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "assistantToolsFunction")
+  toJSON = genericToJSON (removeFieldLabelPrefix "assistantToolsFunction")
 
 
 -- | 
@@ -265,9 +269,9 @@ data AssistantToolsRetrieval = AssistantToolsRetrieval
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON AssistantToolsRetrieval where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "assistantToolsRetrieval")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantToolsRetrieval")
 instance ToJSON AssistantToolsRetrieval where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "assistantToolsRetrieval")
+  toJSON = genericToJSON (removeFieldLabelPrefix "assistantToolsRetrieval")
 
 
 -- | Specifying a particular function via &#x60;{\&quot;name\&quot;: \&quot;my_function\&quot;}&#x60; forces the model to call that function. 
@@ -276,9 +280,9 @@ data ChatCompletionFunctionCallOption = ChatCompletionFunctionCallOption
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionFunctionCallOption where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionFunctionCallOption")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionFunctionCallOption")
 instance ToJSON ChatCompletionFunctionCallOption where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionFunctionCallOption")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionFunctionCallOption")
 
 
 -- | 
@@ -289,9 +293,9 @@ data ChatCompletionFunctions = ChatCompletionFunctions
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionFunctions where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionFunctions")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionFunctions")
 instance ToJSON ChatCompletionFunctions where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionFunctions")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionFunctions")
 
 
 -- | 
@@ -302,9 +306,9 @@ data ChatCompletionMessageToolCall = ChatCompletionMessageToolCall
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionMessageToolCall where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionMessageToolCall")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionMessageToolCall")
 instance ToJSON ChatCompletionMessageToolCall where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionMessageToolCall")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionMessageToolCall")
 
 
 -- | 
@@ -316,9 +320,9 @@ data ChatCompletionMessageToolCallChunk = ChatCompletionMessageToolCallChunk
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionMessageToolCallChunk where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionMessageToolCallChunk")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallChunk")
 instance ToJSON ChatCompletionMessageToolCallChunk where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionMessageToolCallChunk")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallChunk")
 
 
 -- | 
@@ -328,9 +332,9 @@ data ChatCompletionMessageToolCallChunkFunction = ChatCompletionMessageToolCallC
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionMessageToolCallChunkFunction where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionMessageToolCallChunkFunction")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallChunkFunction")
 instance ToJSON ChatCompletionMessageToolCallChunkFunction where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionMessageToolCallChunkFunction")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallChunkFunction")
 
 
 -- | The function that the model called.
@@ -340,9 +344,9 @@ data ChatCompletionMessageToolCallFunction = ChatCompletionMessageToolCallFuncti
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionMessageToolCallFunction where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionMessageToolCallFunction")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallFunction")
 instance ToJSON ChatCompletionMessageToolCallFunction where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionMessageToolCallFunction")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallFunction")
 
 
 -- | Specifies a tool the model should use. Use to force the model to call a specific function.
@@ -352,9 +356,9 @@ data ChatCompletionNamedToolChoice = ChatCompletionNamedToolChoice
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionNamedToolChoice where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionNamedToolChoice")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionNamedToolChoice")
 instance ToJSON ChatCompletionNamedToolChoice where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionNamedToolChoice")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionNamedToolChoice")
 
 
 -- | 
@@ -363,9 +367,9 @@ data ChatCompletionNamedToolChoiceFunction = ChatCompletionNamedToolChoiceFuncti
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionNamedToolChoiceFunction where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionNamedToolChoiceFunction")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionNamedToolChoiceFunction")
 instance ToJSON ChatCompletionNamedToolChoiceFunction where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionNamedToolChoiceFunction")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionNamedToolChoiceFunction")
 
 
 -- | 
@@ -378,9 +382,9 @@ data ChatCompletionRequestAssistantMessage = ChatCompletionRequestAssistantMessa
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestAssistantMessage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestAssistantMessage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestAssistantMessage")
 instance ToJSON ChatCompletionRequestAssistantMessage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestAssistantMessage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestAssistantMessage")
 
 
 -- | Deprecated and replaced by &#x60;tool_calls&#x60;. The name and arguments of a function that should be called, as generated by the model.
@@ -390,9 +394,9 @@ data ChatCompletionRequestAssistantMessageFunctionCall = ChatCompletionRequestAs
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestAssistantMessageFunctionCall where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestAssistantMessageFunctionCall")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestAssistantMessageFunctionCall")
 instance ToJSON ChatCompletionRequestAssistantMessageFunctionCall where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestAssistantMessageFunctionCall")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestAssistantMessageFunctionCall")
 
 
 -- | 
@@ -403,14 +407,14 @@ data ChatCompletionRequestFunctionMessage = ChatCompletionRequestFunctionMessage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestFunctionMessage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestFunctionMessage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestFunctionMessage")
 instance ToJSON ChatCompletionRequestFunctionMessage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestFunctionMessage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestFunctionMessage")
 
 
 -- | 
 data ChatCompletionRequestMessage = ChatCompletionRequestMessage
-  { chatCompletionRequestMessageContent :: Text -- ^ The contents of the function message.
+  { chatCompletionRequestMessageContent :: ChatCompletionRequestMessageContent -- ^ The contents of the function message.
   , chatCompletionRequestMessageRole :: Text -- ^ The role of the messages author, in this case `function`.
   , chatCompletionRequestMessageName :: Maybe Text -- ^ The name of the function to call.
   , chatCompletionRequestMessageToolUnderscorecalls :: Maybe [ChatCompletionMessageToolCall] -- ^ The tool calls generated by the model, such as function calls.
@@ -419,10 +423,28 @@ data ChatCompletionRequestMessage = ChatCompletionRequestMessage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestMessage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessage")
 instance ToJSON ChatCompletionRequestMessage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestMessage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestMessage")
 
+data ChatCompletionRequestMessageContent
+  = ChatCompletionRequestMessageContentText Text
+  | ChatCompletionRequestMessageContentParts [ChatCompletionRequestMessageContentPart]
+ deriving (Show, Eq, Generic, Data)
+
+instance FromJSON ChatCompletionRequestMessageContent where
+  -- When it is a string, parse it as a text
+  -- When it is a list, parse it as a list of parts
+  parseJSON = \case
+    Aeson.String text -> pure $ ChatCompletionRequestMessageContentText text
+    Aeson.Array parts -> do
+      parsedParts <- mapM Aeson.parseJSON $ V.toList parts
+      pure $ ChatCompletionRequestMessageContentParts parsedParts
+    _ -> fail "Invalid ChatCompletionRequestMessageContent"
+instance ToJSON ChatCompletionRequestMessageContent where
+  toJSON = \case
+    ChatCompletionRequestMessageContentText text -> Aeson.String text
+    ChatCompletionRequestMessageContentParts parts -> Aeson.Array $ V.fromList $ map toJSON parts
 
 -- | 
 data ChatCompletionRequestMessageContentPart = ChatCompletionRequestMessageContentPart
@@ -432,9 +454,9 @@ data ChatCompletionRequestMessageContentPart = ChatCompletionRequestMessageConte
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContentPart where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestMessageContentPart")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPart")
 instance ToJSON ChatCompletionRequestMessageContentPart where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestMessageContentPart")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPart")
 
 
 -- | 
@@ -444,9 +466,9 @@ data ChatCompletionRequestMessageContentPartImage = ChatCompletionRequestMessage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContentPartImage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestMessageContentPartImage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartImage")
 instance ToJSON ChatCompletionRequestMessageContentPartImage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestMessageContentPartImage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartImage")
 
 
 -- | 
@@ -456,9 +478,9 @@ data ChatCompletionRequestMessageContentPartImageImageUrl = ChatCompletionReques
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContentPartImageImageUrl where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestMessageContentPartImageImageUrl")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartImageImageUrl")
 instance ToJSON ChatCompletionRequestMessageContentPartImageImageUrl where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestMessageContentPartImageImageUrl")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartImageImageUrl")
 
 
 -- | 
@@ -468,9 +490,9 @@ data ChatCompletionRequestMessageContentPartText = ChatCompletionRequestMessageC
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContentPartText where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestMessageContentPartText")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartText")
 instance ToJSON ChatCompletionRequestMessageContentPartText where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestMessageContentPartText")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartText")
 
 
 -- | 
@@ -481,9 +503,9 @@ data ChatCompletionRequestSystemMessage = ChatCompletionRequestSystemMessage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestSystemMessage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestSystemMessage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestSystemMessage")
 instance ToJSON ChatCompletionRequestSystemMessage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestSystemMessage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestSystemMessage")
 
 
 -- | 
@@ -494,9 +516,9 @@ data ChatCompletionRequestToolMessage = ChatCompletionRequestToolMessage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestToolMessage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestToolMessage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestToolMessage")
 instance ToJSON ChatCompletionRequestToolMessage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestToolMessage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestToolMessage")
 
 
 -- | 
@@ -507,9 +529,9 @@ data ChatCompletionRequestUserMessage = ChatCompletionRequestUserMessage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestUserMessage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestUserMessage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestUserMessage")
 instance ToJSON ChatCompletionRequestUserMessage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestUserMessage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestUserMessage")
 
 
 -- | The contents of the user message. 
@@ -518,10 +540,10 @@ data ChatCompletionRequestUserMessageContent = ChatCompletionRequestUserMessageC
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRequestUserMessageContent where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRequestUserMessageContent")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestUserMessageContent")
 instance ToJSON ChatCompletionRequestUserMessageContent where
   toJSON :: ChatCompletionRequestUserMessageContent -> Value
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRequestUserMessageContent")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRequestUserMessageContent")
 
 
 -- | A chat completion message generated by the model.
@@ -533,9 +555,9 @@ data ChatCompletionResponseMessage = ChatCompletionResponseMessage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionResponseMessage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionResponseMessage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionResponseMessage")
 instance ToJSON ChatCompletionResponseMessage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionResponseMessage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionResponseMessage")
 
 
 -- | The role of the author of a message
@@ -544,9 +566,9 @@ data ChatCompletionRole = ChatCompletionRole
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionRole where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionRole")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRole")
 instance ToJSON ChatCompletionRole where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionRole")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionRole")
 
 
 -- | A chat completion delta generated by streamed model responses.
@@ -558,9 +580,9 @@ data ChatCompletionStreamResponseDelta = ChatCompletionStreamResponseDelta
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionStreamResponseDelta where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionStreamResponseDelta")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionStreamResponseDelta")
 instance ToJSON ChatCompletionStreamResponseDelta where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionStreamResponseDelta")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionStreamResponseDelta")
 
 
 -- | Deprecated and replaced by &#x60;tool_calls&#x60;. The name and arguments of a function that should be called, as generated by the model.
@@ -570,9 +592,9 @@ data ChatCompletionStreamResponseDeltaFunctionCall = ChatCompletionStreamRespons
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionStreamResponseDeltaFunctionCall where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionStreamResponseDeltaFunctionCall")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionStreamResponseDeltaFunctionCall")
 instance ToJSON ChatCompletionStreamResponseDeltaFunctionCall where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionStreamResponseDeltaFunctionCall")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionStreamResponseDeltaFunctionCall")
 
 
 -- | 
@@ -584,9 +606,9 @@ data ChatCompletionTokenLogprob = ChatCompletionTokenLogprob
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionTokenLogprob where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionTokenLogprob")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionTokenLogprob")
 instance ToJSON ChatCompletionTokenLogprob where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionTokenLogprob")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionTokenLogprob")
 
 
 -- | 
@@ -597,9 +619,9 @@ data ChatCompletionTokenLogprobTopLogprobsInner = ChatCompletionTokenLogprobTopL
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionTokenLogprobTopLogprobsInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionTokenLogprobTopLogprobsInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionTokenLogprobTopLogprobsInner")
 instance ToJSON ChatCompletionTokenLogprobTopLogprobsInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionTokenLogprobTopLogprobsInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionTokenLogprobTopLogprobsInner")
 
 
 -- | 
@@ -609,9 +631,9 @@ data ChatCompletionTool = ChatCompletionTool
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionTool where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionTool")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionTool")
 instance ToJSON ChatCompletionTool where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionTool")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionTool")
 
 
 -- | Controls which (if any) function is called by the model. &#x60;none&#x60; means the model will not call a function and instead generates a message. &#x60;auto&#x60; means the model can pick between generating a message or calling a function. Specifying a particular function via &#x60;{\&quot;type\&quot;: \&quot;function\&quot;, \&quot;function\&quot;: {\&quot;name\&quot;: \&quot;my_function\&quot;}}&#x60; forces the model to call that function.  &#x60;none&#x60; is the default when no functions are present. &#x60;auto&#x60; is the default if functions are present. 
@@ -621,9 +643,9 @@ data ChatCompletionToolChoiceOption = ChatCompletionToolChoiceOption
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ChatCompletionToolChoiceOption where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "chatCompletionToolChoiceOption")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionToolChoiceOption")
 instance ToJSON ChatCompletionToolChoiceOption where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "chatCompletionToolChoiceOption")
+  toJSON = genericToJSON (removeFieldLabelPrefix "chatCompletionToolChoiceOption")
 
 
 -- | Usage statistics for the completion request.
@@ -634,9 +656,9 @@ data CompletionUsage = CompletionUsage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CompletionUsage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "completionUsage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "completionUsage")
 instance ToJSON CompletionUsage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "completionUsage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "completionUsage")
 
 
 -- | 
@@ -645,9 +667,9 @@ data CreateAssistantFileRequest = CreateAssistantFileRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateAssistantFileRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createAssistantFileRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createAssistantFileRequest")
 instance ToJSON CreateAssistantFileRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createAssistantFileRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createAssistantFileRequest")
 
 
 -- | 
@@ -662,9 +684,9 @@ data CreateAssistantRequest = CreateAssistantRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateAssistantRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createAssistantRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createAssistantRequest")
 instance ToJSON CreateAssistantRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createAssistantRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createAssistantRequest")
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
@@ -673,9 +695,9 @@ data CreateAssistantRequestModel = CreateAssistantRequestModel
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateAssistantRequestModel where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createAssistantRequestModel")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createAssistantRequestModel")
 instance ToJSON CreateAssistantRequestModel where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createAssistantRequestModel")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createAssistantRequestModel")
 
 
 -- | Represents a chat completion response returned by model, based on the provided input.
@@ -690,9 +712,9 @@ data CreateChatCompletionFunctionResponse = CreateChatCompletionFunctionResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionFunctionResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionFunctionResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionFunctionResponse")
 instance ToJSON CreateChatCompletionFunctionResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionFunctionResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionFunctionResponse")
 
 
 -- | 
@@ -703,9 +725,9 @@ data CreateChatCompletionFunctionResponseChoicesInner = CreateChatCompletionFunc
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionFunctionResponseChoicesInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionFunctionResponseChoicesInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionFunctionResponseChoicesInner")
 instance ToJSON CreateChatCompletionFunctionResponseChoicesInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionFunctionResponseChoicesInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionFunctionResponseChoicesInner")
 
 
 -- | 
@@ -733,9 +755,9 @@ data CreateChatCompletionRequest = CreateChatCompletionRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequest")
 instance ToJSON CreateChatCompletionRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionRequest")
 
 
 -- | Deprecated in favor of &#x60;tool_choice&#x60;.  Controls which (if any) function is called by the model. &#x60;none&#x60; means the model will not call a function and instead generates a message. &#x60;auto&#x60; means the model can pick between generating a message or calling a function. Specifying a particular function via &#x60;{\&quot;name\&quot;: \&quot;my_function\&quot;}&#x60; forces the model to call that function.  &#x60;none&#x60; is the default when no functions are present. &#x60;auto&#x60; is the default if functions are present. 
@@ -744,18 +766,18 @@ data CreateChatCompletionRequestFunctionCall = CreateChatCompletionRequestFuncti
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequestFunctionCall where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionRequestFunctionCall")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequestFunctionCall")
 instance ToJSON CreateChatCompletionRequestFunctionCall where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionRequestFunctionCall")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionRequestFunctionCall")
 
 
 -- | ID of the model to use. See the [model endpoint compatibility](/docs/models/model-endpoint-compatibility) table for details on which models work with the Chat API.
 newtype CreateChatCompletionRequestModel = CreateChatCompletionRequestModel Text deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequestModel where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionRequestModel")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequestModel")
 instance ToJSON CreateChatCompletionRequestModel where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionRequestModel")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionRequestModel")
 
 
 -- | An object specifying the format that the model must output. Compatible with [GPT-4 Turbo](/docs/models/gpt-4-and-gpt-4-turbo) and all GPT-3.5 Turbo models newer than &#x60;gpt-3.5-turbo-1106&#x60;.  Setting to &#x60;{ \&quot;type\&quot;: \&quot;json_object\&quot; }&#x60; enables JSON mode, which guarantees the message the model generates is valid JSON.  **Important:** when using JSON mode, you **must** also instruct the model to produce JSON yourself via a system or user message. Without this, the model may generate an unending stream of whitespace until the generation reaches the token limit, resulting in a long-running and seemingly \&quot;stuck\&quot; request. Also note that the message content may be partially cut off if &#x60;finish_reason&#x3D;\&quot;length\&quot;&#x60;, which indicates the generation exceeded &#x60;max_tokens&#x60; or the conversation exceeded the max context length. 
@@ -764,9 +786,9 @@ data CreateChatCompletionRequestResponseFormat = CreateChatCompletionRequestResp
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequestResponseFormat where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionRequestResponseFormat")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequestResponseFormat")
 instance ToJSON CreateChatCompletionRequestResponseFormat where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionRequestResponseFormat")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionRequestResponseFormat")
 
 
 -- | Up to 4 sequences where the API will stop generating further tokens. 
@@ -775,9 +797,9 @@ data CreateChatCompletionRequestStop = CreateChatCompletionRequestStop
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequestStop where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionRequestStop")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequestStop")
 instance ToJSON CreateChatCompletionRequestStop where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionRequestStop")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionRequestStop")
 
 
 -- | Represents a chat completion response returned by model, based on the provided input.
@@ -792,9 +814,9 @@ data CreateChatCompletionResponse = CreateChatCompletionResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionResponse")
 instance ToJSON CreateChatCompletionResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionResponse")
 
 
 -- | 
@@ -806,9 +828,9 @@ data CreateChatCompletionResponseChoicesInner = CreateChatCompletionResponseChoi
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionResponseChoicesInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionResponseChoicesInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionResponseChoicesInner")
 instance ToJSON CreateChatCompletionResponseChoicesInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionResponseChoicesInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionResponseChoicesInner")
 
 
 -- | Log probability information for the choice.
@@ -817,9 +839,9 @@ data CreateChatCompletionResponseChoicesInnerLogprobs = CreateChatCompletionResp
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionResponseChoicesInnerLogprobs where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionResponseChoicesInnerLogprobs")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionResponseChoicesInnerLogprobs")
 instance ToJSON CreateChatCompletionResponseChoicesInnerLogprobs where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionResponseChoicesInnerLogprobs")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionResponseChoicesInnerLogprobs")
 
 
 -- | Represents a streamed chunk of a chat completion response returned by model, based on the provided input.
@@ -833,9 +855,9 @@ data CreateChatCompletionStreamResponse = CreateChatCompletionStreamResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionStreamResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionStreamResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionStreamResponse")
 instance ToJSON CreateChatCompletionStreamResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionStreamResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionStreamResponse")
 
 
 -- | 
@@ -847,9 +869,9 @@ data CreateChatCompletionStreamResponseChoicesInner = CreateChatCompletionStream
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateChatCompletionStreamResponseChoicesInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createChatCompletionStreamResponseChoicesInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionStreamResponseChoicesInner")
 instance ToJSON CreateChatCompletionStreamResponseChoicesInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createChatCompletionStreamResponseChoicesInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createChatCompletionStreamResponseChoicesInner")
 
 
 -- | 
@@ -874,9 +896,9 @@ data CreateCompletionRequest = CreateCompletionRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateCompletionRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createCompletionRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequest")
 instance ToJSON CreateCompletionRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createCompletionRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createCompletionRequest")
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
@@ -885,9 +907,9 @@ data CreateCompletionRequestModel = CreateCompletionRequestModel
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateCompletionRequestModel where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createCompletionRequestModel")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequestModel")
 instance ToJSON CreateCompletionRequestModel where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createCompletionRequestModel")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createCompletionRequestModel")
 
 
 -- | The prompt(s) to generate completions for, encoded as a string, array of strings, array of tokens, or array of token arrays.  Note that &lt;|endoftext|&gt; is the document separator that the model sees during training, so if a prompt is not specified the model will generate as if from the beginning of a new document. 
@@ -896,9 +918,9 @@ data CreateCompletionRequestPrompt = CreateCompletionRequestPrompt
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateCompletionRequestPrompt where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createCompletionRequestPrompt")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequestPrompt")
 instance ToJSON CreateCompletionRequestPrompt where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createCompletionRequestPrompt")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createCompletionRequestPrompt")
 
 
 -- | Up to 4 sequences where the API will stop generating further tokens. The returned text will not contain the stop sequence. 
@@ -907,9 +929,9 @@ data CreateCompletionRequestStop = CreateCompletionRequestStop
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateCompletionRequestStop where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createCompletionRequestStop")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequestStop")
 instance ToJSON CreateCompletionRequestStop where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createCompletionRequestStop")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createCompletionRequestStop")
 
 
 -- | Represents a completion response from the API. Note: both the streamed and non-streamed response objects share the same shape (unlike the chat endpoint). 
@@ -924,9 +946,9 @@ data CreateCompletionResponse = CreateCompletionResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateCompletionResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createCompletionResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionResponse")
 instance ToJSON CreateCompletionResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createCompletionResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createCompletionResponse")
 
 
 -- | 
@@ -938,9 +960,9 @@ data CreateCompletionResponseChoicesInner = CreateCompletionResponseChoicesInner
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateCompletionResponseChoicesInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createCompletionResponseChoicesInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionResponseChoicesInner")
 instance ToJSON CreateCompletionResponseChoicesInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createCompletionResponseChoicesInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createCompletionResponseChoicesInner")
 
 
 -- | 
@@ -952,9 +974,9 @@ data CreateCompletionResponseChoicesInnerLogprobs = CreateCompletionResponseChoi
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateCompletionResponseChoicesInnerLogprobs where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createCompletionResponseChoicesInnerLogprobs")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionResponseChoicesInnerLogprobs")
 instance ToJSON CreateCompletionResponseChoicesInnerLogprobs where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createCompletionResponseChoicesInnerLogprobs")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createCompletionResponseChoicesInnerLogprobs")
 
 
 -- | 
@@ -967,9 +989,9 @@ data CreateEmbeddingRequest = CreateEmbeddingRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateEmbeddingRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createEmbeddingRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingRequest")
 instance ToJSON CreateEmbeddingRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createEmbeddingRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createEmbeddingRequest")
 
 
 -- | Input text to embed, encoded as a string or array of tokens. To embed multiple inputs in a single request, pass an array of strings or array of token arrays. The input must not exceed the max input tokens for the model (8192 tokens for &#x60;text-embedding-ada-002&#x60;), cannot be an empty string, and any array must be 2048 dimensions or less. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens. 
@@ -978,9 +1000,9 @@ data CreateEmbeddingRequestInput = CreateEmbeddingRequestInput
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateEmbeddingRequestInput where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createEmbeddingRequestInput")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingRequestInput")
 instance ToJSON CreateEmbeddingRequestInput where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createEmbeddingRequestInput")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createEmbeddingRequestInput")
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
@@ -989,9 +1011,9 @@ data CreateEmbeddingRequestModel = CreateEmbeddingRequestModel
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateEmbeddingRequestModel where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createEmbeddingRequestModel")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingRequestModel")
 instance ToJSON CreateEmbeddingRequestModel where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createEmbeddingRequestModel")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createEmbeddingRequestModel")
 
 
 -- | 
@@ -1003,9 +1025,9 @@ data CreateEmbeddingResponse = CreateEmbeddingResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateEmbeddingResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createEmbeddingResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingResponse")
 instance ToJSON CreateEmbeddingResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createEmbeddingResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createEmbeddingResponse")
 
 
 -- | The usage information for the request.
@@ -1015,9 +1037,9 @@ data CreateEmbeddingResponseUsage = CreateEmbeddingResponseUsage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateEmbeddingResponseUsage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createEmbeddingResponseUsage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingResponseUsage")
 instance ToJSON CreateEmbeddingResponseUsage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createEmbeddingResponseUsage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createEmbeddingResponseUsage")
 
 
 -- | 
@@ -1030,9 +1052,9 @@ data CreateFineTuningJobRequest = CreateFineTuningJobRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createFineTuningJobRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequest")
 instance ToJSON CreateFineTuningJobRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createFineTuningJobRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createFineTuningJobRequest")
 
 
 -- | The hyperparameters used for the fine-tuning job.
@@ -1043,9 +1065,9 @@ data CreateFineTuningJobRequestHyperparameters = CreateFineTuningJobRequestHyper
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestHyperparameters where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createFineTuningJobRequestHyperparameters")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparameters")
 instance ToJSON CreateFineTuningJobRequestHyperparameters where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createFineTuningJobRequestHyperparameters")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparameters")
 
 
 -- | Number of examples in each batch. A larger batch size means that model parameters are updated less frequently, but with lower variance. 
@@ -1054,9 +1076,9 @@ data CreateFineTuningJobRequestHyperparametersBatchSize = CreateFineTuningJobReq
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestHyperparametersBatchSize where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createFineTuningJobRequestHyperparametersBatchSize")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersBatchSize")
 instance ToJSON CreateFineTuningJobRequestHyperparametersBatchSize where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createFineTuningJobRequestHyperparametersBatchSize")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersBatchSize")
 
 
 -- | Scaling factor for the learning rate. A smaller learning rate may be useful to avoid overfitting. 
@@ -1065,9 +1087,9 @@ data CreateFineTuningJobRequestHyperparametersLearningRateMultiplier = CreateFin
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestHyperparametersLearningRateMultiplier where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createFineTuningJobRequestHyperparametersLearningRateMultiplier")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersLearningRateMultiplier")
 instance ToJSON CreateFineTuningJobRequestHyperparametersLearningRateMultiplier where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createFineTuningJobRequestHyperparametersLearningRateMultiplier")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersLearningRateMultiplier")
 
 
 -- | The number of epochs to train the model for. An epoch refers to one full cycle through the training dataset. 
@@ -1076,9 +1098,9 @@ data CreateFineTuningJobRequestHyperparametersNEpochs = CreateFineTuningJobReque
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestHyperparametersNEpochs where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createFineTuningJobRequestHyperparametersNEpochs")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersNEpochs")
 instance ToJSON CreateFineTuningJobRequestHyperparametersNEpochs where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createFineTuningJobRequestHyperparametersNEpochs")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersNEpochs")
 
 
 -- | The name of the model to fine-tune. You can select one of the [supported models](/docs/guides/fine-tuning/what-models-can-be-fine-tuned). 
@@ -1087,9 +1109,9 @@ data CreateFineTuningJobRequestModel = CreateFineTuningJobRequestModel
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestModel where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createFineTuningJobRequestModel")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestModel")
 instance ToJSON CreateFineTuningJobRequestModel where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createFineTuningJobRequestModel")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createFineTuningJobRequestModel")
 
 
 -- | 
@@ -1105,9 +1127,9 @@ data CreateImageRequest = CreateImageRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateImageRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createImageRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createImageRequest")
 instance ToJSON CreateImageRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createImageRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createImageRequest")
 
 
 -- | The model to use for image generation.
@@ -1116,9 +1138,9 @@ data CreateImageRequestModel = CreateImageRequestModel
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateImageRequestModel where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createImageRequestModel")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createImageRequestModel")
 instance ToJSON CreateImageRequestModel where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createImageRequestModel")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createImageRequestModel")
 
 
 -- | 
@@ -1130,9 +1152,9 @@ data CreateMessageRequest = CreateMessageRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateMessageRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createMessageRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createMessageRequest")
 instance ToJSON CreateMessageRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createMessageRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createMessageRequest")
 
 
 -- | 
@@ -1142,9 +1164,9 @@ data CreateModerationRequest = CreateModerationRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateModerationRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createModerationRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationRequest")
 instance ToJSON CreateModerationRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createModerationRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createModerationRequest")
 
 
 -- | The input text to classify
@@ -1153,9 +1175,9 @@ data CreateModerationRequestInput = CreateModerationRequestInput
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateModerationRequestInput where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createModerationRequestInput")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationRequestInput")
 instance ToJSON CreateModerationRequestInput where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createModerationRequestInput")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createModerationRequestInput")
 
 
 -- | Two content moderations models are available: &#x60;text-moderation-stable&#x60; and &#x60;text-moderation-latest&#x60;.  The default is &#x60;text-moderation-latest&#x60; which will be automatically upgraded over time. This ensures you are always using our most accurate model. If you use &#x60;text-moderation-stable&#x60;, we will provide advanced notice before updating the model. Accuracy of &#x60;text-moderation-stable&#x60; may be slightly lower than for &#x60;text-moderation-latest&#x60;. 
@@ -1164,9 +1186,9 @@ data CreateModerationRequestModel = CreateModerationRequestModel
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateModerationRequestModel where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createModerationRequestModel")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationRequestModel")
 instance ToJSON CreateModerationRequestModel where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createModerationRequestModel")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createModerationRequestModel")
 
 
 -- | Represents if a given text input is potentially harmful.
@@ -1177,9 +1199,9 @@ data CreateModerationResponse = CreateModerationResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateModerationResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createModerationResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationResponse")
 instance ToJSON CreateModerationResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createModerationResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createModerationResponse")
 
 
 -- | 
@@ -1190,9 +1212,9 @@ data CreateModerationResponseResultsInner = CreateModerationResponseResultsInner
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateModerationResponseResultsInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createModerationResponseResultsInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationResponseResultsInner")
 instance ToJSON CreateModerationResponseResultsInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createModerationResponseResultsInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createModerationResponseResultsInner")
 
 
 -- | A list of the categories, and whether they are flagged or not.
@@ -1211,9 +1233,9 @@ data CreateModerationResponseResultsInnerCategories = CreateModerationResponseRe
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateModerationResponseResultsInnerCategories where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createModerationResponseResultsInnerCategories")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationResponseResultsInnerCategories")
 instance ToJSON CreateModerationResponseResultsInnerCategories where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createModerationResponseResultsInnerCategories")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createModerationResponseResultsInnerCategories")
 
 
 -- | A list of the categories along with their scores as predicted by model.
@@ -1232,9 +1254,9 @@ data CreateModerationResponseResultsInnerCategoryScores = CreateModerationRespon
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateModerationResponseResultsInnerCategoryScores where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createModerationResponseResultsInnerCategoryScores")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationResponseResultsInnerCategoryScores")
 instance ToJSON CreateModerationResponseResultsInnerCategoryScores where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createModerationResponseResultsInnerCategoryScores")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createModerationResponseResultsInnerCategoryScores")
 
 
 -- | 
@@ -1248,9 +1270,9 @@ data CreateRunRequest = CreateRunRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateRunRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createRunRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createRunRequest")
 instance ToJSON CreateRunRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createRunRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createRunRequest")
 
 
 -- | 
@@ -1263,9 +1285,9 @@ data CreateSpeechRequest = CreateSpeechRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateSpeechRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createSpeechRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createSpeechRequest")
 instance ToJSON CreateSpeechRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createSpeechRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createSpeechRequest")
 
 
 -- | One of the available [TTS models](/docs/models/tts): &#x60;tts-1&#x60; or &#x60;tts-1-hd&#x60; 
@@ -1274,9 +1296,9 @@ data CreateSpeechRequestModel = CreateSpeechRequestModel
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateSpeechRequestModel where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createSpeechRequestModel")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createSpeechRequestModel")
 instance ToJSON CreateSpeechRequestModel where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createSpeechRequestModel")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createSpeechRequestModel")
 
 
 -- | 
@@ -1290,9 +1312,9 @@ data CreateThreadAndRunRequest = CreateThreadAndRunRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateThreadAndRunRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createThreadAndRunRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createThreadAndRunRequest")
 instance ToJSON CreateThreadAndRunRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createThreadAndRunRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createThreadAndRunRequest")
 
 
 -- | 
@@ -1302,9 +1324,9 @@ data CreateThreadAndRunRequestToolsInner = CreateThreadAndRunRequestToolsInner
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateThreadAndRunRequestToolsInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createThreadAndRunRequestToolsInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createThreadAndRunRequestToolsInner")
 instance ToJSON CreateThreadAndRunRequestToolsInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createThreadAndRunRequestToolsInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createThreadAndRunRequestToolsInner")
 
 
 -- | 
@@ -1314,9 +1336,9 @@ data CreateThreadRequest = CreateThreadRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateThreadRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createThreadRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createThreadRequest")
 instance ToJSON CreateThreadRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createThreadRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createThreadRequest")
 
 
 -- | 
@@ -1329,9 +1351,9 @@ data CreateTranscription200Response = CreateTranscription200Response
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateTranscription200Response where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createTranscription200Response")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranscription200Response")
 instance ToJSON CreateTranscription200Response where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createTranscription200Response")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createTranscription200Response")
 
 
 -- | Represents a transcription response returned by model, based on the provided input.
@@ -1340,9 +1362,9 @@ data CreateTranscriptionResponseJson = CreateTranscriptionResponseJson
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateTranscriptionResponseJson where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createTranscriptionResponseJson")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranscriptionResponseJson")
 instance ToJSON CreateTranscriptionResponseJson where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createTranscriptionResponseJson")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createTranscriptionResponseJson")
 
 
 -- | Represents a verbose json transcription response returned by model, based on the provided input.
@@ -1355,9 +1377,9 @@ data CreateTranscriptionResponseVerboseJson = CreateTranscriptionResponseVerbose
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateTranscriptionResponseVerboseJson where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createTranscriptionResponseVerboseJson")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranscriptionResponseVerboseJson")
 instance ToJSON CreateTranscriptionResponseVerboseJson where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createTranscriptionResponseVerboseJson")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createTranscriptionResponseVerboseJson")
 
 
 -- | 
@@ -1369,9 +1391,9 @@ data CreateTranslation200Response = CreateTranslation200Response
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateTranslation200Response where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createTranslation200Response")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranslation200Response")
 instance ToJSON CreateTranslation200Response where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createTranslation200Response")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createTranslation200Response")
 
 
 -- | 
@@ -1380,9 +1402,9 @@ data CreateTranslationResponseJson = CreateTranslationResponseJson
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateTranslationResponseJson where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createTranslationResponseJson")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranslationResponseJson")
 instance ToJSON CreateTranslationResponseJson where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createTranslationResponseJson")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createTranslationResponseJson")
 
 
 -- | 
@@ -1394,9 +1416,9 @@ data CreateTranslationResponseVerboseJson = CreateTranslationResponseVerboseJson
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateTranslationResponseVerboseJson where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "createTranslationResponseVerboseJson")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranslationResponseVerboseJson")
 instance ToJSON CreateTranslationResponseVerboseJson where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "createTranslationResponseVerboseJson")
+  toJSON = genericToJSON (removeFieldLabelPrefix "createTranslationResponseVerboseJson")
 
 
 -- | Deletes the association between the assistant and the file, but does not delete the [File](/docs/api-reference/files) object itself.
@@ -1407,9 +1429,9 @@ data DeleteAssistantFileResponse = DeleteAssistantFileResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON DeleteAssistantFileResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "deleteAssistantFileResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteAssistantFileResponse")
 instance ToJSON DeleteAssistantFileResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "deleteAssistantFileResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "deleteAssistantFileResponse")
 
 
 -- | 
@@ -1420,9 +1442,9 @@ data DeleteAssistantResponse = DeleteAssistantResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON DeleteAssistantResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "deleteAssistantResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteAssistantResponse")
 instance ToJSON DeleteAssistantResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "deleteAssistantResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "deleteAssistantResponse")
 
 
 -- | 
@@ -1433,9 +1455,9 @@ data DeleteFileResponse = DeleteFileResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON DeleteFileResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "deleteFileResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteFileResponse")
 instance ToJSON DeleteFileResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "deleteFileResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "deleteFileResponse")
 
 
 -- | 
@@ -1446,9 +1468,9 @@ data DeleteMessageResponse = DeleteMessageResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON DeleteMessageResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "deleteMessageResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteMessageResponse")
 instance ToJSON DeleteMessageResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "deleteMessageResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "deleteMessageResponse")
 
 
 -- | 
@@ -1459,9 +1481,9 @@ data DeleteModelResponse = DeleteModelResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON DeleteModelResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "deleteModelResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteModelResponse")
 instance ToJSON DeleteModelResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "deleteModelResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "deleteModelResponse")
 
 
 -- | 
@@ -1472,9 +1494,9 @@ data DeleteThreadResponse = DeleteThreadResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON DeleteThreadResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "deleteThreadResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteThreadResponse")
 instance ToJSON DeleteThreadResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "deleteThreadResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "deleteThreadResponse")
 
 
 -- | Represents an embedding vector returned by embedding endpoint. 
@@ -1485,9 +1507,9 @@ data Embedding = Embedding
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON Embedding where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "embedding")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "embedding")
 instance ToJSON Embedding where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "embedding")
+  toJSON = genericToJSON (removeFieldLabelPrefix "embedding")
 
 
 -- | 
@@ -1499,9 +1521,9 @@ data Error = Error
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON Error where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "error")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "error")
 instance ToJSON Error where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "error")
+  toJSON = genericToJSON (removeFieldLabelPrefix "error")
 
 
 -- | 
@@ -1510,9 +1532,9 @@ data ErrorResponse = ErrorResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ErrorResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "errorResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "errorResponse")
 instance ToJSON ErrorResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "errorResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "errorResponse")
 
 
 -- | The &#x60;fine_tuning.job&#x60; object represents a fine-tuning job that has been created through the API. 
@@ -1534,9 +1556,9 @@ data FineTuningJob = FineTuningJob
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON FineTuningJob where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "fineTuningJob")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJob")
 instance ToJSON FineTuningJob where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "fineTuningJob")
+  toJSON = genericToJSON (removeFieldLabelPrefix "fineTuningJob")
 
 
 -- | For fine-tuning jobs that have &#x60;failed&#x60;, this will contain more information on the cause of the failure.
@@ -1547,9 +1569,9 @@ data FineTuningJobError = FineTuningJobError
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON FineTuningJobError where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "fineTuningJobError")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJobError")
 instance ToJSON FineTuningJobError where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "fineTuningJobError")
+  toJSON = genericToJSON (removeFieldLabelPrefix "fineTuningJobError")
 
 
 -- | Fine-tuning job event object
@@ -1562,9 +1584,9 @@ data FineTuningJobEvent = FineTuningJobEvent
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON FineTuningJobEvent where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "fineTuningJobEvent")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJobEvent")
 instance ToJSON FineTuningJobEvent where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "fineTuningJobEvent")
+  toJSON = genericToJSON (removeFieldLabelPrefix "fineTuningJobEvent")
 
 
 -- | The hyperparameters used for the fine-tuning job. See the [fine-tuning guide](/docs/guides/fine-tuning) for more details.
@@ -1573,9 +1595,9 @@ data FineTuningJobHyperparameters = FineTuningJobHyperparameters
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON FineTuningJobHyperparameters where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "fineTuningJobHyperparameters")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJobHyperparameters")
 instance ToJSON FineTuningJobHyperparameters where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "fineTuningJobHyperparameters")
+  toJSON = genericToJSON (removeFieldLabelPrefix "fineTuningJobHyperparameters")
 
 
 -- | The number of epochs to train the model for. An epoch refers to one full cycle through the training dataset. \&quot;auto\&quot; decides the optimal number of epochs based on the size of the dataset. If setting the number manually, we support any number between 1 and 50 epochs.
@@ -1584,9 +1606,9 @@ data FineTuningJobHyperparametersNEpochs = FineTuningJobHyperparametersNEpochs
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON FineTuningJobHyperparametersNEpochs where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "fineTuningJobHyperparametersNEpochs")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJobHyperparametersNEpochs")
 instance ToJSON FineTuningJobHyperparametersNEpochs where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "fineTuningJobHyperparametersNEpochs")
+  toJSON = genericToJSON (removeFieldLabelPrefix "fineTuningJobHyperparametersNEpochs")
 
 
 -- | 
@@ -1597,9 +1619,9 @@ data FunctionObject = FunctionObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON FunctionObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "functionObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "functionObject")
 instance ToJSON FunctionObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "functionObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "functionObject")
 
 
 -- | Represents the url or the content of an image generated by the OpenAI API.
@@ -1610,9 +1632,9 @@ data Image = Image
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON Image where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "image")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "image")
 instance ToJSON Image where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "image")
+  toJSON = genericToJSON (removeFieldLabelPrefix "image")
 
 
 -- | 
@@ -1622,9 +1644,9 @@ data ImagesResponse = ImagesResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ImagesResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "imagesResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "imagesResponse")
 instance ToJSON ImagesResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "imagesResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "imagesResponse")
 
 
 -- | 
@@ -1637,9 +1659,9 @@ data ListAssistantFilesResponse = ListAssistantFilesResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListAssistantFilesResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listAssistantFilesResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listAssistantFilesResponse")
 instance ToJSON ListAssistantFilesResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listAssistantFilesResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listAssistantFilesResponse")
 
 
 -- | 
@@ -1652,9 +1674,9 @@ data ListAssistantsResponse = ListAssistantsResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListAssistantsResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listAssistantsResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listAssistantsResponse")
 instance ToJSON ListAssistantsResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listAssistantsResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listAssistantsResponse")
 
 
 -- | 
@@ -1664,9 +1686,9 @@ data ListFilesResponse = ListFilesResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListFilesResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listFilesResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listFilesResponse")
 instance ToJSON ListFilesResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listFilesResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listFilesResponse")
 
 
 -- | 
@@ -1676,9 +1698,9 @@ data ListFineTuningJobEventsResponse = ListFineTuningJobEventsResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListFineTuningJobEventsResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listFineTuningJobEventsResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listFineTuningJobEventsResponse")
 instance ToJSON ListFineTuningJobEventsResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listFineTuningJobEventsResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listFineTuningJobEventsResponse")
 
 
 -- | 
@@ -1691,9 +1713,9 @@ data ListMessageFilesResponse = ListMessageFilesResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListMessageFilesResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listMessageFilesResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listMessageFilesResponse")
 instance ToJSON ListMessageFilesResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listMessageFilesResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listMessageFilesResponse")
 
 
 -- | 
@@ -1706,9 +1728,9 @@ data ListMessagesResponse = ListMessagesResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListMessagesResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listMessagesResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listMessagesResponse")
 instance ToJSON ListMessagesResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listMessagesResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listMessagesResponse")
 
 
 -- | 
@@ -1718,9 +1740,9 @@ data ListModelsResponse = ListModelsResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListModelsResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listModelsResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listModelsResponse")
 instance ToJSON ListModelsResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listModelsResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listModelsResponse")
 
 
 -- | 
@@ -1731,9 +1753,9 @@ data ListPaginatedFineTuningJobsResponse = ListPaginatedFineTuningJobsResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListPaginatedFineTuningJobsResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listPaginatedFineTuningJobsResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listPaginatedFineTuningJobsResponse")
 instance ToJSON ListPaginatedFineTuningJobsResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listPaginatedFineTuningJobsResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listPaginatedFineTuningJobsResponse")
 
 
 -- | 
@@ -1746,9 +1768,9 @@ data ListRunStepsResponse = ListRunStepsResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListRunStepsResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listRunStepsResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listRunStepsResponse")
 instance ToJSON ListRunStepsResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listRunStepsResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listRunStepsResponse")
 
 
 -- | 
@@ -1761,9 +1783,9 @@ data ListRunsResponse = ListRunsResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListRunsResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listRunsResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listRunsResponse")
 instance ToJSON ListRunsResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listRunsResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listRunsResponse")
 
 
 -- | 
@@ -1776,9 +1798,9 @@ data ListThreadsResponse = ListThreadsResponse
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ListThreadsResponse where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "listThreadsResponse")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "listThreadsResponse")
 instance ToJSON ListThreadsResponse where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "listThreadsResponse")
+  toJSON = genericToJSON (removeFieldLabelPrefix "listThreadsResponse")
 
 
 -- | References an image [File](/docs/api-reference/files) in the content of a message.
@@ -1788,9 +1810,9 @@ data MessageContentImageFileObject = MessageContentImageFileObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentImageFileObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentImageFileObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentImageFileObject")
 instance ToJSON MessageContentImageFileObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentImageFileObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentImageFileObject")
 
 
 -- | 
@@ -1799,9 +1821,9 @@ data MessageContentImageFileObjectImageFile = MessageContentImageFileObjectImage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentImageFileObjectImageFile where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentImageFileObjectImageFile")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentImageFileObjectImageFile")
 instance ToJSON MessageContentImageFileObjectImageFile where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentImageFileObjectImageFile")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentImageFileObjectImageFile")
 
 
 -- | A citation within the message that points to a specific quote from a specific File associated with the assistant or the message. Generated when the assistant uses the \&quot;retrieval\&quot; tool to search files.
@@ -1814,9 +1836,9 @@ data MessageContentTextAnnotationsFileCitationObject = MessageContentTextAnnotat
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentTextAnnotationsFileCitationObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentTextAnnotationsFileCitationObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFileCitationObject")
 instance ToJSON MessageContentTextAnnotationsFileCitationObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentTextAnnotationsFileCitationObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFileCitationObject")
 
 
 -- | 
@@ -1826,9 +1848,9 @@ data MessageContentTextAnnotationsFileCitationObjectFileCitation = MessageConten
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentTextAnnotationsFileCitationObjectFileCitation where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentTextAnnotationsFileCitationObjectFileCitation")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFileCitationObjectFileCitation")
 instance ToJSON MessageContentTextAnnotationsFileCitationObjectFileCitation where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentTextAnnotationsFileCitationObjectFileCitation")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFileCitationObjectFileCitation")
 
 
 -- | A URL for the file that&#39;s generated when the assistant used the &#x60;code_interpreter&#x60; tool to generate a file.
@@ -1841,9 +1863,9 @@ data MessageContentTextAnnotationsFilePathObject = MessageContentTextAnnotations
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentTextAnnotationsFilePathObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentTextAnnotationsFilePathObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFilePathObject")
 instance ToJSON MessageContentTextAnnotationsFilePathObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentTextAnnotationsFilePathObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFilePathObject")
 
 
 -- | 
@@ -1852,9 +1874,9 @@ data MessageContentTextAnnotationsFilePathObjectFilePath = MessageContentTextAnn
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentTextAnnotationsFilePathObjectFilePath where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentTextAnnotationsFilePathObjectFilePath")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFilePathObjectFilePath")
 instance ToJSON MessageContentTextAnnotationsFilePathObjectFilePath where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentTextAnnotationsFilePathObjectFilePath")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFilePathObjectFilePath")
 
 
 -- | The text content that is part of a message.
@@ -1864,9 +1886,9 @@ data MessageContentTextObject = MessageContentTextObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentTextObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentTextObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextObject")
 instance ToJSON MessageContentTextObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentTextObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentTextObject")
 
 
 -- | 
@@ -1876,9 +1898,9 @@ data MessageContentTextObjectText = MessageContentTextObjectText
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentTextObjectText where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentTextObjectText")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextObjectText")
 instance ToJSON MessageContentTextObjectText where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentTextObjectText")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentTextObjectText")
 
 
 -- | 
@@ -1892,9 +1914,9 @@ data MessageContentTextObjectTextAnnotationsInner = MessageContentTextObjectText
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageContentTextObjectTextAnnotationsInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageContentTextObjectTextAnnotationsInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextObjectTextAnnotationsInner")
 instance ToJSON MessageContentTextObjectTextAnnotationsInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageContentTextObjectTextAnnotationsInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageContentTextObjectTextAnnotationsInner")
 
 
 -- | A list of files attached to a &#x60;message&#x60;.
@@ -1906,9 +1928,9 @@ data MessageFileObject = MessageFileObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageFileObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageFileObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageFileObject")
 instance ToJSON MessageFileObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageFileObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageFileObject")
 
 
 -- | Represents a message within a [thread](/docs/api-reference/threads).
@@ -1926,9 +1948,9 @@ data MessageObject = MessageObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageObject")
 instance ToJSON MessageObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageObject")
 
 
 -- | 
@@ -1939,9 +1961,9 @@ data MessageObjectContentInner = MessageObjectContentInner
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON MessageObjectContentInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "messageObjectContentInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "messageObjectContentInner")
 instance ToJSON MessageObjectContentInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "messageObjectContentInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "messageObjectContentInner")
 
 
 -- | Describes an OpenAI model offering that can be used with the API.
@@ -1953,9 +1975,9 @@ data Model = Model
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON Model where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "model")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "model")
 instance ToJSON Model where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "model")
+  toJSON = genericToJSON (removeFieldLabelPrefix "model")
 
 
 -- | 
@@ -1970,9 +1992,9 @@ data ModifyAssistantRequest = ModifyAssistantRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ModifyAssistantRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "modifyAssistantRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "modifyAssistantRequest")
 instance ToJSON ModifyAssistantRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "modifyAssistantRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "modifyAssistantRequest")
 
 
 -- | 
@@ -1981,9 +2003,9 @@ data ModifyMessageRequest = ModifyMessageRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ModifyMessageRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "modifyMessageRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "modifyMessageRequest")
 instance ToJSON ModifyMessageRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "modifyMessageRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "modifyMessageRequest")
 
 
 -- | 
@@ -1992,9 +2014,9 @@ data ModifyRunRequest = ModifyRunRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ModifyRunRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "modifyRunRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "modifyRunRequest")
 instance ToJSON ModifyRunRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "modifyRunRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "modifyRunRequest")
 
 
 -- | 
@@ -2003,9 +2025,9 @@ data ModifyThreadRequest = ModifyThreadRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ModifyThreadRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "modifyThreadRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "modifyThreadRequest")
 instance ToJSON ModifyThreadRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "modifyThreadRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "modifyThreadRequest")
 
 
 -- | The &#x60;File&#x60; object represents a document that has been uploaded to OpenAI.
@@ -2021,9 +2043,9 @@ data OpenAIFile = OpenAIFile
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON OpenAIFile where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "openAIFile")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "openAIFile")
 instance ToJSON OpenAIFile where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "openAIFile")
+  toJSON = genericToJSON (removeFieldLabelPrefix "openAIFile")
 
 
 -- | Usage statistics related to the run. This value will be &#x60;null&#x60; if the run is not in a terminal state (i.e. &#x60;in_progress&#x60;, &#x60;queued&#x60;, etc.).
@@ -2034,9 +2056,9 @@ data RunCompletionUsage = RunCompletionUsage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunCompletionUsage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runCompletionUsage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runCompletionUsage")
 instance ToJSON RunCompletionUsage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runCompletionUsage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runCompletionUsage")
 
 
 -- | Represents an execution run on a [thread](/docs/api-reference/threads).
@@ -2063,9 +2085,9 @@ data RunObject = RunObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runObject")
 instance ToJSON RunObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runObject")
 
 
 -- | The last error associated with this run. Will be &#x60;null&#x60; if there are no errors.
@@ -2075,9 +2097,9 @@ data RunObjectLastError = RunObjectLastError
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunObjectLastError where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runObjectLastError")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runObjectLastError")
 instance ToJSON RunObjectLastError where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runObjectLastError")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runObjectLastError")
 
 
 -- | Details on the action required to continue the run. Will be &#x60;null&#x60; if no action is required.
@@ -2087,9 +2109,9 @@ data RunObjectRequiredAction = RunObjectRequiredAction
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunObjectRequiredAction where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runObjectRequiredAction")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runObjectRequiredAction")
 instance ToJSON RunObjectRequiredAction where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runObjectRequiredAction")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runObjectRequiredAction")
 
 
 -- | Details on the tool outputs needed for this run to continue.
@@ -2098,9 +2120,9 @@ data RunObjectRequiredActionSubmitToolOutputs = RunObjectRequiredActionSubmitToo
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunObjectRequiredActionSubmitToolOutputs where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runObjectRequiredActionSubmitToolOutputs")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runObjectRequiredActionSubmitToolOutputs")
 instance ToJSON RunObjectRequiredActionSubmitToolOutputs where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runObjectRequiredActionSubmitToolOutputs")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runObjectRequiredActionSubmitToolOutputs")
 
 
 -- | Usage statistics related to the run step. This value will be &#x60;null&#x60; while the run step&#39;s status is &#x60;in_progress&#x60;.
@@ -2111,9 +2133,9 @@ data RunStepCompletionUsage = RunStepCompletionUsage
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepCompletionUsage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepCompletionUsage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepCompletionUsage")
 instance ToJSON RunStepCompletionUsage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepCompletionUsage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepCompletionUsage")
 
 
 -- | Details of the message creation by the run step.
@@ -2123,9 +2145,9 @@ data RunStepDetailsMessageCreationObject = RunStepDetailsMessageCreationObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsMessageCreationObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsMessageCreationObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsMessageCreationObject")
 instance ToJSON RunStepDetailsMessageCreationObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsMessageCreationObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsMessageCreationObject")
 
 
 -- | 
@@ -2134,9 +2156,9 @@ data RunStepDetailsMessageCreationObjectMessageCreation = RunStepDetailsMessageC
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsMessageCreationObjectMessageCreation where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsMessageCreationObjectMessageCreation")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsMessageCreationObjectMessageCreation")
 instance ToJSON RunStepDetailsMessageCreationObjectMessageCreation where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsMessageCreationObjectMessageCreation")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsMessageCreationObjectMessageCreation")
 
 
 -- | Details of the Code Interpreter tool call the run step was involved in.
@@ -2147,9 +2169,9 @@ data RunStepDetailsToolCallsCodeObject = RunStepDetailsToolCallsCodeObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsCodeObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObject")
 instance ToJSON RunStepDetailsToolCallsCodeObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsCodeObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObject")
 
 
 -- | The Code Interpreter tool call definition.
@@ -2159,9 +2181,9 @@ data RunStepDetailsToolCallsCodeObjectCodeInterpreter = RunStepDetailsToolCallsC
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeObjectCodeInterpreter where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsCodeObjectCodeInterpreter")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObjectCodeInterpreter")
 instance ToJSON RunStepDetailsToolCallsCodeObjectCodeInterpreter where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsCodeObjectCodeInterpreter")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObjectCodeInterpreter")
 
 
 -- | 
@@ -2172,9 +2194,9 @@ data RunStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner = RunStepDetai
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner")
 instance ToJSON RunStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner")
 
 
 -- | 
@@ -2184,9 +2206,9 @@ data RunStepDetailsToolCallsCodeOutputImageObject = RunStepDetailsToolCallsCodeO
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeOutputImageObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsCodeOutputImageObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputImageObject")
 instance ToJSON RunStepDetailsToolCallsCodeOutputImageObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsCodeOutputImageObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputImageObject")
 
 
 -- | 
@@ -2195,9 +2217,9 @@ data RunStepDetailsToolCallsCodeOutputImageObjectImage = RunStepDetailsToolCalls
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeOutputImageObjectImage where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsCodeOutputImageObjectImage")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputImageObjectImage")
 instance ToJSON RunStepDetailsToolCallsCodeOutputImageObjectImage where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsCodeOutputImageObjectImage")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputImageObjectImage")
 
 
 -- | Text output from the Code Interpreter tool call as part of a run step.
@@ -2207,9 +2229,9 @@ data RunStepDetailsToolCallsCodeOutputLogsObject = RunStepDetailsToolCallsCodeOu
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeOutputLogsObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsCodeOutputLogsObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputLogsObject")
 instance ToJSON RunStepDetailsToolCallsCodeOutputLogsObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsCodeOutputLogsObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputLogsObject")
 
 
 -- | 
@@ -2220,9 +2242,9 @@ data RunStepDetailsToolCallsFunctionObject = RunStepDetailsToolCallsFunctionObje
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsFunctionObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsFunctionObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsFunctionObject")
 instance ToJSON RunStepDetailsToolCallsFunctionObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsFunctionObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsFunctionObject")
 
 
 -- | The definition of the function that was called.
@@ -2233,9 +2255,9 @@ data RunStepDetailsToolCallsFunctionObjectFunction = RunStepDetailsToolCallsFunc
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsFunctionObjectFunction where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsFunctionObjectFunction")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsFunctionObjectFunction")
 instance ToJSON RunStepDetailsToolCallsFunctionObjectFunction where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsFunctionObjectFunction")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsFunctionObjectFunction")
 
 
 -- | Details of the tool call.
@@ -2245,9 +2267,9 @@ data RunStepDetailsToolCallsObject = RunStepDetailsToolCallsObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsObject")
 instance ToJSON RunStepDetailsToolCallsObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsObject")
 
 
 -- | 
@@ -2260,9 +2282,9 @@ data RunStepDetailsToolCallsObjectToolCallsInner = RunStepDetailsToolCallsObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsObjectToolCallsInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsObjectToolCallsInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsObjectToolCallsInner")
 instance ToJSON RunStepDetailsToolCallsObjectToolCallsInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsObjectToolCallsInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsObjectToolCallsInner")
 
 
 -- | 
@@ -2273,9 +2295,9 @@ data RunStepDetailsToolCallsRetrievalObject = RunStepDetailsToolCallsRetrievalOb
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsRetrievalObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepDetailsToolCallsRetrievalObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsRetrievalObject")
 instance ToJSON RunStepDetailsToolCallsRetrievalObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepDetailsToolCallsRetrievalObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepDetailsToolCallsRetrievalObject")
 
 
 -- | Represents a step in execution of a run. 
@@ -2299,9 +2321,9 @@ data RunStepObject = RunStepObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepObject")
 instance ToJSON RunStepObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepObject")
 
 
 -- | The last error associated with this run step. Will be &#x60;null&#x60; if there are no errors.
@@ -2311,9 +2333,9 @@ data RunStepObjectLastError = RunStepObjectLastError
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepObjectLastError where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepObjectLastError")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepObjectLastError")
 instance ToJSON RunStepObjectLastError where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepObjectLastError")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepObjectLastError")
 
 
 -- | The details of the run step.
@@ -2324,9 +2346,9 @@ data RunStepObjectStepDetails = RunStepObjectStepDetails
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunStepObjectStepDetails where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runStepObjectStepDetails")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepObjectStepDetails")
 instance ToJSON RunStepObjectStepDetails where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runStepObjectStepDetails")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runStepObjectStepDetails")
 
 
 -- | Tool call objects
@@ -2337,9 +2359,9 @@ data RunToolCallObject = RunToolCallObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunToolCallObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runToolCallObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runToolCallObject")
 instance ToJSON RunToolCallObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runToolCallObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runToolCallObject")
 
 
 -- | The function definition.
@@ -2349,9 +2371,9 @@ data RunToolCallObjectFunction = RunToolCallObjectFunction
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON RunToolCallObjectFunction where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "runToolCallObjectFunction")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "runToolCallObjectFunction")
 instance ToJSON RunToolCallObjectFunction where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "runToolCallObjectFunction")
+  toJSON = genericToJSON (removeFieldLabelPrefix "runToolCallObjectFunction")
 
 
 -- | 
@@ -2360,9 +2382,9 @@ data SubmitToolOutputsRunRequest = SubmitToolOutputsRunRequest
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON SubmitToolOutputsRunRequest where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "submitToolOutputsRunRequest")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "submitToolOutputsRunRequest")
 instance ToJSON SubmitToolOutputsRunRequest where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "submitToolOutputsRunRequest")
+  toJSON = genericToJSON (removeFieldLabelPrefix "submitToolOutputsRunRequest")
 
 
 -- | 
@@ -2372,9 +2394,9 @@ data SubmitToolOutputsRunRequestToolOutputsInner = SubmitToolOutputsRunRequestTo
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON SubmitToolOutputsRunRequestToolOutputsInner where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "submitToolOutputsRunRequestToolOutputsInner")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "submitToolOutputsRunRequestToolOutputsInner")
 instance ToJSON SubmitToolOutputsRunRequestToolOutputsInner where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "submitToolOutputsRunRequestToolOutputsInner")
+  toJSON = genericToJSON (removeFieldLabelPrefix "submitToolOutputsRunRequestToolOutputsInner")
 
 
 -- | Represents a thread that contains [messages](/docs/api-reference/messages).
@@ -2386,9 +2408,9 @@ data ThreadObject = ThreadObject
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON ThreadObject where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "threadObject")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "threadObject")
 instance ToJSON ThreadObject where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "threadObject")
+  toJSON = genericToJSON (removeFieldLabelPrefix "threadObject")
 
 
 -- | 
@@ -2406,9 +2428,9 @@ data TranscriptionSegment = TranscriptionSegment
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON TranscriptionSegment where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "transcriptionSegment")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "transcriptionSegment")
 instance ToJSON TranscriptionSegment where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "transcriptionSegment")
+  toJSON = genericToJSON (removeFieldLabelPrefix "transcriptionSegment")
 
 
 -- | 
@@ -2419,9 +2441,9 @@ data TranscriptionWord = TranscriptionWord
   } deriving (Show, Eq, Generic, Data)
 
 instance FromJSON TranscriptionWord where
-  parseJSON = genericParseJSON (removeFieldLabelPrefix True "transcriptionWord")
+  parseJSON = genericParseJSON (removeFieldLabelPrefix "transcriptionWord")
 instance ToJSON TranscriptionWord where
-  toJSON = genericToJSON (removeFieldLabelPrefix False "transcriptionWord")
+  toJSON = genericToJSON (removeFieldLabelPrefix "transcriptionWord")
 
 
 uncapitalize :: String -> String
@@ -2430,12 +2452,8 @@ uncapitalize [] = []
 
 -- | Remove a field label prefix during JSON parsing.
 --   Also perform any replacements for special characters.
---   The @forParsing@ parameter is to distinguish between the cases in which we're using this
---   to power a @FromJSON@ or a @ToJSON@ instance. In the first case we're parsing, and we want
---   to replace special characters with their quoted equivalents (because we cannot have special
---   chars in identifier names), while we want to do vice versa when sending data instead.
-removeFieldLabelPrefix :: Bool -> String -> Options
-removeFieldLabelPrefix forParsing prefix =
+removeFieldLabelPrefix :: String -> Options
+removeFieldLabelPrefix prefix =
   defaultOptions
     { omitNothingFields  = True
     , fieldLabelModifier = uncapitalize . fromMaybe (error ("did not find prefix " ++ prefix)) . stripPrefix prefix . replaceSpecialChars
