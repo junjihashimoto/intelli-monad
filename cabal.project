@@ -1,0 +1,3 @@
+packages:
+        openai-servant-gen/*.cabal
+        examples/*.cabal
