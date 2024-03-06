@@ -79,6 +79,8 @@ library
                     , bytestring
                     , haskeline
                     , transformers
+                    , persistent
+                    , persistent-sqlite
 
     -- Directories containing source files.
     hs-source-dirs:   src

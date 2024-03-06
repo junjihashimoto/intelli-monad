@@ -19,7 +19,7 @@ import           Data.IORef
 import           Network.HTTP.Client     (newManager)
 import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Servant.Client          (ClientEnv, mkClientEnv, parseBaseUrl, responseBody)
-import           System.Environment      (getEnv)
+import           System.Environment      (getEnv, lookupEnv)
 import           System.Console.Haskeline
 import           Control.Monad (forM_)
 import           Control.Monad.IO.Class (liftIO)
@@ -131,7 +131,10 @@ defaultRequest =
 runRequest :: ChatCompletion a => API.CreateChatCompletionRequest -> a -> IO (a, API.CreateChatCompletionResponse)
 runRequest defaultReq request = do
   api_key <- (API.clientAuth . T.pack) <$> getEnv "OPENAI_API_KEY"
-  url <- parseBaseUrl "https://api.openai.com/v1/"
+  url <- do
+    lookupEnv "OPENAI_ENDPOINT" >>= \case
+      Just url -> parseBaseUrl url
+      Nothing -> parseBaseUrl "https://api.openai.com/v1/"
   manager <- newManager tlsManagerSettings
   let API.OpenAIBackend{..} = API.createOpenAIClient
       req = (toRequest defaultReq request)
