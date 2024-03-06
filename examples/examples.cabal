@@ -80,6 +80,21 @@ executable chat-completion-local
     hs-source-dirs:   app
     default-language: Haskell2010
 
+executable text2speech
+    import:           warnings
+    main-is:          text2speech.hs
+    build-depends:    base == 4.*
+                    , http-client
+                    , http-client-tls
+                    , servant-client
+                    , openai-servant-gen
+                    , text
+                    , aeson
+                    , servant
+                    , bytestring
+    hs-source-dirs:   app
+    default-language: Haskell2010
+
 executable chat-completion-server
     import:           warnings
     main-is:          chat-completion-server.hs

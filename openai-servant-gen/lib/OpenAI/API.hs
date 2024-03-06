@@ -12,6 +12,8 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+
 {-# OPTIONS_GHC
 -fno-warn-unused-binds -fno-warn-unused-imports -freduction-depth=328 #-}
 
@@ -44,7 +46,7 @@ import           Control.Monad.Except               (ExceptT, runExceptT)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Reader         (ReaderT (..))
 import           Data.Aeson                         (Value)
-import           Data.ByteString                    (ByteString)
+import           Data.ByteString                    (ByteString, fromStrict, toStrict)
 import           Data.Coerce                        (coerce)
 import           Data.Data                          (Data)
 import           Data.Function                      ((&))
@@ -78,7 +80,8 @@ import           Servant.Server.StaticFiles         (serveDirectoryFileServer)
 import           Web.FormUrlEncoded
 import           Web.HttpApiData
 
-
+import qualified Network.HTTP.Media               as M
+import           Data.Data
 
 data FormCreateTranscription = FormCreateTranscription
   { createTranscriptionFile :: FilePath
@@ -188,6 +191,15 @@ instance ToHttpApiData a => ToHttpApiData (QueryList 'MultiParamArray a) where
 formatSeparatedQueryList :: ToHttpApiData a => Char ->  QueryList p a -> Text
 formatSeparatedQueryList char = T.intercalate (T.singleton char) . map toQueryParam . fromQueryList
 
+data AudioMpeg deriving Typeable
+instance Accept AudioMpeg where
+    contentType _ = "audio" M.// "mpeg"
+
+instance MimeRender AudioMpeg ByteString where
+    mimeRender _ = fromStrict
+
+instance MimeUnrender AudioMpeg ByteString where
+    mimeUnrender _ = Right . toStrict
 
 -- | Servant type-level API, generated from the OpenAPI spec for OpenAI.
 type OpenAIAPI
@@ -219,7 +231,7 @@ type OpenAIAPI
     :<|> Protected :> "threads" :> Capture "thread_id" Text :> "runs" :> Capture "run_id" Text :> ReqBody '[JSON] ModifyRunRequest :> Verb 'POST 200 '[JSON] RunObject -- 'modifyRun' route
     :<|> Protected :> "threads" :> Capture "thread_id" Text :> ReqBody '[JSON] ModifyThreadRequest :> Verb 'POST 200 '[JSON] ThreadObject -- 'modifyThread' route
     :<|> Protected :> "threads" :> Capture "thread_id" Text :> "runs" :> Capture "run_id" Text :> "submit_tool_outputs" :> ReqBody '[JSON] SubmitToolOutputsRunRequest :> Verb 'POST 200 '[JSON] RunObject -- 'submitToolOuputsToRun' route
-    :<|> Protected :> "audio" :> "speech" :> ReqBody '[JSON] CreateSpeechRequest :> Verb 'POST 200 '[JSON] (Headers '[Header "Transfer-Encoding" Text] FilePath) -- 'createSpeech' route
+    :<|> Protected :> "audio" :> "speech" :> ReqBody '[JSON] CreateSpeechRequest :> Verb 'POST 200 '[AudioMpeg] ByteString -- 'createSpeech' route
     :<|> Protected :> "audio" :> "transcriptions" :> ReqBody '[FormUrlEncoded] FormCreateTranscription :> Verb 'POST 200 '[JSON] CreateTranscription200Response -- 'createTranscription' route
     :<|> Protected :> "audio" :> "translations" :> ReqBody '[FormUrlEncoded] FormCreateTranslation :> Verb 'POST 200 '[JSON] CreateTranslation200Response -- 'createTranslation' route
     :<|> Protected :> "chat" :> "completions" :> ReqBody '[JSON] CreateChatCompletionRequest :> Verb 'POST 200 '[JSON] CreateChatCompletionResponse -- 'createChatCompletion' route
@@ -290,7 +302,7 @@ data OpenAIBackend a m = OpenAIBackend
   , modifyRun :: a -> Text -> Text -> ModifyRunRequest -> m RunObject{- ^  -}
   , modifyThread :: a -> Text -> ModifyThreadRequest -> m ThreadObject{- ^  -}
   , submitToolOuputsToRun :: a -> Text -> Text -> SubmitToolOutputsRunRequest -> m RunObject{- ^  -}
-  , createSpeech :: a -> CreateSpeechRequest -> m (Headers '[Header "Transfer-Encoding" Text] FilePath){- ^  -}
+  , createSpeech :: a -> CreateSpeechRequest -> m ByteString{- ^  -}
   , createTranscription :: a -> FormCreateTranscription -> m CreateTranscription200Response{- ^  -}
   , createTranslation :: a -> FormCreateTranslation -> m CreateTranslation200Response{- ^  -}
   , createChatCompletion :: a -> CreateChatCompletionRequest -> m CreateChatCompletionResponse{- ^  -}

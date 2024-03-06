@@ -690,9 +690,7 @@ instance ToJSON CreateAssistantRequest where
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
-data CreateAssistantRequestModel = CreateAssistantRequestModel
-  { 
-  } deriving (Show, Eq, Generic, Data)
+data CreateAssistantRequestModel = CreateAssistantRequestModel Text  deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateAssistantRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createAssistantRequestModel")
@@ -902,9 +900,7 @@ instance ToJSON CreateCompletionRequest where
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
-data CreateCompletionRequestModel = CreateCompletionRequestModel
-  { 
-  } deriving (Show, Eq, Generic, Data)
+data CreateCompletionRequestModel = CreateCompletionRequestModel Text  deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateCompletionRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequestModel")
@@ -1006,9 +1002,7 @@ instance ToJSON CreateEmbeddingRequestInput where
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
-data CreateEmbeddingRequestModel = CreateEmbeddingRequestModel
-  { 
-  } deriving (Show, Eq, Generic, Data)
+data CreateEmbeddingRequestModel = CreateEmbeddingRequestModel Text  deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateEmbeddingRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingRequestModel")
@@ -1104,9 +1098,7 @@ instance ToJSON CreateFineTuningJobRequestHyperparametersNEpochs where
 
 
 -- | The name of the model to fine-tune. You can select one of the [supported models](/docs/guides/fine-tuning/what-models-can-be-fine-tuned). 
-data CreateFineTuningJobRequestModel = CreateFineTuningJobRequestModel
-  { 
-  } deriving (Show, Eq, Generic, Data)
+data CreateFineTuningJobRequestModel = CreateFineTuningJobRequestModel Text  deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestModel")
@@ -1133,9 +1125,7 @@ instance ToJSON CreateImageRequest where
 
 
 -- | The model to use for image generation.
-data CreateImageRequestModel = CreateImageRequestModel
-  { 
-  } deriving (Show, Eq, Generic, Data)
+data CreateImageRequestModel = CreateImageRequestModel Text  deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateImageRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createImageRequestModel")
@@ -1181,9 +1171,7 @@ instance ToJSON CreateModerationRequestInput where
 
 
 -- | Two content moderations models are available: &#x60;text-moderation-stable&#x60; and &#x60;text-moderation-latest&#x60;.  The default is &#x60;text-moderation-latest&#x60; which will be automatically upgraded over time. This ensures you are always using our most accurate model. If you use &#x60;text-moderation-stable&#x60;, we will provide advanced notice before updating the model. Accuracy of &#x60;text-moderation-stable&#x60; may be slightly lower than for &#x60;text-moderation-latest&#x60;. 
-data CreateModerationRequestModel = CreateModerationRequestModel
-  { 
-  } deriving (Show, Eq, Generic, Data)
+data CreateModerationRequestModel = CreateModerationRequestModel Text  deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateModerationRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationRequestModel")
@@ -1291,9 +1279,7 @@ instance ToJSON CreateSpeechRequest where
 
 
 -- | One of the available [TTS models](/docs/models/tts): &#x60;tts-1&#x60; or &#x60;tts-1-hd&#x60; 
-data CreateSpeechRequestModel = CreateSpeechRequestModel
-  { 
-  } deriving (Show, Eq, Generic, Data)
+data CreateSpeechRequestModel = CreateSpeechRequestModel Text  deriving (Show, Eq, Generic, Data)
 
 instance FromJSON CreateSpeechRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createSpeechRequestModel")
