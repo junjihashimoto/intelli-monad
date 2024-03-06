@@ -118,7 +118,7 @@ backend = OpenAIBackend
                 , completionUsageCompletionUnderscoretokens = 9
                 , completionUsageTotalUnderscoretokens = 17
                 }
-            , createChatCompletionResponseSystemUnderscorefingerprint = "fp_b9d4cef803"
+            , createChatCompletionResponseSystemUnderscorefingerprint = Just "fp_b9d4cef803"
             }
 --  , createCompletion :: a -> CreateCompletionRequest -> m CreateCompletionResponse{- ^  -}
   , createCompletion = undefined

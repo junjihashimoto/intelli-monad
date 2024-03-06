@@ -12,6 +12,10 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Codec.Picture as P
 
+import           Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
+import           Control.Monad.IO.Class
+import           Data.IORef
+
 import           Network.HTTP.Client     (newManager)
 import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Servant.Client          (ClientEnv, mkClientEnv, parseBaseUrl, responseBody)
@@ -20,8 +24,6 @@ import           System.Console.Haskeline
 import           Control.Monad (forM_)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.Aeson (encode)
-
-
 
 data User = User | System | Assistant deriving (Eq, Show)
 
@@ -53,8 +55,23 @@ class ChatCompletion a where
   toRequest :: API.CreateChatCompletionRequest -> a -> API.CreateChatCompletionRequest
   fromResponse :: API.CreateChatCompletionResponse -> a
 
-class Validate a b where
+class ChatCompletion a => Validate a b where
   tryConvert :: a -> Either a b
+
+data Context = Context
+  { contextRequest :: API.CreateChatCompletionRequest
+  , contextResponse :: Maybe API.CreateChatCompletionRequest
+  } deriving (Eq, Show)
+
+type Prompt = ReaderT (IORef Context) IO
+
+-- instance (TypedChatCompletion i0 o0, TypedChatCompletion o0 o1) => TypedChatCompletion i0 o1
+
+runPrompt :: API.CreateChatCompletionRequest -> Prompt a -> IO a
+runPrompt req func = do
+  context <- newIORef $ Context req Nothing
+  runReaderT func context
+  
 
 instance ChatCompletion Contents where
   toRequest orgRequest (Contents contents) =

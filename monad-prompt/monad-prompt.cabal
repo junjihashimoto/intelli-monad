@@ -78,6 +78,7 @@ library
                     , aeson
                     , bytestring
                     , haskeline
+                    , transformers
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -101,7 +102,9 @@ executable monad-prompt
     -- Other library packages from which modules are imported.
     build-depends:
         base ^>=4.18.1.0,
-        monad-prompt
+        monad-prompt,
+        openai-servant-gen,
+        text
 
     -- Directories containing source files.
     hs-source-dirs:   app

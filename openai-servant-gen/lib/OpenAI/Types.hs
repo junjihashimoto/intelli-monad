@@ -808,7 +808,7 @@ data CreateChatCompletionResponse = CreateChatCompletionResponse
   , createChatCompletionResponseChoices :: [CreateChatCompletionResponseChoicesInner] -- ^ A list of chat completion choices. Can be more than one if `n` is greater than 1.
   , createChatCompletionResponseCreated :: Int -- ^ The Unix timestamp (in seconds) of when the chat completion was created.
   , createChatCompletionResponseModel :: Text -- ^ The model used for the chat completion.
-  , createChatCompletionResponseSystemUnderscorefingerprint :: Text -- ^ This fingerprint represents the backend configuration that the model runs with.  Can be used in conjunction with the `seed` request parameter to understand when backend changes have been made that might impact determinism. 
+  , createChatCompletionResponseSystemUnderscorefingerprint :: Maybe Text -- ^ This fingerprint represents the backend configuration that the model runs with.  Can be used in conjunction with the `seed` request parameter to understand when backend changes have been made that might impact determinism. 
   , createChatCompletionResponseObject :: Text -- ^ The object type, which is always `chat.completion`.
   , createChatCompletionResponseUsage :: Maybe CompletionUsage -- ^ 
   } deriving (Show, Eq, Generic, Data)
