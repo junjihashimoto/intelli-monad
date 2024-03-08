@@ -1,4 +1,4 @@
-# Revision history for monad-prompt
+# Revision history for intelli-monad
 
 ## 0.1.0.0 -- YYYY-mm-dd
 

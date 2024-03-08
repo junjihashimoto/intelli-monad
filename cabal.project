@@ -1,4 +1,4 @@
 packages:
         openai-servant-gen/*.cabal
         examples/*.cabal
-        monad-prompt/*.cabal
+        intelli-monad/*.cabal
