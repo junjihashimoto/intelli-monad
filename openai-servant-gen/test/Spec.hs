@@ -141,7 +141,7 @@ main = hspec $ do
                 { createChatCompletionResponseChoicesInnerIndex = 0
                 , createChatCompletionResponseChoicesInnerMessage = ChatCompletionResponseMessage
                     { chatCompletionResponseMessageRole = "assistant"
-                    , chatCompletionResponseMessageContent = "Hello! How can I assist you today?"
+                    , chatCompletionResponseMessageContent = Just "Hello! How can I assist you today?"
                     , chatCompletionResponseMessageToolUnderscorecalls = Nothing
                     , chatCompletionResponseMessageFunctionUnderscorecall = Nothing
                     }

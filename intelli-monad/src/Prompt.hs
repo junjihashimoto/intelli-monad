@@ -5,6 +5,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RankNTypes  #-}
+{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 
 module Prompt where
 
@@ -27,7 +34,12 @@ import           System.Console.Haskeline
 import           Control.Monad (forM_, forM)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.Aeson (encode)
+import qualified Data.Aeson as A
 import           System.Process
+import           GHC.Generics
+import           GHC.IO.Exception
+import           Data.Proxy
+import           Data.Maybe (fromMaybe)
 
 data User = User | System | Assistant deriving (Eq, Show)
 
@@ -100,13 +112,61 @@ call = do
   push contents
   return contents
 
--- instance (TypedChatCompletion i0 o0, TypedChatCompletion o0 o1) => TypedChatCompletion i0 o1
-
 runPrompt :: (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> Prompt m a -> m a
 runPrompt req func = do
   let context = Context req Nothing mempty 
   fst <$> runStateT func context
-  
+
+class (A.ToJSON a, A.FromJSON a, A.ToJSON b, A.FromJSON b) => Tool a b | a -> b where
+  toolSchema :: API.ChatCompletionTool
+  toolExec :: a -> IO b
+  toolAdd :: API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest 
+  toolAdd req =
+    let prevTools = case API.createChatCompletionRequestTools req of
+          Nothing -> []
+          Just v -> v
+        newTools = prevTools ++ [toolSchema @a @b]
+    in req { API.createChatCompletionRequestTools = Just newTools } 
+
+data BashInput = BashInput
+  { script :: String
+  } deriving (Eq, Show, Generic)
+
+data BashOutput = BashOutput
+  { code :: Int
+  , stdout :: String
+  , stderr :: String
+  } deriving (Eq, Show, Generic)
+
+instance A.FromJSON BashInput
+instance A.ToJSON BashInput
+instance A.FromJSON BashOutput
+instance A.ToJSON BashOutput
+
+instance Tool BashInput BashOutput where
+  toolSchema = API.ChatCompletionTool
+    { chatCompletionToolType = "function"
+    , chatCompletionToolFunction = API.FunctionObject
+      { functionObjectDescription = Just "Call a bash script in a local environment"
+      , functionObjectName = "call_bash_script"
+      , functionObjectParameters = Just $
+        [ ("type", "object")
+        , ("properties", A.Object [
+              ("script", A.Object [
+                  ("type", "string"),
+                  ("description", "A script executing in a local environment ")
+                  ])
+              ])
+        , ("required", A.Array ["script"])
+        ]
+      }
+    }
+  toolExec args = do
+    (code, stdout, stderr) <- readCreateProcessWithExitCode (shell args.script) ""
+    let code' = case code of
+          ExitSuccess -> 0
+          ExitFailure v -> v
+    return $ BashOutput code' stdout stderr
 
 instance ChatCompletion Contents where
   toRequest orgRequest (Contents contents) =
@@ -135,7 +195,7 @@ instance ChatCompletion Contents where
       let message = API.createChatCompletionResponseChoicesInnerMessage res
           role = textToUser $ API.chatCompletionResponseMessageRole message
           content = API.chatCompletionResponseMessageContent message
-      in Content (role, Text content)
+      in Content (role, Text (fromMaybe "" content))
       
       
 defaultRequest :: API.CreateChatCompletionRequest
@@ -183,28 +243,6 @@ runRequest defaultReq request = do
 getTextInputLine :: MonadTrans t => String -> t (InputT IO) (Maybe T.Text)
 getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
 
-shAgent :: Contents -> IO Contents
-shAgent inputs = do
-  let spec = Contents [
-          Content (System, Text "You are a agent to run bash command of your tasks. Input messages are tasks. You should generate bash scripts to resolve the tasks.")
-        ]
-  contents <- runPrompt defaultRequest (push (spec <> inputs) >> call)
-  outs <- forM (unContents contents) $ \(Content (user, message))-> do
-    v <- readCreateProcess (shell (T.unpack $ unText message)) ""
-    return $ Content (System, Text (T.pack v))
-  return $ Contents outs
-
-shAgent' :: Contents -> IO Contents
-shAgent' inputs = do
-  let spec = Contents [
-          Content (System, Text "You can run a script with a message '%script-type <script>', e.g. '%bash ls' or '%python print(1+3), then it returns a system prompt as the result.")
-        ]
-  contents <- runPrompt defaultRequest (push (spec <> inputs) >> call)
-  outs <- forM (unContents contents) $ \(Content (user, message))-> do
-    v <- readCreateProcess (shell (T.unpack $ unText message)) ""
-    return $ Content (System, Text (T.pack v))
-  return $ Contents outs
-
 showContents :: MonadIO m => Contents -> m ()
 showContents (Contents res) = do
   forM_ res $ \(Content (user, message)) ->
@@ -212,7 +250,8 @@ showContents (Contents res) = do
   
 runRepl :: API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl defaultReq contents = do
-  runInputT defaultSettings (runPrompt defaultReq (push contents >> loop))
+  let settings = toolAdd @BashInput defaultReq
+  runInputT defaultSettings (runPrompt settings (push contents >> loop))
   where
     loop :: Prompt (InputT IO) ()
     loop = do
