@@ -3,6 +3,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Prompt where
 
@@ -10,20 +12,22 @@ import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import qualified Data.ByteString.Lazy as BS
 import qualified Codec.Picture as P
 
-import           Control.Monad.Trans.Reader (ReaderT, ask, runReaderT)
+import           Control.Monad.Trans.State (StateT, get, put, runStateT)
+import           Control.Monad.Trans.Class (lift, MonadTrans)
 import           Control.Monad.IO.Class
-import           Data.IORef
 
-import           Network.HTTP.Client     (newManager)
+import           Network.HTTP.Client     (newManager, managerResponseTimeout, responseTimeoutMicro)
 import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Servant.Client          (ClientEnv, mkClientEnv, parseBaseUrl, responseBody)
 import           System.Environment      (getEnv, lookupEnv)
 import           System.Console.Haskeline
-import           Control.Monad (forM_)
+import           Control.Monad (forM_, forM)
 import           Control.Monad.IO.Class (liftIO)
 import           Data.Aeson (encode)
+import           System.Process
 
 data User = User | System | Assistant deriving (Eq, Show)
 
@@ -47,9 +51,9 @@ instance Show Message where
 
 newtype Model = Model T.Text deriving (Eq, Show)
 
-newtype Content = Content (User, Message) deriving (Eq, Show)
+newtype Content = Content { unContent :: (User, Message) } deriving (Eq, Show)
 
-newtype Contents = Contents [Content] deriving (Eq, Show, Semigroup, Monoid)
+newtype Contents = Contents { unContents :: [Content] } deriving (Eq, Show, Semigroup, Monoid)
 
 class ChatCompletion a where
   toRequest :: API.CreateChatCompletionRequest -> a -> API.CreateChatCompletionRequest
@@ -59,18 +63,49 @@ class ChatCompletion a => Validate a b where
   tryConvert :: a -> Either a b
 
 data Context = Context
-  { contextRequest :: API.CreateChatCompletionRequest
-  , contextResponse :: Maybe API.CreateChatCompletionRequest
+  { request :: API.CreateChatCompletionRequest
+  , response :: Maybe API.CreateChatCompletionResponse
+  , contents :: Contents
   } deriving (Eq, Show)
 
-type Prompt = ReaderT (IORef Context) IO
+type Prompt = StateT Context
+
+getContext :: (MonadIO m, MonadFail m) => Prompt m Context
+getContext = get
+  
+setContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
+setContext = put
+  
+-- last :: (MonadIO m, MonadFail m) => Prompt m (Maybe Contents)
+-- last = do
+--   prev <- getContext
+--   let contents' = unContents prev.contents
+--   if length contents' == 0
+--     then return Nothing
+--     else return $ Just $ head contents'
+
+push :: (MonadIO m, MonadFail m) => Contents -> Prompt m ()
+push contents = do
+  prev <- getContext
+  let nextContents = prev.contents <> contents
+      next = prev { contents = nextContents, request = toRequest prev.request nextContents }
+  setContext next
+
+call :: (MonadIO m, MonadFail m) => Prompt m Contents
+call = do
+  prev <- getContext
+  (contents, res) <- liftIO $ runRequest prev.request prev.contents
+  let next = prev { response = Just res }
+  setContext next
+  push contents
+  return contents
 
 -- instance (TypedChatCompletion i0 o0, TypedChatCompletion o0 o1) => TypedChatCompletion i0 o1
 
-runPrompt :: API.CreateChatCompletionRequest -> Prompt a -> IO a
+runPrompt :: (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> Prompt m a -> m a
 runPrompt req func = do
-  context <- newIORef $ Context req Nothing
-  runReaderT func context
+  let context = Context req Nothing mempty 
+  fst <$> runStateT func context
   
 
 instance ChatCompletion Contents where
@@ -135,27 +170,66 @@ runRequest defaultReq request = do
     lookupEnv "OPENAI_ENDPOINT" >>= \case
       Just url -> parseBaseUrl url
       Nothing -> parseBaseUrl "https://api.openai.com/v1/"
-  manager <- newManager tlsManagerSettings
+  manager <- newManager (
+    tlsManagerSettings {
+        managerResponseTimeout = responseTimeoutMicro (120 * 1000 * 1000) 
+    })
   let API.OpenAIBackend{..} = API.createOpenAIClient
       req = (toRequest defaultReq request)
   -- print $ encode req
   res <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
   return (fromResponse res, res)
 
-runRepl :: API.CreateChatCompletionRequest -> IO ()
-runRepl defaultReq = do
-  runInputT defaultSettings (loop mempty)
+getTextInputLine :: MonadTrans t => String -> t (InputT IO) (Maybe T.Text)
+getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
+
+shAgent :: Contents -> IO Contents
+shAgent inputs = do
+  let spec = Contents [
+          Content (System, Text "You are a agent to run bash command of your tasks. Input messages are tasks. You should generate bash scripts to resolve the tasks.")
+        ]
+  contents <- runPrompt defaultRequest (push (spec <> inputs) >> call)
+  outs <- forM (unContents contents) $ \(Content (user, message))-> do
+    v <- readCreateProcess (shell (T.unpack $ unText message)) ""
+    return $ Content (System, Text (T.pack v))
+  return $ Contents outs
+
+shAgent' :: Contents -> IO Contents
+shAgent' inputs = do
+  let spec = Contents [
+          Content (System, Text "You can run a script with a message '%script-type <script>', e.g. '%bash ls' or '%python print(1+3), then it returns a system prompt as the result.")
+        ]
+  contents <- runPrompt defaultRequest (push (spec <> inputs) >> call)
+  outs <- forM (unContents contents) $ \(Content (user, message))-> do
+    v <- readCreateProcess (shell (T.unpack $ unText message)) ""
+    return $ Content (System, Text (T.pack v))
+  return $ Contents outs
+
+showContents :: MonadIO m => Contents -> m ()
+showContents (Contents res) = do
+  forM_ res $ \(Content (user, message)) ->
+    liftIO $ T.putStrLn $ userToText user <> ": " <> unText message
+  
+runRepl :: API.CreateChatCompletionRequest -> Contents -> IO ()
+runRepl defaultReq contents = do
+  runInputT defaultSettings (runPrompt defaultReq (push contents >> loop))
   where
-    loop :: Contents -> InputT IO ()
-    loop prev = do
-      minput <- getInputLine "% "
+    loop :: Prompt (InputT IO) ()
+    loop = do
+      minput <- getTextInputLine "% "
       case minput of
         Nothing -> return ()
         Just "quit" -> return ()
+        Just "show-usage" -> do
+          context <- getContext
+          case (encode <$> (API.createChatCompletionResponseUsage <$> context.response)) of
+            Just v -> liftIO $ do
+              BS.putStr v
+              BS.putStr "\n"
+            Nothing -> return ()
+          loop
         Just input -> do
-          let newReq = (prev <> Contents [ Content (User, Text (T.pack input)) ] )
-          (c@(Contents res), r) <- liftIO $ runRequest defaultReq newReq
-          forM_ res $ \(Content (user, message)) ->
-            liftIO $ T.putStrLn $ userToText user <> ": " <> unText message
-          loop (newReq <> c)
-
+          let contents = Contents [Content (User, Text input)]
+          push contents
+          call >>= showContents
+          loop

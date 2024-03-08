@@ -16,4 +16,4 @@ main = do
       Nothing -> return "gpt-4"
   runRepl defaultRequest {
     API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
-  }
+  } mempty

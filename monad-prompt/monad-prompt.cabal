@@ -81,6 +81,7 @@ library
                     , transformers
                     , persistent
                     , persistent-sqlite
+                    , process
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -103,10 +104,11 @@ executable monad-prompt
 
     -- Other library packages from which modules are imported.
     build-depends:
-        base ^>=4.18.1.0,
+        base == 4.*,
         monad-prompt,
         openai-servant-gen,
-        text
+        text,
+        process
 
     -- Directories containing source files.
     hs-source-dirs:   app
@@ -138,5 +140,5 @@ test-suite monad-prompt-test
 
     -- Test dependencies.
     build-depends:
-        base ^>=4.18.1.0,
+        base ==4.*,
         monad-prompt
