@@ -14,7 +14,6 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE FlexibleInstances  #-}
 
-
 module Prompt where
 
 import qualified OpenAI.API as API
@@ -22,13 +21,11 @@ import qualified OpenAI.Types as API
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
-import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString as BS
-import qualified Codec.Picture as P
 import           Codec.Picture.Png (encodePng)
 
 
-import           Control.Monad.Trans.State (StateT, get, put, runStateT)
+import           Control.Monad.Trans.State (get, put, runStateT)
 import           Control.Monad.Trans.Class (lift, MonadTrans)
 import           Control.Monad.IO.Class
 
@@ -40,82 +37,17 @@ import           System.Console.Haskeline
 import           Control.Monad (forM_, forM)
 import           Data.Aeson (encode)
 import qualified Data.Aeson as A
-import           System.Process
-import           GHC.Generics
-import           GHC.IO.Exception
 import           Data.Maybe (fromMaybe, catMaybes)
 import qualified Data.ByteString.Base64 as Base64
 
-
-data User = User | System | Assistant | Tool deriving (Eq, Show)
-
-userToText :: User -> T.Text
-userToText = \case
-  User -> "user"
-  System -> "system"
-  Assistant -> "assistant"
-  Tool -> "tool"
-  
-textToUser :: T.Text -> User
-textToUser = \case
-  "user" -> User
-  "system" -> System
-  "assistant" -> Assistant
-  "tool" -> Tool
-  v -> error $ T.unpack $ "Undefined role:" <> v
-
-instance Show (P.Image P.PixelRGB8) where
-  show _ = "Image: ..."
-  
-data Message
-  = Text { unText :: T.Text }
-  | Image { unImage :: P.Image P.PixelRGB8 }
-  | ToolCall { toolId :: T.Text
-             , toolName :: T.Text
-             , toolArguments :: T.Text
-             }
-  | ToolReturn { toolId :: T.Text
-               , toolName :: T.Text
-               , toolContent :: T.Text
-               }
-  deriving (Eq, Show)
-
-newtype Model = Model T.Text deriving (Eq, Show)
-
-newtype Content = Content { unContent :: (User, Message) } deriving (Eq, Show)
-
-newtype Contents = Contents { unContents :: [Content] } deriving (Eq, Show, Semigroup, Monoid)
-
-class ChatCompletion a where
-  toRequest :: API.CreateChatCompletionRequest -> a -> API.CreateChatCompletionRequest
-  fromResponse :: API.CreateChatCompletionResponse -> a
-
-class ChatCompletion a => Validate a b where
-  tryConvert :: a -> Either a b
-
-data Context = Context
-  { request :: API.CreateChatCompletionRequest
-  , response :: Maybe API.CreateChatCompletionResponse
-  , contents :: Contents
-  , tokens :: [Int]
-  , total_tokens :: Int
-  } deriving (Eq, Show)
-
-type Prompt = StateT Context
+import           Prompt.Types
+import           Prompt.Tools
 
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = get
   
 setContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
 setContext = put
-
--- last :: (MonadIO m, MonadFail m) => Prompt m (Maybe Contents)
--- last = do
---   prev <- getContext
---   let contents' = unContents prev.contents
---   if length contents' == 0
---     then return Nothing
---     else return $ Just $ head contents'
 
 push :: (MonadIO m, MonadFail m) => Contents -> Prompt m ()
 push contents = do
@@ -145,15 +77,15 @@ call = do
 hasToolCall :: Contents -> Bool
 hasToolCall (Contents cs) =
   let loop [] = False
-      loop (m@(Content (user, (ToolCall _ _ _))) : cs) = True
-      loop (_ : cs) = loop cs
+      loop ((Content (_, (ToolCall _ _ _))) : _) = True
+      loop (_ : cs') = loop cs'
   in loop cs
 
 filterToolCall :: Contents -> Contents
 filterToolCall (Contents cs) =
   let loop [] = []
-      loop (m@(Content (user, (ToolCall _ _ _))) : cs) = m: loop cs
-      loop (_ : cs) = loop cs
+      loop (m@(Content (_, (ToolCall _ _ _))) : cs') = m: loop cs'
+      loop (_ : cs') = loop cs'
   in Contents $ loop cs
 
 tryToolExec :: (MonadIO m, MonadFail m) => Contents -> Prompt m Contents
@@ -174,59 +106,6 @@ runPrompt :: (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> Prom
 runPrompt req func = do
   let context = Context req Nothing mempty [] 0
   fst <$> runStateT func context
-
-class (A.ToJSON a, A.FromJSON a, A.ToJSON b, A.FromJSON b) => Tool a b | a -> b where
-  toolFunctionName :: T.Text
-  toolSchema :: API.ChatCompletionTool
-  toolExec :: a -> IO b
-  toolAdd :: API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest 
-  toolAdd req =
-    let prevTools = case API.createChatCompletionRequestTools req of
-          Nothing -> []
-          Just v -> v
-        newTools = prevTools ++ [toolSchema @a @b]
-    in req { API.createChatCompletionRequestTools = Just newTools } 
-
-data BashInput = BashInput
-  { script :: String
-  } deriving (Eq, Show, Generic)
-
-data BashOutput = BashOutput
-  { code :: Int
-  , stdout :: String
-  , stderr :: String
-  } deriving (Eq, Show, Generic)
-
-instance A.FromJSON BashInput
-instance A.ToJSON BashInput
-instance A.FromJSON BashOutput
-instance A.ToJSON BashOutput
-
-instance Tool BashInput BashOutput where
-  toolFunctionName = "call_bash_script"
-  toolSchema = API.ChatCompletionTool
-    { chatCompletionToolType = "function"
-    , chatCompletionToolFunction = API.FunctionObject
-      { functionObjectDescription = Just "Call a bash script in a local environment"
-      , functionObjectName = "call_bash_script"
-      , functionObjectParameters = Just $
-        [ ("type", "object")
-        , ("properties", A.Object [
-              ("script", A.Object [
-                  ("type", "string"),
-                  ("description", "A script executing in a local environment ")
-                  ])
-              ])
-        , ("required", A.Array ["script"])
-        ]
-      }
-    }
-  toolExec args = do
-    (code, stdout, stderr) <- readCreateProcessWithExitCode (shell args.script) ""
-    let code' = case code of
-          ExitSuccess -> 0
-          ExitFailure v -> v
-    return $ BashOutput code' stdout stderr
 
 instance ChatCompletion Contents where
   toRequest orgRequest (Contents contents) =
