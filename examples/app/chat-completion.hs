@@ -38,7 +38,7 @@ main = do
   let request = API.CreateChatCompletionRequest
                     { createChatCompletionRequestMessages = [
                         ChatCompletionRequestMessage
-                        { chatCompletionRequestMessageContent = API.ChatCompletionRequestMessageContentText "Hello"
+                        { chatCompletionRequestMessageContent = Just $ API.ChatCompletionRequestMessageContentText "Hello"
                         -- 'User' is not one of ['system', 'assistant', 'user', 'function']
                         , chatCompletionRequestMessageRole = "user"
                         , chatCompletionRequestMessageName = Nothing

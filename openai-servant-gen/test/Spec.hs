@@ -98,7 +98,7 @@ main = hspec $ do
         request `shouldBe` Right (CreateChatCompletionRequest
                                     { createChatCompletionRequestMessages = [
                                         ChatCompletionRequestMessage
-                                        { chatCompletionRequestMessageContent = ChatCompletionRequestMessageContentText "Hello"
+                                        { chatCompletionRequestMessageContent = Just $ ChatCompletionRequestMessageContentText "Hello"
                                         -- 'User' is not one of ['system', 'assistant', 'user', 'function']
                                         , chatCompletionRequestMessageRole = "user"
                                         , chatCompletionRequestMessageName = Nothing
