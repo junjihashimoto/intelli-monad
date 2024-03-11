@@ -40,28 +40,57 @@ import qualified Data.Aeson as A
 import           Data.Maybe (fromMaybe, catMaybes)
 import qualified Data.ByteString.Base64 as Base64
 
+import Data.Time
+import Data.Time.Calendar
+
 import           Prompt.Types
 import           Prompt.Tools
+import Data.Coerce
+import Database.Persist.Sqlite (SqliteConf)
+
+type Contents = [Content]
+
+defaultUTCTime ::UTCTime
+defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
 
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = get
+
+withDB :: (MonadIO m, MonadFail m) => (Conn SqliteConf -> m a) -> m a
+withDB func =
+  setup (config @SqliteConf) >>= \case
+    Nothing -> fail "Can not open a database."
+    Just (conn :: Conn SqliteConf) -> func conn
   
 setContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
-setContext = put
+setContext context = do
+  put context
+  withDB $ \conn -> save @SqliteConf conn context
+  return ()
 
 push :: (MonadIO m, MonadFail m) => Contents -> Prompt m ()
 push contents = do
   prev <- getContext
-  let nextContents = prev.contents <> contents
-      next = prev { contents = nextContents, request = toRequest prev.request nextContents }
+  let nextContents = prev.contextContents <> contents
+      next = prev
+        { contextContents = nextContents
+        , contextRequest = toRequest prev.contextRequest nextContents
+        }
   setContext next
+  
+  withDB $ \conn -> saveContents @SqliteConf conn contents
+  return ()
+  
 
 call :: (MonadIO m, MonadFail m) => Prompt m Contents
 call = do
   prev <- getContext
-  (contents, res) <- liftIO $ runRequest prev.request prev.contents
+  (contents, res) <- liftIO $ runRequest prev.contextRequest prev.contextContents
   let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
-      next = prev { response = Just res, tokens = prev.tokens ++ [current_total_tokens - total_tokens prev] , total_tokens = current_total_tokens}
+      next = prev
+        { contextResponse = Just res
+        , contextTotalTokens = current_total_tokens
+        }
   setContext next
   push contents
   if hasToolCall contents
@@ -73,44 +102,59 @@ call = do
       call
     else return contents
   
-
 hasToolCall :: Contents -> Bool
-hasToolCall (Contents cs) =
+hasToolCall cs =
   let loop [] = False
-      loop ((Content (_, (ToolCall _ _ _))) : _) = True
+      loop ((Content _ (ToolCall _ _ _) _ _) : _) = True
       loop (_ : cs') = loop cs'
   in loop cs
 
 filterToolCall :: Contents -> Contents
-filterToolCall (Contents cs) =
+filterToolCall cs =
   let loop [] = []
-      loop (m@(Content (_, (ToolCall _ _ _))) : cs') = m: loop cs'
+      loop (m@(Content _ (ToolCall _ _ _) _ _) : cs') = m: loop cs'
       loop (_ : cs') = loop cs'
-  in Contents $ loop cs
+  in loop cs
 
 tryToolExec :: (MonadIO m, MonadFail m) => Contents -> Prompt m Contents
 tryToolExec contents = do
-  cs <- forM (unContents (filterToolCall contents)) $ \c@(Content (user, (ToolCall id' name' args'))) ->
+  cs <- forM (filterToolCall contents) $ \c@(Content user (ToolCall id' name' args') _ _) ->
     if name' == toolFunctionName @BashInput
       then do
         case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String BashInput) of
           Left err -> return Nothing
           Right input -> do
             output <- liftIO $ toolExec input
-            return $ Just $ (Content (Tool, ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))))
+            time <- liftIO getCurrentTime
+            return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) "default" time)
       else
         return Nothing
-  return $ Contents $ catMaybes cs
+  return $ catMaybes cs
     
 runPrompt :: (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> Prompt m a -> m a
 runPrompt req func = do
-  let context = Context req Nothing mempty [] 0
+  -- let context = Context req Nothing mempty [] [] 0 "default" 0
+  context <- withDB $ \conn -> do
+    load @SqliteConf conn "default" >>= \case
+      Just v -> return v
+      Nothing -> do
+        time <- liftIO getCurrentTime        
+        let init = Context
+                    { contextRequest = req
+                    , contextResponse = Nothing
+                    , contextContents = []
+                    , contextTotalTokens = 0
+                    , contextSessionName = "default"
+                    , contextCreated = time
+                    }
+        initialize @SqliteConf conn init
+        return init
   fst <$> runStateT func context
 
 instance ChatCompletion Contents where
-  toRequest orgRequest (Contents contents) =
+  toRequest orgRequest contents =
     let messages = flip map contents $ \case
-          Content (user, Text message) -> 
+          Content user (Message message) _ _ -> 
             API.ChatCompletionRequestMessage
               { API.chatCompletionRequestMessageContent = Just $ API.ChatCompletionRequestMessageContentText message
               , API.chatCompletionRequestMessageRole = userToText user
@@ -119,7 +163,7 @@ instance ChatCompletion Contents where
               , API.chatCompletionRequestMessageFunctionUnderscorecall = Nothing
               , API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
               }
-          Content (user, Image img) -> 
+          Content user (Image type' img) _ _ -> 
             API.ChatCompletionRequestMessage
               { API.chatCompletionRequestMessageContent = Just $
                 API.ChatCompletionRequestMessageContentParts [
@@ -128,8 +172,7 @@ instance ChatCompletion Contents where
                     , API.chatCompletionRequestMessageContentPartImageUnderscoreurl =
                       Just $ API.ChatCompletionRequestMessageContentPartImageImageUrl
                               { API.chatCompletionRequestMessageContentPartImageImageUrlUrl =
-                                  let b64 = (Base64.encode (BS.toStrict (encodePng img)) :: BS.ByteString)
-                                  in "data:image/png;base64," <>  (T.decodeUtf8 b64)
+                                  "data:image/png;base64," <> img
                               , API.chatCompletionRequestMessageContentPartImageImageUrlDetail = Nothing  
                               }
                     }
@@ -140,7 +183,7 @@ instance ChatCompletion Contents where
               , API.chatCompletionRequestMessageFunctionUnderscorecall = Nothing
               , API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
               }
-          Content (user, ToolCall id' name' args') -> 
+          Content user (ToolCall id' name' args') _ _ -> 
             API.ChatCompletionRequestMessage
               { API.chatCompletionRequestMessageContent = Nothing
               , API.chatCompletionRequestMessageRole = userToText user
@@ -159,7 +202,7 @@ instance ChatCompletion Contents where
               , API.chatCompletionRequestMessageFunctionUnderscorecall = Nothing
               , API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
               }
-          Content (user, ToolReturn id' name' ret') -> 
+          Content user (ToolReturn id' name' ret') _ _ -> 
             API.ChatCompletionRequestMessage
               { API.chatCompletionRequestMessageContent = Just $ API.ChatCompletionRequestMessageContentText ret'
               , API.chatCompletionRequestMessageRole = userToText user
@@ -169,41 +212,17 @@ instance ChatCompletion Contents where
               , API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
               }
     in orgRequest { API.createChatCompletionRequestMessages = messages }
-  fromResponse response = Contents $
+  fromResponse response =
     concat $ flip map (API.createChatCompletionResponseChoices response) $ \res -> 
       let message = API.createChatCompletionResponseChoicesInnerMessage res
           role = textToUser $ API.chatCompletionResponseMessageRole message
           content = API.chatCompletionResponseMessageContent message
       in case API.chatCompletionResponseMessageToolUnderscorecalls message of
-         Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content (role, ToolCall id' name' args')) toolcalls
+         Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') "default" defaultUTCTime) toolcalls
          
-         Nothing -> [Content (role, Text (fromMaybe "" content))]
+         Nothing -> [Content role (Message (fromMaybe "" content)) "default" defaultUTCTime]
       
       
-defaultRequest :: API.CreateChatCompletionRequest
-defaultRequest =
-  API.CreateChatCompletionRequest
-                    { API.createChatCompletionRequestMessages = []
-                    , API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel "gpt-3.5-turbo"
-                    , API.createChatCompletionRequestFrequencyUnderscorepenalty = Nothing
-                    , API.createChatCompletionRequestLogitUnderscorebias = Nothing
-                    , API.createChatCompletionRequestLogprobs = Nothing
-                    , API.createChatCompletionRequestTopUnderscorelogprobs  = Nothing
-                    , API.createChatCompletionRequestMaxUnderscoretokens  = Nothing
-                    , API.createChatCompletionRequestN  = Nothing
-                    , API.createChatCompletionRequestPresenceUnderscorepenalty  = Nothing
-                    , API.createChatCompletionRequestResponseUnderscoreformat  = Nothing
-                    , API.createChatCompletionRequestSeed = Just 0
-                    , API.createChatCompletionRequestStop = Nothing
-                    , API.createChatCompletionRequestStream = Nothing
-                    , API.createChatCompletionRequestTemperature = Nothing
-                    , API.createChatCompletionRequestTopUnderscorep = Nothing
-                    , API.createChatCompletionRequestTools = Nothing
-                    , API.createChatCompletionRequestToolUnderscorechoice = Nothing
-                    , API.createChatCompletionRequestUser = Nothing
-                    , API.createChatCompletionRequestFunctionUnderscorecall = Nothing
-                    , API.createChatCompletionRequestFunctions = Nothing
-                    }
 
 runRequest :: ChatCompletion a => API.CreateChatCompletionRequest -> a -> IO (a, API.CreateChatCompletionResponse)
 runRequest defaultReq request = do
@@ -226,12 +245,12 @@ getTextInputLine :: MonadTrans t => String -> t (InputT IO) (Maybe T.Text)
 getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
 
 showContents :: MonadIO m => Contents -> m ()
-showContents (Contents res) = do
-  forM_ res $ \(Content (user, message)) ->
+showContents res = do
+  forM_ res $ \(Content user message _ _) ->
     liftIO $ T.putStrLn $ userToText user <> ": " <>
                case message of
-                 Text t -> t
-                 Image _ -> "Image: ..."
+                 Message t -> t
+                 Image _ _ -> "Image: ..."
                  c@(ToolCall _ _ _) -> T.pack $ show c
                  c@(ToolReturn _ _ _) -> T.pack $ show c
     
@@ -249,13 +268,22 @@ runRepl defaultReq contents = do
         Just "quit" -> return ()
         Just "clear" -> do
           loop
+        Just "show-contents" -> do
+          context <- getContext
+          showContents context.contextContents
+          loop
         Just "show-usage" -> do
           context <- getContext
           liftIO $ do
-            print context.total_tokens
+            print context.contextTotalTokens
+          loop
+        Just "show-context" -> do
+          context <- getContext
+          liftIO $ do
+            print context
           loop
         Just input -> do
-          let contents = Contents [Content (User, Text input)]
+          let contents = [Content User (Message input) "default" defaultUTCTime]
           push contents
           ret <- call
           showContents ret

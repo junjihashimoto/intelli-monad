@@ -85,6 +85,7 @@ library
                     , persistent-sqlite
                     , process
                     , base64-bytestring
+                    , time
 
     -- Directories containing source files.
     hs-source-dirs:   src

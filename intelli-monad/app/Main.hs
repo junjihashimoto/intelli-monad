@@ -5,7 +5,8 @@ module Main where
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 import qualified Data.Text as T
-import Prompt
+import           Prompt
+import           Prompt.Types
 import           System.Environment      (lookupEnv)
 
 main :: IO ()
