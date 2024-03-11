@@ -118,17 +118,22 @@ filterToolCall cs =
 
 tryToolExec :: (MonadIO m, MonadFail m) => Contents -> Prompt m Contents
 tryToolExec contents = do
-  cs <- forM (filterToolCall contents) $ \c@(Content user (ToolCall id' name' args') _ _) ->
-    if name' == toolFunctionName @BashInput
-      then do
+  cs <- forM (filterToolCall contents) $ \c@(Content user (ToolCall id' name' args') _ _) -> do
+    if name' == toolFunctionName @BashInput then
         case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String BashInput) of
           Left err -> return Nothing
           Right input -> do
             output <- liftIO $ toolExec input
             time <- liftIO getCurrentTime
             return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) "default" time)
-      else
-        return Nothing
+    else if name' == toolFunctionName @TextToSpeechInput then
+        case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String TextToSpeechInput) of
+          Left err -> return Nothing
+          Right input -> do
+            output <- liftIO $ toolExec input
+            time <- liftIO getCurrentTime
+            return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) "default" time)
+    else return Nothing
   return $ catMaybes cs
     
 runPrompt :: (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> Prompt m a -> m a
@@ -257,7 +262,10 @@ showContents res = do
   
 runRepl :: API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl defaultReq contents = do
-  let settings = toolAdd @BashInput defaultReq
+  let settings =
+        toolAdd @BashInput $
+        toolAdd @TextToSpeechInput $
+        defaultReq
   runInputT defaultSettings (runPrompt settings (push contents >> loop))
   where
     loop :: Prompt (InputT IO) ()

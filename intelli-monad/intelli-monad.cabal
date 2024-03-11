@@ -86,6 +86,7 @@ library
                     , process
                     , base64-bytestring
                     , time
+                    , servant
 
     -- Directories containing source files.
     hs-source-dirs:   src
