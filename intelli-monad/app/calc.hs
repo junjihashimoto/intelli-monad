@@ -64,5 +64,5 @@ instance CustomInstruction Math where
 
 main :: IO ()
 main = do
-  v <- runPromptWithValidation @ValidateNumber @StateLessConf [] [CustomInstructionProxy (Proxy @Math)] "default" (fromModel "gpt-4") "2+3+3+sin(3)"
+  v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [CustomInstructionProxy (Proxy @Math)] "default" (fromModel "gpt-4") "2+3+3+sin(3)"
   print (v :: Maybe ValidateNumber)

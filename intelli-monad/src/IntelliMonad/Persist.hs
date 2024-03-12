@@ -46,7 +46,7 @@ import GHC.Generics
 import IntelliMonad.Types
 import qualified OpenAI.Types as API
 
-data StateLessConf = StateLessConf
+data StatelessConf = StatelessConf
 
 class PersistentBackend p where
   type Conn p
@@ -99,9 +99,9 @@ instance PersistentBackend SqliteConf where
   deleteSession conn sessionName = do
     liftIO $ runPool (config @SqliteConf) (deleteWhere [ContextSessionName ==. sessionName]) conn
 
-instance PersistentBackend StateLessConf where
-  type Conn StateLessConf = ()
-  config = StateLessConf
+instance PersistentBackend StatelessConf where
+  type Conn StatelessConf = ()
+  config = StatelessConf
   setup _ = return $ Just ()
   initialize conn context = return ()
   load _ _ = return Nothing
