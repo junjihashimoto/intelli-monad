@@ -19,6 +19,7 @@ module IntelliMonad.Repl where
 import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (MonadTrans, lift)
+import Control.Monad.Trans.State (put)
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
 import Data.Text (Text)
@@ -26,6 +27,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Time
 import Data.Void
+import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Tools
 import IntelliMonad.Types
@@ -36,6 +38,11 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
 
+import Database.Persist
+import Database.Persist.PersistValue
+import Database.Persist.Sqlite
+import Database.Persist.TH
+
 type Parser = Parsec Void Text
 
 data ReplCommand
@@ -43,12 +50,13 @@ data ReplCommand
   | Clear
   | ShowContents
   | ShowUsage
+  | ShowRequest
   | ShowContext
+  | ShowSession
   | ListSessions
-  | RenameSession (Text, Text)
+  | CopySession (Text, Text)
   | DeleteSession Text
   | SwitchSession Text
-  | ShowSession
   | Help
   deriving (Eq, Show)
 
@@ -58,15 +66,18 @@ parseRepl =
     <|> (try (lexm (string ":clear")) >> pure Clear)
     <|> (try (lexm (string ":show") >> lexm (string "contents")) >> pure ShowContents)
     <|> (try (lexm (string ":show") >> lexm (string "usage")) >> pure ShowUsage)
+    <|> (try (lexm (string ":show") >> lexm (string "request")) >> pure ShowRequest)
     <|> (try (lexm (string ":show") >> lexm (string "context")) >> pure ShowContext)
+    <|> (try (lexm (string ":show") >> lexm (string "session")) >> pure ShowSession)
     <|> (try (lexm (string ":list") >> lexm (string "sessions")) >> pure ListSessions)
+    <|> (try (lexm (string ":list")) >> pure ListSessions)
     <|> ( try
-            ( lexm (string ":rename") >> lexm (string "session") >> do
+            ( lexm (string ":copy") >> lexm (string "session") >> do
                 from <- T.pack <$> lexm sessionName
                 to <- T.pack <$> lexm sessionName
                 return (from, to)
             )
-            >>= pure . RenameSession
+            >>= pure . CopySession
         )
     <|> (try (lexm (string ":delete") >> lexm (string "session") >> lexm sessionName) >>= pure . DeleteSession . T.pack)
     <|> (try (lexm (string ":switch") >> lexm (string "session") >> lexm sessionName) >>= pure . SwitchSession . T.pack)
@@ -79,8 +90,8 @@ parseRepl =
 getTextInputLine :: (MonadTrans t) => String -> t (InputT IO) (Maybe T.Text)
 getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
 
-runRepl :: API.CreateChatCompletionRequest -> Contents -> IO ()
-runRepl defaultReq contents = do
+runRepl :: Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
+runRepl sessionName defaultReq contents = do
   let settings =
         toolAdd @BashInput $
           toolAdd @TextToSpeechInput $
@@ -92,7 +103,7 @@ runRepl defaultReq contents = do
           autoAddHistory = True
         }
     )
-    (runPrompt settings (push contents >> loop))
+    (runPrompt sessionName settings (push contents >> loop))
   where
     loop :: Prompt (InputT IO) ()
     loop = do
@@ -106,7 +117,10 @@ runRepl defaultReq contents = do
                 liftIO $ print err
                 loop
               Right Quit -> return ()
-              Right Clear -> loop
+              Right Clear -> do
+                prev <- getContext
+                setContext $ prev {contextBody = []}
+                loop
               Right ShowContents -> do
                 context <- getContext
                 showContents context.contextBody
@@ -116,22 +130,47 @@ runRepl defaultReq contents = do
                 liftIO $ do
                   print context.contextTotalTokens
                 loop
-              Right ShowContext -> do 
+              Right ShowRequest -> do 
                 prev <- getContext
                 let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
                 liftIO $ do
                   BS.putStr $ BS.toStrict $ encodePretty req
-                  print ""
+                  T.putStrLn ""
+                loop
+              Right ShowContext -> do 
+                prev <- getContext
+                liftIO $ do
+                  putStrLn $ show prev
+                loop
+              Right ShowSession -> do 
+                prev <- getContext
+                liftIO $ do
+                  T.putStrLn $ prev.contextSessionName
                 loop
               Right ListSessions -> do
+                liftIO $ do
+                  list <- withDB $ \conn -> listSessions @SqliteConf conn
+                  forM_ list $ \sessionName -> T.putStrLn sessionName
                 loop
-              Right (RenameSession (from',to')) -> do
+              Right (CopySession (from',to')) -> do
+                liftIO $ do
+                  withDB $ \conn -> do
+                    mv <- load @SqliteConf conn from'
+                    case mv of
+                      Just v -> do
+                        _ <- save @SqliteConf conn (v {contextSessionName = to'})
+                        return ()
+                      Nothing -> T.putStrLn $ "Failed to load " <> from'
                 loop
               Right (DeleteSession session) -> do
+                withDB $ \conn -> deleteSession @SqliteConf conn session
                 loop
               Right (SwitchSession session) -> do
-                loop
-              Right ShowSession -> do
+                mv <- withDB $ \conn -> load @SqliteConf conn session
+                case mv of
+                  Just v -> do
+                    put v
+                  Nothing -> liftIO $ T.putStrLn $ "Failed to load " <> session
                 loop
               Right Help -> do
                 liftIO $ do
@@ -139,16 +178,19 @@ runRepl defaultReq contents = do
                   putStrLn ":clear"
                   putStrLn ":show contents"
                   putStrLn ":show usage"
+                  putStrLn ":show request"
                   putStrLn ":show context"
+                  putStrLn ":show session"
                   putStrLn ":list sessions"
-                  putStrLn ":rename session <from> <to>"
+                  putStrLn ":copy session <from> <to>"
                   putStrLn ":delete session <session name>"
                   putStrLn ":switch session <session name>"
                   putStrLn ":help"
                 loop
           else do 
             time <- liftIO getCurrentTime
-            let contents = [Content User (Message input) "default" time]
+            context <- getContext
+            let contents = [Content User (Message input) context.contextSessionName time]
             push contents
             ret <- call
             showContents ret

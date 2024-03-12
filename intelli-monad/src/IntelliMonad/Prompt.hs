@@ -29,6 +29,7 @@ import qualified Data.ByteString.Base64 as Base64
 import Data.Coerce
 import qualified Data.Map as M
 import Data.Maybe (catMaybes, fromMaybe)
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
@@ -101,7 +102,7 @@ pushToolReturn contents = do
 call :: (MonadIO m, MonadFail m) => Prompt m Contents
 call = do
   prev <- getContext
-  (contents, res) <- liftIO $ runRequest prev.contextRequest prev.contextBody
+  (contents, res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest prev.contextBody
   let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
       next =
         prev
@@ -113,7 +114,7 @@ call = do
   if hasToolCall contents
     then do
       showContents contents
-      retTool <- tryToolExec contents
+      retTool <- tryToolExec next.contextSessionName contents
       showContents retTool
       pushToolReturn retTool
       call
@@ -133,8 +134,8 @@ filterToolCall cs =
       loop (_ : cs') = loop cs'
    in loop cs
 
-tryToolExec :: (MonadIO m, MonadFail m) => Contents -> Prompt m Contents
-tryToolExec contents = do
+tryToolExec :: (MonadIO m, MonadFail m) => Text -> Contents -> Prompt m Contents
+tryToolExec sessionName contents = do
   cs <- forM (filterToolCall contents) $ \c@(Content user (ToolCall id' name' args') _ _) -> do
     if name' == toolFunctionName @BashInput
       then case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String BashInput) of
@@ -142,7 +143,7 @@ tryToolExec contents = do
         Right input -> do
           output <- liftIO $ toolExec input
           time <- liftIO getCurrentTime
-          return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) "default" time)
+          return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) sessionName time)
       else
         if name' == toolFunctionName @TextToSpeechInput
           then case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String TextToSpeechInput) of
@@ -150,14 +151,14 @@ tryToolExec contents = do
             Right input -> do
               output <- liftIO $ toolExec input
               time <- liftIO getCurrentTime
-              return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) "default" time)
+              return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) sessionName time)
           else return Nothing
   return $ catMaybes cs
 
-runPrompt :: (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> Prompt m a -> m a
-runPrompt req func = do
+runPrompt :: (MonadIO m, MonadFail m) => Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
+runPrompt sessionName req func = do
   context <- withDB $ \conn -> do
-    load @SqliteConf conn "default" >>= \case
+    load @SqliteConf conn sessionName >>= \case
       Just v -> return v
       Nothing -> do
         time <- liftIO getCurrentTime
@@ -169,7 +170,7 @@ runPrompt req func = do
                   contextBody = [],
                   contextFooter = [],
                   contextTotalTokens = 0,
-                  contextSessionName = "default",
+                  contextSessionName = sessionName,
                   contextCreated = time
                 }
         initialize @SqliteConf conn init
@@ -240,17 +241,17 @@ instance ChatCompletion Contents where
                 API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
               }
      in orgRequest {API.createChatCompletionRequestMessages = messages}
-  fromResponse response =
+  fromResponse sessionName response =
     concat $ flip map (API.createChatCompletionResponseChoices response) $ \res ->
       let message = API.createChatCompletionResponseChoicesInnerMessage res
           role = textToUser $ API.chatCompletionResponseMessageRole message
           content = API.chatCompletionResponseMessageContent message
        in case API.chatCompletionResponseMessageToolUnderscorecalls message of
-            Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') "default" defaultUTCTime) toolcalls
-            Nothing -> [Content role (Message (fromMaybe "" content)) "default" defaultUTCTime]
+            Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
+            Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
 
-runRequest :: (ChatCompletion a) => API.CreateChatCompletionRequest -> a -> IO (a, API.CreateChatCompletionResponse)
-runRequest defaultReq request = do
+runRequest :: (ChatCompletion a) => Text -> API.CreateChatCompletionRequest -> a -> IO (a, API.CreateChatCompletionResponse)
+runRequest sessionName defaultReq request = do
   api_key <- (API.clientAuth . T.pack) <$> getEnv "OPENAI_API_KEY"
   url <- do
     lookupEnv "OPENAI_ENDPOINT" >>= \case
@@ -265,7 +266,7 @@ runRequest defaultReq request = do
   let API.OpenAIBackend {..} = API.createOpenAIClient
       req = (toRequest defaultReq request)
   res <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
-  return (fromResponse res, res)
+  return (fromResponse sessionName res, res)
 
 showContents :: (MonadIO m) => Contents -> m ()
 showContents res = do

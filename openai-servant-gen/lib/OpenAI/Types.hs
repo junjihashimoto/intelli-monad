@@ -200,7 +200,7 @@ data AssistantFileObject = AssistantFileObject
   , assistantFileObjectObject :: Text -- ^ The object type, which is always `assistant.file`.
   , assistantFileObjectCreatedUnderscoreat :: Int -- ^ The Unix timestamp (in seconds) for when the assistant file was created.
   , assistantFileObjectAssistantUnderscoreid :: Text -- ^ The assistant ID that the file is attached to.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON AssistantFileObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantFileObject")
@@ -220,7 +220,7 @@ data AssistantObject = AssistantObject
   , assistantObjectTools :: [AssistantObjectToolsInner] -- ^ A list of tool enabled on the assistant. There can be a maximum of 128 tools per assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`. 
   , assistantObjectFileUnderscoreids :: [Text] -- ^ A list of [file](/docs/api-reference/files) IDs attached to this assistant. There can be a maximum of 20 files attached to the assistant. Files are ordered by their creation date in ascending order. 
   , assistantObjectMetadata :: Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON AssistantObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantObject")
@@ -232,7 +232,7 @@ instance ToJSON AssistantObject where
 data AssistantObjectToolsInner = AssistantObjectToolsInner
   { assistantObjectToolsInnerType :: Text -- ^ The type of tool being defined: `function`
   , assistantObjectToolsInnerFunction :: FunctionObject -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON AssistantObjectToolsInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantObjectToolsInner")
@@ -243,7 +243,7 @@ instance ToJSON AssistantObjectToolsInner where
 -- | 
 data AssistantToolsCode = AssistantToolsCode
   { assistantToolsCodeType :: Text -- ^ The type of tool being defined: `code_interpreter`
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON AssistantToolsCode where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantToolsCode")
@@ -255,7 +255,7 @@ instance ToJSON AssistantToolsCode where
 data AssistantToolsFunction = AssistantToolsFunction
   { assistantToolsFunctionType :: Text -- ^ The type of tool being defined: `function`
   , assistantToolsFunctionFunction :: FunctionObject -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON AssistantToolsFunction where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantToolsFunction")
@@ -266,7 +266,7 @@ instance ToJSON AssistantToolsFunction where
 -- | 
 data AssistantToolsRetrieval = AssistantToolsRetrieval
   { assistantToolsRetrievalType :: Text -- ^ The type of tool being defined: `retrieval`
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON AssistantToolsRetrieval where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "assistantToolsRetrieval")
@@ -277,7 +277,7 @@ instance ToJSON AssistantToolsRetrieval where
 -- | Specifying a particular function via &#x60;{\&quot;name\&quot;: \&quot;my_function\&quot;}&#x60; forces the model to call that function. 
 data ChatCompletionFunctionCallOption = ChatCompletionFunctionCallOption
   { chatCompletionFunctionCallOptionName :: Text -- ^ The name of the function to call.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionFunctionCallOption where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionFunctionCallOption")
@@ -290,7 +290,7 @@ data ChatCompletionFunctions = ChatCompletionFunctions
   { chatCompletionFunctionsDescription :: Maybe Text -- ^ A description of what the function does, used by the model to choose when and how to call the function.
   , chatCompletionFunctionsName :: Text -- ^ The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
   , chatCompletionFunctionsParameters :: Maybe (Map.Map String Value) -- ^ The parameters the functions accepts, described as a JSON Schema object. See the [guide](/docs/guides/text-generation/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.   Omitting `parameters` defines a function with an empty parameter list.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionFunctions where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionFunctions")
@@ -303,7 +303,7 @@ data ChatCompletionMessageToolCall = ChatCompletionMessageToolCall
   { chatCompletionMessageToolCallId :: Text -- ^ The ID of the tool call.
   , chatCompletionMessageToolCallType :: Text -- ^ The type of the tool. Currently, only `function` is supported.
   , chatCompletionMessageToolCallFunction :: ChatCompletionMessageToolCallFunction -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionMessageToolCall where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionMessageToolCall")
@@ -317,7 +317,7 @@ data ChatCompletionMessageToolCallChunk = ChatCompletionMessageToolCallChunk
   , chatCompletionMessageToolCallChunkId :: Maybe Text -- ^ The ID of the tool call.
   , chatCompletionMessageToolCallChunkType :: Maybe Text -- ^ The type of the tool. Currently, only `function` is supported.
   , chatCompletionMessageToolCallChunkFunction :: Maybe ChatCompletionMessageToolCallChunkFunction -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionMessageToolCallChunk where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallChunk")
@@ -329,7 +329,7 @@ instance ToJSON ChatCompletionMessageToolCallChunk where
 data ChatCompletionMessageToolCallChunkFunction = ChatCompletionMessageToolCallChunkFunction
   { chatCompletionMessageToolCallChunkFunctionName :: Maybe Text -- ^ The name of the function to call.
   , chatCompletionMessageToolCallChunkFunctionArguments :: Maybe Text -- ^ The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionMessageToolCallChunkFunction where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallChunkFunction")
@@ -341,7 +341,7 @@ instance ToJSON ChatCompletionMessageToolCallChunkFunction where
 data ChatCompletionMessageToolCallFunction = ChatCompletionMessageToolCallFunction
   { chatCompletionMessageToolCallFunctionName :: Text -- ^ The name of the function to call.
   , chatCompletionMessageToolCallFunctionArguments :: Text -- ^ The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionMessageToolCallFunction where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionMessageToolCallFunction")
@@ -353,7 +353,7 @@ instance ToJSON ChatCompletionMessageToolCallFunction where
 data ChatCompletionNamedToolChoice = ChatCompletionNamedToolChoice
   { chatCompletionNamedToolChoiceType :: Text -- ^ The type of the tool. Currently, only `function` is supported.
   , chatCompletionNamedToolChoiceFunction :: ChatCompletionNamedToolChoiceFunction -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionNamedToolChoice where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionNamedToolChoice")
@@ -364,7 +364,7 @@ instance ToJSON ChatCompletionNamedToolChoice where
 -- | 
 data ChatCompletionNamedToolChoiceFunction = ChatCompletionNamedToolChoiceFunction
   { chatCompletionNamedToolChoiceFunctionName :: Text -- ^ The name of the function to call.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionNamedToolChoiceFunction where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionNamedToolChoiceFunction")
@@ -379,7 +379,7 @@ data ChatCompletionRequestAssistantMessage = ChatCompletionRequestAssistantMessa
   , chatCompletionRequestAssistantMessageName :: Maybe Text -- ^ An optional name for the participant. Provides the model information to differentiate between participants of the same role.
   , chatCompletionRequestAssistantMessageToolUnderscorecalls :: Maybe [ChatCompletionMessageToolCall] -- ^ The tool calls generated by the model, such as function calls.
   , chatCompletionRequestAssistantMessageFunctionUnderscorecall :: Maybe ChatCompletionRequestAssistantMessageFunctionCall -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestAssistantMessage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestAssistantMessage")
@@ -391,7 +391,7 @@ instance ToJSON ChatCompletionRequestAssistantMessage where
 data ChatCompletionRequestAssistantMessageFunctionCall = ChatCompletionRequestAssistantMessageFunctionCall
   { chatCompletionRequestAssistantMessageFunctionCallArguments :: Text -- ^ The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function.
   , chatCompletionRequestAssistantMessageFunctionCallName :: Text -- ^ The name of the function to call.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestAssistantMessageFunctionCall where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestAssistantMessageFunctionCall")
@@ -404,7 +404,7 @@ data ChatCompletionRequestFunctionMessage = ChatCompletionRequestFunctionMessage
   { chatCompletionRequestFunctionMessageRole :: Text -- ^ The role of the messages author, in this case `function`.
   , chatCompletionRequestFunctionMessageContent :: Text -- ^ The contents of the function message.
   , chatCompletionRequestFunctionMessageName :: Text -- ^ The name of the function to call.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestFunctionMessage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestFunctionMessage")
@@ -420,7 +420,7 @@ data ChatCompletionRequestMessage = ChatCompletionRequestMessage
   , chatCompletionRequestMessageToolUnderscorecalls :: Maybe [ChatCompletionMessageToolCall] -- ^ The tool calls generated by the model, such as function calls.
   , chatCompletionRequestMessageFunctionUnderscorecall :: Maybe ChatCompletionRequestAssistantMessageFunctionCall -- ^ 
   , chatCompletionRequestMessageToolUnderscorecallUnderscoreid :: Maybe Text -- ^ Tool call that this message is responding to.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessage")
@@ -430,7 +430,7 @@ instance ToJSON ChatCompletionRequestMessage where
 data ChatCompletionRequestMessageContent
   = ChatCompletionRequestMessageContentText Text
   | ChatCompletionRequestMessageContentParts [ChatCompletionRequestMessageContentPart]
- deriving (Show, Eq, Generic, Data)
+ deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContent where
   -- When it is a string, parse it as a text
@@ -451,7 +451,7 @@ data ChatCompletionRequestMessageContentPart = ChatCompletionRequestMessageConte
   { chatCompletionRequestMessageContentPartType :: Text -- ^ The type of the content part.
   , chatCompletionRequestMessageContentPartText :: Maybe Text -- ^ The text content.
   , chatCompletionRequestMessageContentPartImageUnderscoreurl :: Maybe ChatCompletionRequestMessageContentPartImageImageUrl -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContentPart where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPart")
@@ -463,7 +463,7 @@ instance ToJSON ChatCompletionRequestMessageContentPart where
 data ChatCompletionRequestMessageContentPartImage = ChatCompletionRequestMessageContentPartImage
   { chatCompletionRequestMessageContentPartImageType :: Text -- ^ The type of the content part.
   , chatCompletionRequestMessageContentPartImageImageUnderscoreurl :: ChatCompletionRequestMessageContentPartImageImageUrl -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContentPartImage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartImage")
@@ -475,7 +475,7 @@ instance ToJSON ChatCompletionRequestMessageContentPartImage where
 data ChatCompletionRequestMessageContentPartImageImageUrl = ChatCompletionRequestMessageContentPartImageImageUrl
   { chatCompletionRequestMessageContentPartImageImageUrlUrl :: Text -- ^ Either a URL of the image or the base64 encoded image data.
   , chatCompletionRequestMessageContentPartImageImageUrlDetail :: Maybe Text -- ^ Specifies the detail level of the image. Learn more in the [Vision guide](/docs/guides/vision/low-or-high-fidelity-image-understanding).
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContentPartImageImageUrl where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartImageImageUrl")
@@ -487,7 +487,7 @@ instance ToJSON ChatCompletionRequestMessageContentPartImageImageUrl where
 data ChatCompletionRequestMessageContentPartText = ChatCompletionRequestMessageContentPartText
   { chatCompletionRequestMessageContentPartTextType :: Text -- ^ The type of the content part.
   , chatCompletionRequestMessageContentPartTextText :: Text -- ^ The text content.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestMessageContentPartText where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestMessageContentPartText")
@@ -500,7 +500,7 @@ data ChatCompletionRequestSystemMessage = ChatCompletionRequestSystemMessage
   { chatCompletionRequestSystemMessageContent :: Text -- ^ The contents of the system message.
   , chatCompletionRequestSystemMessageRole :: Text -- ^ The role of the messages author, in this case `system`.
   , chatCompletionRequestSystemMessageName :: Maybe Text -- ^ An optional name for the participant. Provides the model information to differentiate between participants of the same role.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestSystemMessage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestSystemMessage")
@@ -513,7 +513,7 @@ data ChatCompletionRequestToolMessage = ChatCompletionRequestToolMessage
   { chatCompletionRequestToolMessageRole :: Text -- ^ The role of the messages author, in this case `tool`.
   , chatCompletionRequestToolMessageContent :: Text -- ^ The contents of the tool message.
   , chatCompletionRequestToolMessageToolUnderscorecallUnderscoreid :: Text -- ^ Tool call that this message is responding to.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestToolMessage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestToolMessage")
@@ -526,7 +526,7 @@ data ChatCompletionRequestUserMessage = ChatCompletionRequestUserMessage
   { chatCompletionRequestUserMessageContent :: ChatCompletionRequestUserMessageContent -- ^ 
   , chatCompletionRequestUserMessageRole :: Text -- ^ The role of the messages author, in this case `user`.
   , chatCompletionRequestUserMessageName :: Maybe Text -- ^ An optional name for the participant. Provides the model information to differentiate between participants of the same role.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestUserMessage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestUserMessage")
@@ -537,7 +537,7 @@ instance ToJSON ChatCompletionRequestUserMessage where
 -- | The contents of the user message. 
 data ChatCompletionRequestUserMessageContent = ChatCompletionRequestUserMessageContent
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRequestUserMessageContent where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRequestUserMessageContent")
@@ -552,7 +552,7 @@ data ChatCompletionResponseMessage = ChatCompletionResponseMessage
   , chatCompletionResponseMessageToolUnderscorecalls :: Maybe [ChatCompletionMessageToolCall] -- ^ The tool calls generated by the model, such as function calls.
   , chatCompletionResponseMessageRole :: Text -- ^ The role of the author of this message.
   , chatCompletionResponseMessageFunctionUnderscorecall :: Maybe ChatCompletionRequestAssistantMessageFunctionCall -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionResponseMessage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionResponseMessage")
@@ -563,7 +563,7 @@ instance ToJSON ChatCompletionResponseMessage where
 -- | The role of the author of a message
 data ChatCompletionRole = ChatCompletionRole
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionRole where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionRole")
@@ -577,7 +577,7 @@ data ChatCompletionStreamResponseDelta = ChatCompletionStreamResponseDelta
   , chatCompletionStreamResponseDeltaFunctionUnderscorecall :: Maybe ChatCompletionStreamResponseDeltaFunctionCall -- ^ 
   , chatCompletionStreamResponseDeltaToolUnderscorecalls :: Maybe [ChatCompletionMessageToolCallChunk] -- ^ 
   , chatCompletionStreamResponseDeltaRole :: Maybe Text -- ^ The role of the author of this message.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionStreamResponseDelta where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionStreamResponseDelta")
@@ -589,7 +589,7 @@ instance ToJSON ChatCompletionStreamResponseDelta where
 data ChatCompletionStreamResponseDeltaFunctionCall = ChatCompletionStreamResponseDeltaFunctionCall
   { chatCompletionStreamResponseDeltaFunctionCallArguments :: Maybe Text -- ^ The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function.
   , chatCompletionStreamResponseDeltaFunctionCallName :: Maybe Text -- ^ The name of the function to call.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionStreamResponseDeltaFunctionCall where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionStreamResponseDeltaFunctionCall")
@@ -603,7 +603,7 @@ data ChatCompletionTokenLogprob = ChatCompletionTokenLogprob
   , chatCompletionTokenLogprobLogprob :: Double -- ^ The log probability of this token, if it is within the top 20 most likely tokens. Otherwise, the value `-9999.0` is used to signify that the token is very unlikely.
   , chatCompletionTokenLogprobBytes :: [Int] -- ^ A list of integers representing the UTF-8 bytes representation of the token. Useful in instances where characters are represented by multiple tokens and their byte representations must be combined to generate the correct text representation. Can be `null` if there is no bytes representation for the token.
   , chatCompletionTokenLogprobTopUnderscorelogprobs :: [ChatCompletionTokenLogprobTopLogprobsInner] -- ^ List of the most likely tokens and their log probability, at this token position. In rare cases, there may be fewer than the number of requested `top_logprobs` returned.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionTokenLogprob where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionTokenLogprob")
@@ -616,7 +616,7 @@ data ChatCompletionTokenLogprobTopLogprobsInner = ChatCompletionTokenLogprobTopL
   { chatCompletionTokenLogprobTopLogprobsInnerToken :: Text -- ^ The token.
   , chatCompletionTokenLogprobTopLogprobsInnerLogprob :: Double -- ^ The log probability of this token, if it is within the top 20 most likely tokens. Otherwise, the value `-9999.0` is used to signify that the token is very unlikely.
   , chatCompletionTokenLogprobTopLogprobsInnerBytes :: [Int] -- ^ A list of integers representing the UTF-8 bytes representation of the token. Useful in instances where characters are represented by multiple tokens and their byte representations must be combined to generate the correct text representation. Can be `null` if there is no bytes representation for the token.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionTokenLogprobTopLogprobsInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionTokenLogprobTopLogprobsInner")
@@ -628,7 +628,7 @@ instance ToJSON ChatCompletionTokenLogprobTopLogprobsInner where
 data ChatCompletionTool = ChatCompletionTool
   { chatCompletionToolType :: Text -- ^ The type of the tool. Currently, only `function` is supported.
   , chatCompletionToolFunction :: FunctionObject -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionTool where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionTool")
@@ -640,7 +640,7 @@ instance ToJSON ChatCompletionTool where
 data ChatCompletionToolChoiceOption = ChatCompletionToolChoiceOption
   { chatCompletionToolChoiceOptionType :: Text -- ^ The type of the tool. Currently, only `function` is supported.
   , chatCompletionToolChoiceOptionFunction :: ChatCompletionNamedToolChoiceFunction -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ChatCompletionToolChoiceOption where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "chatCompletionToolChoiceOption")
@@ -653,7 +653,7 @@ data CompletionUsage = CompletionUsage
   { completionUsageCompletionUnderscoretokens :: Int -- ^ Number of tokens in the generated completion.
   , completionUsagePromptUnderscoretokens :: Int -- ^ Number of tokens in the prompt.
   , completionUsageTotalUnderscoretokens :: Int -- ^ Total number of tokens used in the request (prompt + completion).
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CompletionUsage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "completionUsage")
@@ -664,7 +664,7 @@ instance ToJSON CompletionUsage where
 -- | 
 data CreateAssistantFileRequest = CreateAssistantFileRequest
   { createAssistantFileRequestFileUnderscoreid :: Text -- ^ A [File](/docs/api-reference/files) ID (with `purpose=\"assistants\"`) that the assistant should use. Useful for tools like `retrieval` and `code_interpreter` that can access files.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateAssistantFileRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createAssistantFileRequest")
@@ -681,7 +681,7 @@ data CreateAssistantRequest = CreateAssistantRequest
   , createAssistantRequestTools :: Maybe [AssistantObjectToolsInner] -- ^ A list of tool enabled on the assistant. There can be a maximum of 128 tools per assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`. 
   , createAssistantRequestFileUnderscoreids :: Maybe [Text] -- ^ A list of [file](/docs/api-reference/files) IDs attached to this assistant. There can be a maximum of 20 files attached to the assistant. Files are ordered by their creation date in ascending order. 
   , createAssistantRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateAssistantRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createAssistantRequest")
@@ -690,7 +690,7 @@ instance ToJSON CreateAssistantRequest where
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
-data CreateAssistantRequestModel = CreateAssistantRequestModel Text  deriving (Show, Eq, Generic, Data)
+data CreateAssistantRequestModel = CreateAssistantRequestModel Text  deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateAssistantRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createAssistantRequestModel")
@@ -707,7 +707,7 @@ data CreateChatCompletionFunctionResponse = CreateChatCompletionFunctionResponse
   , createChatCompletionFunctionResponseSystemUnderscorefingerprint :: Maybe Text -- ^ This fingerprint represents the backend configuration that the model runs with.  Can be used in conjunction with the `seed` request parameter to understand when backend changes have been made that might impact determinism. 
   , createChatCompletionFunctionResponseObject :: Text -- ^ The object type, which is always `chat.completion`.
   , createChatCompletionFunctionResponseUsage :: Maybe CompletionUsage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionFunctionResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionFunctionResponse")
@@ -720,7 +720,7 @@ data CreateChatCompletionFunctionResponseChoicesInner = CreateChatCompletionFunc
   { createChatCompletionFunctionResponseChoicesInnerFinishUnderscorereason :: Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, or `function_call` if the model called a function. 
   , createChatCompletionFunctionResponseChoicesInnerIndex :: Int -- ^ The index of the choice in the list of choices.
   , createChatCompletionFunctionResponseChoicesInnerMessage :: ChatCompletionResponseMessage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionFunctionResponseChoicesInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionFunctionResponseChoicesInner")
@@ -750,7 +750,7 @@ data CreateChatCompletionRequest = CreateChatCompletionRequest
   , createChatCompletionRequestUser :: Maybe Text -- ^ A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids). 
   , createChatCompletionRequestFunctionUnderscorecall :: Maybe CreateChatCompletionRequestFunctionCall -- ^ 
   , createChatCompletionRequestFunctions :: Maybe [ChatCompletionFunctions] -- ^ Deprecated in favor of `tools`.  A list of functions the model may generate JSON inputs for. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequest")
@@ -761,7 +761,7 @@ instance ToJSON CreateChatCompletionRequest where
 -- | Deprecated in favor of &#x60;tool_choice&#x60;.  Controls which (if any) function is called by the model. &#x60;none&#x60; means the model will not call a function and instead generates a message. &#x60;auto&#x60; means the model can pick between generating a message or calling a function. Specifying a particular function via &#x60;{\&quot;name\&quot;: \&quot;my_function\&quot;}&#x60; forces the model to call that function.  &#x60;none&#x60; is the default when no functions are present. &#x60;auto&#x60; is the default if functions are present. 
 data CreateChatCompletionRequestFunctionCall = CreateChatCompletionRequestFunctionCall
   { createChatCompletionRequestFunctionCallName :: Text -- ^ The name of the function to call.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequestFunctionCall where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequestFunctionCall")
@@ -770,7 +770,7 @@ instance ToJSON CreateChatCompletionRequestFunctionCall where
 
 
 -- | ID of the model to use. See the [model endpoint compatibility](/docs/models/model-endpoint-compatibility) table for details on which models work with the Chat API.
-newtype CreateChatCompletionRequestModel = CreateChatCompletionRequestModel Text deriving (Show, Eq, Generic, Data)
+newtype CreateChatCompletionRequestModel = CreateChatCompletionRequestModel Text deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequestModel")
@@ -781,7 +781,7 @@ instance ToJSON CreateChatCompletionRequestModel where
 -- | An object specifying the format that the model must output. Compatible with [GPT-4 Turbo](/docs/models/gpt-4-and-gpt-4-turbo) and all GPT-3.5 Turbo models newer than &#x60;gpt-3.5-turbo-1106&#x60;.  Setting to &#x60;{ \&quot;type\&quot;: \&quot;json_object\&quot; }&#x60; enables JSON mode, which guarantees the message the model generates is valid JSON.  **Important:** when using JSON mode, you **must** also instruct the model to produce JSON yourself via a system or user message. Without this, the model may generate an unending stream of whitespace until the generation reaches the token limit, resulting in a long-running and seemingly \&quot;stuck\&quot; request. Also note that the message content may be partially cut off if &#x60;finish_reason&#x3D;\&quot;length\&quot;&#x60;, which indicates the generation exceeded &#x60;max_tokens&#x60; or the conversation exceeded the max context length. 
 data CreateChatCompletionRequestResponseFormat = CreateChatCompletionRequestResponseFormat
   { createChatCompletionRequestResponseFormatType :: Maybe Text -- ^ Must be one of `text` or `json_object`.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequestResponseFormat where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequestResponseFormat")
@@ -792,7 +792,7 @@ instance ToJSON CreateChatCompletionRequestResponseFormat where
 -- | Up to 4 sequences where the API will stop generating further tokens. 
 data CreateChatCompletionRequestStop = CreateChatCompletionRequestStop
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionRequestStop where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionRequestStop")
@@ -809,7 +809,7 @@ data CreateChatCompletionResponse = CreateChatCompletionResponse
   , createChatCompletionResponseSystemUnderscorefingerprint :: Maybe Text -- ^ This fingerprint represents the backend configuration that the model runs with.  Can be used in conjunction with the `seed` request parameter to understand when backend changes have been made that might impact determinism. 
   , createChatCompletionResponseObject :: Text -- ^ The object type, which is always `chat.completion`.
   , createChatCompletionResponseUsage :: Maybe CompletionUsage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionResponse")
@@ -823,7 +823,7 @@ data CreateChatCompletionResponseChoicesInner = CreateChatCompletionResponseChoi
   , createChatCompletionResponseChoicesInnerIndex :: Int -- ^ The index of the choice in the list of choices.
   , createChatCompletionResponseChoicesInnerMessage :: ChatCompletionResponseMessage -- ^ 
   , createChatCompletionResponseChoicesInnerLogprobs :: Maybe CreateChatCompletionResponseChoicesInnerLogprobs -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionResponseChoicesInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionResponseChoicesInner")
@@ -834,7 +834,7 @@ instance ToJSON CreateChatCompletionResponseChoicesInner where
 -- | Log probability information for the choice.
 data CreateChatCompletionResponseChoicesInnerLogprobs = CreateChatCompletionResponseChoicesInnerLogprobs
   { createChatCompletionResponseChoicesInnerLogprobsContent :: [ChatCompletionTokenLogprob] -- ^ A list of message content tokens with log probability information.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionResponseChoicesInnerLogprobs where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionResponseChoicesInnerLogprobs")
@@ -850,7 +850,7 @@ data CreateChatCompletionStreamResponse = CreateChatCompletionStreamResponse
   , createChatCompletionStreamResponseModel :: Text -- ^ The model to generate the completion.
   , createChatCompletionStreamResponseSystemUnderscorefingerprint :: Maybe Text -- ^ This fingerprint represents the backend configuration that the model runs with. Can be used in conjunction with the `seed` request parameter to understand when backend changes have been made that might impact determinism. 
   , createChatCompletionStreamResponseObject :: Text -- ^ The object type, which is always `chat.completion.chunk`.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionStreamResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionStreamResponse")
@@ -864,7 +864,7 @@ data CreateChatCompletionStreamResponseChoicesInner = CreateChatCompletionStream
   , createChatCompletionStreamResponseChoicesInnerLogprobs :: Maybe CreateChatCompletionResponseChoicesInnerLogprobs -- ^ 
   , createChatCompletionStreamResponseChoicesInnerFinishUnderscorereason :: Text -- ^ The reason the model stopped generating tokens. This will be `stop` if the model hit a natural stop point or a provided stop sequence, `length` if the maximum number of tokens specified in the request was reached, `content_filter` if content was omitted due to a flag from our content filters, `tool_calls` if the model called a tool, or `function_call` (deprecated) if the model called a function. 
   , createChatCompletionStreamResponseChoicesInnerIndex :: Int -- ^ The index of the choice in the list of choices.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateChatCompletionStreamResponseChoicesInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createChatCompletionStreamResponseChoicesInner")
@@ -891,7 +891,7 @@ data CreateCompletionRequest = CreateCompletionRequest
   , createCompletionRequestTemperature :: Maybe Double -- ^ What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.  We generally recommend altering this or `top_p` but not both. 
   , createCompletionRequestTopUnderscorep :: Maybe Double -- ^ An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.  We generally recommend altering this or `temperature` but not both. 
   , createCompletionRequestUser :: Maybe Text -- ^ A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids). 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateCompletionRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequest")
@@ -900,7 +900,7 @@ instance ToJSON CreateCompletionRequest where
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
-data CreateCompletionRequestModel = CreateCompletionRequestModel Text  deriving (Show, Eq, Generic, Data)
+data CreateCompletionRequestModel = CreateCompletionRequestModel Text  deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateCompletionRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequestModel")
@@ -911,7 +911,7 @@ instance ToJSON CreateCompletionRequestModel where
 -- | The prompt(s) to generate completions for, encoded as a string, array of strings, array of tokens, or array of token arrays.  Note that &lt;|endoftext|&gt; is the document separator that the model sees during training, so if a prompt is not specified the model will generate as if from the beginning of a new document. 
 data CreateCompletionRequestPrompt = CreateCompletionRequestPrompt
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateCompletionRequestPrompt where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequestPrompt")
@@ -922,7 +922,7 @@ instance ToJSON CreateCompletionRequestPrompt where
 -- | Up to 4 sequences where the API will stop generating further tokens. The returned text will not contain the stop sequence. 
 data CreateCompletionRequestStop = CreateCompletionRequestStop
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateCompletionRequestStop where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionRequestStop")
@@ -939,7 +939,7 @@ data CreateCompletionResponse = CreateCompletionResponse
   , createCompletionResponseSystemUnderscorefingerprint :: Maybe Text -- ^ This fingerprint represents the backend configuration that the model runs with.  Can be used in conjunction with the `seed` request parameter to understand when backend changes have been made that might impact determinism. 
   , createCompletionResponseObject :: Text -- ^ The object type, which is always \"text_completion\"
   , createCompletionResponseUsage :: Maybe CompletionUsage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateCompletionResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionResponse")
@@ -953,7 +953,7 @@ data CreateCompletionResponseChoicesInner = CreateCompletionResponseChoicesInner
   , createCompletionResponseChoicesInnerIndex :: Int -- ^ 
   , createCompletionResponseChoicesInnerLogprobs :: Maybe CreateCompletionResponseChoicesInnerLogprobs -- ^ 
   , createCompletionResponseChoicesInnerText :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateCompletionResponseChoicesInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionResponseChoicesInner")
@@ -967,7 +967,7 @@ data CreateCompletionResponseChoicesInnerLogprobs = CreateCompletionResponseChoi
   , createCompletionResponseChoicesInnerLogprobsTokenUnderscorelogprobs :: Maybe [Double] -- ^ 
   , createCompletionResponseChoicesInnerLogprobsTokens :: Maybe [Text] -- ^ 
   , createCompletionResponseChoicesInnerLogprobsTopUnderscorelogprobs :: Maybe [(Map.Map String Double)] -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateCompletionResponseChoicesInnerLogprobs where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createCompletionResponseChoicesInnerLogprobs")
@@ -982,7 +982,7 @@ data CreateEmbeddingRequest = CreateEmbeddingRequest
   , createEmbeddingRequestEncodingUnderscoreformat :: Maybe Text -- ^ The format to return the embeddings in. Can be either `float` or [`base64`](https://pypi.org/project/pybase64/).
   , createEmbeddingRequestDimensions :: Maybe Int -- ^ The number of dimensions the resulting output embeddings should have. Only supported in `text-embedding-3` and later models. 
   , createEmbeddingRequestUser :: Maybe Text -- ^ A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids). 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateEmbeddingRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingRequest")
@@ -993,7 +993,7 @@ instance ToJSON CreateEmbeddingRequest where
 -- | Input text to embed, encoded as a string or array of tokens. To embed multiple inputs in a single request, pass an array of strings or array of token arrays. The input must not exceed the max input tokens for the model (8192 tokens for &#x60;text-embedding-ada-002&#x60;), cannot be an empty string, and any array must be 2048 dimensions or less. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens. 
 data CreateEmbeddingRequestInput = CreateEmbeddingRequestInput
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateEmbeddingRequestInput where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingRequestInput")
@@ -1002,7 +1002,7 @@ instance ToJSON CreateEmbeddingRequestInput where
 
 
 -- | ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them. 
-data CreateEmbeddingRequestModel = CreateEmbeddingRequestModel Text  deriving (Show, Eq, Generic, Data)
+data CreateEmbeddingRequestModel = CreateEmbeddingRequestModel Text  deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateEmbeddingRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingRequestModel")
@@ -1016,7 +1016,7 @@ data CreateEmbeddingResponse = CreateEmbeddingResponse
   , createEmbeddingResponseModel :: Text -- ^ The name of the model used to generate the embedding.
   , createEmbeddingResponseObject :: Text -- ^ The object type, which is always \"list\".
   , createEmbeddingResponseUsage :: CreateEmbeddingResponseUsage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateEmbeddingResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingResponse")
@@ -1028,7 +1028,7 @@ instance ToJSON CreateEmbeddingResponse where
 data CreateEmbeddingResponseUsage = CreateEmbeddingResponseUsage
   { createEmbeddingResponseUsagePromptUnderscoretokens :: Int -- ^ The number of tokens used by the prompt.
   , createEmbeddingResponseUsageTotalUnderscoretokens :: Int -- ^ The total number of tokens used by the request.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateEmbeddingResponseUsage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createEmbeddingResponseUsage")
@@ -1043,7 +1043,7 @@ data CreateFineTuningJobRequest = CreateFineTuningJobRequest
   , createFineTuningJobRequestHyperparameters :: Maybe CreateFineTuningJobRequestHyperparameters -- ^ 
   , createFineTuningJobRequestSuffix :: Maybe Text -- ^ A string of up to 18 characters that will be added to your fine-tuned model name.  For example, a `suffix` of \"custom-model-name\" would produce a model name like `ft:gpt-3.5-turbo:openai:custom-model-name:7p4lURel`. 
   , createFineTuningJobRequestValidationUnderscorefile :: Maybe Text -- ^ The ID of an uploaded file that contains validation data.  If you provide this file, the data is used to generate validation metrics periodically during fine-tuning. These metrics can be viewed in the fine-tuning results file. The same data should not be present in both train and validation files.  Your dataset must be formatted as a JSONL file. You must upload your file with the purpose `fine-tune`.  See the [fine-tuning guide](/docs/guides/fine-tuning) for more details. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequest")
@@ -1056,7 +1056,7 @@ data CreateFineTuningJobRequestHyperparameters = CreateFineTuningJobRequestHyper
   { createFineTuningJobRequestHyperparametersBatchUnderscoresize :: Maybe CreateFineTuningJobRequestHyperparametersBatchSize -- ^ 
   , createFineTuningJobRequestHyperparametersLearningUnderscorerateUnderscoremultiplier :: Maybe CreateFineTuningJobRequestHyperparametersLearningRateMultiplier -- ^ 
   , createFineTuningJobRequestHyperparametersNUnderscoreepochs :: Maybe CreateFineTuningJobRequestHyperparametersNEpochs -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestHyperparameters where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparameters")
@@ -1067,7 +1067,7 @@ instance ToJSON CreateFineTuningJobRequestHyperparameters where
 -- | Number of examples in each batch. A larger batch size means that model parameters are updated less frequently, but with lower variance. 
 data CreateFineTuningJobRequestHyperparametersBatchSize = CreateFineTuningJobRequestHyperparametersBatchSize
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestHyperparametersBatchSize where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersBatchSize")
@@ -1078,7 +1078,7 @@ instance ToJSON CreateFineTuningJobRequestHyperparametersBatchSize where
 -- | Scaling factor for the learning rate. A smaller learning rate may be useful to avoid overfitting. 
 data CreateFineTuningJobRequestHyperparametersLearningRateMultiplier = CreateFineTuningJobRequestHyperparametersLearningRateMultiplier
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestHyperparametersLearningRateMultiplier where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersLearningRateMultiplier")
@@ -1089,7 +1089,7 @@ instance ToJSON CreateFineTuningJobRequestHyperparametersLearningRateMultiplier 
 -- | The number of epochs to train the model for. An epoch refers to one full cycle through the training dataset. 
 data CreateFineTuningJobRequestHyperparametersNEpochs = CreateFineTuningJobRequestHyperparametersNEpochs
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestHyperparametersNEpochs where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestHyperparametersNEpochs")
@@ -1098,7 +1098,7 @@ instance ToJSON CreateFineTuningJobRequestHyperparametersNEpochs where
 
 
 -- | The name of the model to fine-tune. You can select one of the [supported models](/docs/guides/fine-tuning/what-models-can-be-fine-tuned). 
-data CreateFineTuningJobRequestModel = CreateFineTuningJobRequestModel Text  deriving (Show, Eq, Generic, Data)
+data CreateFineTuningJobRequestModel = CreateFineTuningJobRequestModel Text  deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateFineTuningJobRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createFineTuningJobRequestModel")
@@ -1116,7 +1116,7 @@ data CreateImageRequest = CreateImageRequest
   , createImageRequestSize :: Maybe Text -- ^ The size of the generated images. Must be one of `256x256`, `512x512`, or `1024x1024` for `dall-e-2`. Must be one of `1024x1024`, `1792x1024`, or `1024x1792` for `dall-e-3` models.
   , createImageRequestStyle :: Maybe Text -- ^ The style of the generated images. Must be one of `vivid` or `natural`. Vivid causes the model to lean towards generating hyper-real and dramatic images. Natural causes the model to produce more natural, less hyper-real looking images. This param is only supported for `dall-e-3`.
   , createImageRequestUser :: Maybe Text -- ^ A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids). 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateImageRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createImageRequest")
@@ -1125,7 +1125,7 @@ instance ToJSON CreateImageRequest where
 
 
 -- | The model to use for image generation.
-data CreateImageRequestModel = CreateImageRequestModel Text  deriving (Show, Eq, Generic, Data)
+data CreateImageRequestModel = CreateImageRequestModel Text  deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateImageRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createImageRequestModel")
@@ -1139,7 +1139,7 @@ data CreateMessageRequest = CreateMessageRequest
   , createMessageRequestContent :: Text -- ^ The content of the message.
   , createMessageRequestFileUnderscoreids :: Maybe [Text] -- ^ A list of [File](/docs/api-reference/files) IDs that the message should use. There can be a maximum of 10 files attached to a message. Useful for tools like `retrieval` and `code_interpreter` that can access and use files.
   , createMessageRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateMessageRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createMessageRequest")
@@ -1151,7 +1151,7 @@ instance ToJSON CreateMessageRequest where
 data CreateModerationRequest = CreateModerationRequest
   { createModerationRequestInput :: CreateModerationRequestInput -- ^ 
   , createModerationRequestModel :: Maybe CreateModerationRequestModel -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateModerationRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationRequest")
@@ -1162,7 +1162,7 @@ instance ToJSON CreateModerationRequest where
 -- | The input text to classify
 data CreateModerationRequestInput = CreateModerationRequestInput
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateModerationRequestInput where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationRequestInput")
@@ -1171,7 +1171,7 @@ instance ToJSON CreateModerationRequestInput where
 
 
 -- | Two content moderations models are available: &#x60;text-moderation-stable&#x60; and &#x60;text-moderation-latest&#x60;.  The default is &#x60;text-moderation-latest&#x60; which will be automatically upgraded over time. This ensures you are always using our most accurate model. If you use &#x60;text-moderation-stable&#x60;, we will provide advanced notice before updating the model. Accuracy of &#x60;text-moderation-stable&#x60; may be slightly lower than for &#x60;text-moderation-latest&#x60;. 
-data CreateModerationRequestModel = CreateModerationRequestModel Text  deriving (Show, Eq, Generic, Data)
+data CreateModerationRequestModel = CreateModerationRequestModel Text  deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateModerationRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationRequestModel")
@@ -1184,7 +1184,7 @@ data CreateModerationResponse = CreateModerationResponse
   { createModerationResponseId :: Text -- ^ The unique identifier for the moderation request.
   , createModerationResponseModel :: Text -- ^ The model used to generate the moderation results.
   , createModerationResponseResults :: [CreateModerationResponseResultsInner] -- ^ A list of moderation objects.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateModerationResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationResponse")
@@ -1197,7 +1197,7 @@ data CreateModerationResponseResultsInner = CreateModerationResponseResultsInner
   { createModerationResponseResultsInnerFlagged :: Bool -- ^ Whether any of the below categories are flagged.
   , createModerationResponseResultsInnerCategories :: CreateModerationResponseResultsInnerCategories -- ^ 
   , createModerationResponseResultsInnerCategoryUnderscorescores :: CreateModerationResponseResultsInnerCategoryScores -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateModerationResponseResultsInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationResponseResultsInner")
@@ -1218,7 +1218,7 @@ data CreateModerationResponseResultsInnerCategories = CreateModerationResponseRe
   , createModerationResponseResultsInnerCategoriesSexualSlashminors :: Bool -- ^ Sexual content that includes an individual who is under 18 years old.
   , createModerationResponseResultsInnerCategoriesViolence :: Bool -- ^ Content that depicts death, violence, or physical injury.
   , createModerationResponseResultsInnerCategoriesViolenceSlashgraphic :: Bool -- ^ Content that depicts death, violence, or physical injury in graphic detail.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateModerationResponseResultsInnerCategories where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationResponseResultsInnerCategories")
@@ -1239,7 +1239,7 @@ data CreateModerationResponseResultsInnerCategoryScores = CreateModerationRespon
   , createModerationResponseResultsInnerCategoryScoresSexualSlashminors :: Double -- ^ The score for the category 'sexual/minors'.
   , createModerationResponseResultsInnerCategoryScoresViolence :: Double -- ^ The score for the category 'violence'.
   , createModerationResponseResultsInnerCategoryScoresViolenceSlashgraphic :: Double -- ^ The score for the category 'violence/graphic'.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateModerationResponseResultsInnerCategoryScores where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createModerationResponseResultsInnerCategoryScores")
@@ -1255,7 +1255,7 @@ data CreateRunRequest = CreateRunRequest
   , createRunRequestAdditionalUnderscoreinstructions :: Maybe Text -- ^ Appends additional instructions at the end of the instructions for the run. This is useful for modifying the behavior on a per-run basis without overriding other instructions.
   , createRunRequestTools :: Maybe [AssistantObjectToolsInner] -- ^ Override the tools the assistant can use for this run. This is useful for modifying the behavior on a per-run basis.
   , createRunRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateRunRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createRunRequest")
@@ -1270,7 +1270,7 @@ data CreateSpeechRequest = CreateSpeechRequest
   , createSpeechRequestVoice :: Text -- ^ The voice to use when generating the audio. Supported voices are `alloy`, `echo`, `fable`, `onyx`, `nova`, and `shimmer`. Previews of the voices are available in the [Text to speech guide](/docs/guides/text-to-speech/voice-options).
   , createSpeechRequestResponseUnderscoreformat :: Maybe Text -- ^ The format to audio in. Supported formats are `mp3`, `opus`, `aac`, `flac`, `wav`, and `pcm`.
   , createSpeechRequestSpeed :: Maybe Double -- ^ The speed of the generated audio. Select a value from `0.25` to `4.0`. `1.0` is the default.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateSpeechRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createSpeechRequest")
@@ -1279,7 +1279,7 @@ instance ToJSON CreateSpeechRequest where
 
 
 -- | One of the available [TTS models](/docs/models/tts): &#x60;tts-1&#x60; or &#x60;tts-1-hd&#x60; 
-data CreateSpeechRequestModel = CreateSpeechRequestModel Text  deriving (Show, Eq, Generic, Data)
+data CreateSpeechRequestModel = CreateSpeechRequestModel Text  deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateSpeechRequestModel where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createSpeechRequestModel")
@@ -1295,7 +1295,7 @@ data CreateThreadAndRunRequest = CreateThreadAndRunRequest
   , createThreadAndRunRequestInstructions :: Maybe Text -- ^ Override the default system message of the assistant. This is useful for modifying the behavior on a per-run basis.
   , createThreadAndRunRequestTools :: Maybe [CreateThreadAndRunRequestToolsInner] -- ^ Override the tools the assistant can use for this run. This is useful for modifying the behavior on a per-run basis.
   , createThreadAndRunRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateThreadAndRunRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createThreadAndRunRequest")
@@ -1307,7 +1307,7 @@ instance ToJSON CreateThreadAndRunRequest where
 data CreateThreadAndRunRequestToolsInner = CreateThreadAndRunRequestToolsInner
   { createThreadAndRunRequestToolsInnerType :: Text -- ^ The type of tool being defined: `function`
   , createThreadAndRunRequestToolsInnerFunction :: FunctionObject -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateThreadAndRunRequestToolsInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createThreadAndRunRequestToolsInner")
@@ -1319,7 +1319,7 @@ instance ToJSON CreateThreadAndRunRequestToolsInner where
 data CreateThreadRequest = CreateThreadRequest
   { createThreadRequestMessages :: Maybe [CreateMessageRequest] -- ^ A list of [messages](/docs/api-reference/messages) to start the thread with.
   , createThreadRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateThreadRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createThreadRequest")
@@ -1334,7 +1334,7 @@ data CreateTranscription200Response = CreateTranscription200Response
   , createTranscription200ResponseDuration :: Text -- ^ The duration of the input audio.
   , createTranscription200ResponseWords :: Maybe [TranscriptionWord] -- ^ Extracted words and their corresponding timestamps.
   , createTranscription200ResponseSegments :: Maybe [TranscriptionSegment] -- ^ Segments of the transcribed text and their corresponding details.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateTranscription200Response where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranscription200Response")
@@ -1345,7 +1345,7 @@ instance ToJSON CreateTranscription200Response where
 -- | Represents a transcription response returned by model, based on the provided input.
 data CreateTranscriptionResponseJson = CreateTranscriptionResponseJson
   { createTranscriptionResponseJsonText :: Text -- ^ The transcribed text.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateTranscriptionResponseJson where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranscriptionResponseJson")
@@ -1360,7 +1360,7 @@ data CreateTranscriptionResponseVerboseJson = CreateTranscriptionResponseVerbose
   , createTranscriptionResponseVerboseJsonText :: Text -- ^ The transcribed text.
   , createTranscriptionResponseVerboseJsonWords :: Maybe [TranscriptionWord] -- ^ Extracted words and their corresponding timestamps.
   , createTranscriptionResponseVerboseJsonSegments :: Maybe [TranscriptionSegment] -- ^ Segments of the transcribed text and their corresponding details.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateTranscriptionResponseVerboseJson where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranscriptionResponseVerboseJson")
@@ -1374,7 +1374,7 @@ data CreateTranslation200Response = CreateTranslation200Response
   , createTranslation200ResponseLanguage :: Text -- ^ The language of the output translation (always `english`).
   , createTranslation200ResponseDuration :: Text -- ^ The duration of the input audio.
   , createTranslation200ResponseSegments :: Maybe [TranscriptionSegment] -- ^ Segments of the translated text and their corresponding details.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateTranslation200Response where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranslation200Response")
@@ -1385,7 +1385,7 @@ instance ToJSON CreateTranslation200Response where
 -- | 
 data CreateTranslationResponseJson = CreateTranslationResponseJson
   { createTranslationResponseJsonText :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateTranslationResponseJson where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranslationResponseJson")
@@ -1399,7 +1399,7 @@ data CreateTranslationResponseVerboseJson = CreateTranslationResponseVerboseJson
   , createTranslationResponseVerboseJsonDuration :: Text -- ^ The duration of the input audio.
   , createTranslationResponseVerboseJsonText :: Text -- ^ The translated text.
   , createTranslationResponseVerboseJsonSegments :: Maybe [TranscriptionSegment] -- ^ Segments of the translated text and their corresponding details.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON CreateTranslationResponseVerboseJson where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "createTranslationResponseVerboseJson")
@@ -1412,7 +1412,7 @@ data DeleteAssistantFileResponse = DeleteAssistantFileResponse
   { deleteAssistantFileResponseId :: Text -- ^ 
   , deleteAssistantFileResponseDeleted :: Bool -- ^ 
   , deleteAssistantFileResponseObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON DeleteAssistantFileResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteAssistantFileResponse")
@@ -1425,7 +1425,7 @@ data DeleteAssistantResponse = DeleteAssistantResponse
   { deleteAssistantResponseId :: Text -- ^ 
   , deleteAssistantResponseDeleted :: Bool -- ^ 
   , deleteAssistantResponseObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON DeleteAssistantResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteAssistantResponse")
@@ -1438,7 +1438,7 @@ data DeleteFileResponse = DeleteFileResponse
   { deleteFileResponseId :: Text -- ^ 
   , deleteFileResponseObject :: Text -- ^ 
   , deleteFileResponseDeleted :: Bool -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON DeleteFileResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteFileResponse")
@@ -1451,7 +1451,7 @@ data DeleteMessageResponse = DeleteMessageResponse
   { deleteMessageResponseId :: Text -- ^ 
   , deleteMessageResponseDeleted :: Bool -- ^ 
   , deleteMessageResponseObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON DeleteMessageResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteMessageResponse")
@@ -1464,7 +1464,7 @@ data DeleteModelResponse = DeleteModelResponse
   { deleteModelResponseId :: Text -- ^ 
   , deleteModelResponseDeleted :: Bool -- ^ 
   , deleteModelResponseObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON DeleteModelResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteModelResponse")
@@ -1477,7 +1477,7 @@ data DeleteThreadResponse = DeleteThreadResponse
   { deleteThreadResponseId :: Text -- ^ 
   , deleteThreadResponseDeleted :: Bool -- ^ 
   , deleteThreadResponseObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON DeleteThreadResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "deleteThreadResponse")
@@ -1490,7 +1490,7 @@ data Embedding = Embedding
   { embeddingIndex :: Int -- ^ The index of the embedding in the list of embeddings.
   , embeddingEmbedding :: [Double] -- ^ The embedding vector, which is a list of floats. The length of vector depends on the model as listed in the [embedding guide](/docs/guides/embeddings). 
   , embeddingObject :: Text -- ^ The object type, which is always \"embedding\".
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON Embedding where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "embedding")
@@ -1504,7 +1504,7 @@ data Error = Error
   , errorMessage :: Text -- ^ 
   , errorParam :: Text -- ^ 
   , errorType :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON Error where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "error")
@@ -1515,7 +1515,7 @@ instance ToJSON Error where
 -- | 
 data ErrorResponse = ErrorResponse
   { errorResponseError :: Error -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ErrorResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "errorResponse")
@@ -1539,7 +1539,7 @@ data FineTuningJob = FineTuningJob
   , fineTuningJobTrainedUnderscoretokens :: Int -- ^ The total number of billable tokens processed by this fine-tuning job. The value will be null if the fine-tuning job is still running.
   , fineTuningJobTrainingUnderscorefile :: Text -- ^ The file ID used for training. You can retrieve the training data with the [Files API](/docs/api-reference/files/retrieve-contents).
   , fineTuningJobValidationUnderscorefile :: Text -- ^ The file ID used for validation. You can retrieve the validation results with the [Files API](/docs/api-reference/files/retrieve-contents).
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON FineTuningJob where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJob")
@@ -1552,7 +1552,7 @@ data FineTuningJobError = FineTuningJobError
   { fineTuningJobErrorCode :: Text -- ^ A machine-readable error code.
   , fineTuningJobErrorMessage :: Text -- ^ A human-readable error message.
   , fineTuningJobErrorParam :: Text -- ^ The parameter that was invalid, usually `training_file` or `validation_file`. This field will be null if the failure was not parameter-specific.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON FineTuningJobError where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJobError")
@@ -1567,7 +1567,7 @@ data FineTuningJobEvent = FineTuningJobEvent
   , fineTuningJobEventLevel :: Text -- ^ 
   , fineTuningJobEventMessage :: Text -- ^ 
   , fineTuningJobEventObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON FineTuningJobEvent where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJobEvent")
@@ -1578,7 +1578,7 @@ instance ToJSON FineTuningJobEvent where
 -- | The hyperparameters used for the fine-tuning job. See the [fine-tuning guide](/docs/guides/fine-tuning) for more details.
 data FineTuningJobHyperparameters = FineTuningJobHyperparameters
   { fineTuningJobHyperparametersNUnderscoreepochs :: FineTuningJobHyperparametersNEpochs -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON FineTuningJobHyperparameters where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJobHyperparameters")
@@ -1589,7 +1589,7 @@ instance ToJSON FineTuningJobHyperparameters where
 -- | The number of epochs to train the model for. An epoch refers to one full cycle through the training dataset. \&quot;auto\&quot; decides the optimal number of epochs based on the size of the dataset. If setting the number manually, we support any number between 1 and 50 epochs.
 data FineTuningJobHyperparametersNEpochs = FineTuningJobHyperparametersNEpochs
   { 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON FineTuningJobHyperparametersNEpochs where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "fineTuningJobHyperparametersNEpochs")
@@ -1602,7 +1602,7 @@ data FunctionObject = FunctionObject
   { functionObjectDescription :: Maybe Text -- ^ A description of what the function does, used by the model to choose when and how to call the function.
   , functionObjectName :: Text -- ^ The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
   , functionObjectParameters :: Maybe (Map.Map String Value) -- ^ The parameters the functions accepts, described as a JSON Schema object. See the [guide](/docs/guides/text-generation/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.   Omitting `parameters` defines a function with an empty parameter list.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON FunctionObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "functionObject")
@@ -1615,7 +1615,7 @@ data Image = Image
   { imageB64Underscorejson :: Maybe Text -- ^ The base64-encoded JSON of the generated image, if `response_format` is `b64_json`.
   , imageUrl :: Maybe Text -- ^ The URL of the generated image, if `response_format` is `url` (default).
   , imageRevisedUnderscoreprompt :: Maybe Text -- ^ The prompt that was used to generate the image, if there was any revision to the prompt.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON Image where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "image")
@@ -1627,7 +1627,7 @@ instance ToJSON Image where
 data ImagesResponse = ImagesResponse
   { imagesResponseCreated :: Int -- ^ 
   , imagesResponseData :: [Image] -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ImagesResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "imagesResponse")
@@ -1642,7 +1642,7 @@ data ListAssistantFilesResponse = ListAssistantFilesResponse
   , listAssistantFilesResponseFirstUnderscoreid :: Text -- ^ 
   , listAssistantFilesResponseLastUnderscoreid :: Text -- ^ 
   , listAssistantFilesResponseHasUnderscoremore :: Bool -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListAssistantFilesResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listAssistantFilesResponse")
@@ -1657,7 +1657,7 @@ data ListAssistantsResponse = ListAssistantsResponse
   , listAssistantsResponseFirstUnderscoreid :: Text -- ^ 
   , listAssistantsResponseLastUnderscoreid :: Text -- ^ 
   , listAssistantsResponseHasUnderscoremore :: Bool -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListAssistantsResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listAssistantsResponse")
@@ -1669,7 +1669,7 @@ instance ToJSON ListAssistantsResponse where
 data ListFilesResponse = ListFilesResponse
   { listFilesResponseData :: [OpenAIFile] -- ^ 
   , listFilesResponseObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListFilesResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listFilesResponse")
@@ -1681,7 +1681,7 @@ instance ToJSON ListFilesResponse where
 data ListFineTuningJobEventsResponse = ListFineTuningJobEventsResponse
   { listFineTuningJobEventsResponseData :: [FineTuningJobEvent] -- ^ 
   , listFineTuningJobEventsResponseObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListFineTuningJobEventsResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listFineTuningJobEventsResponse")
@@ -1696,7 +1696,7 @@ data ListMessageFilesResponse = ListMessageFilesResponse
   , listMessageFilesResponseFirstUnderscoreid :: Text -- ^ 
   , listMessageFilesResponseLastUnderscoreid :: Text -- ^ 
   , listMessageFilesResponseHasUnderscoremore :: Bool -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListMessageFilesResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listMessageFilesResponse")
@@ -1711,7 +1711,7 @@ data ListMessagesResponse = ListMessagesResponse
   , listMessagesResponseFirstUnderscoreid :: Text -- ^ 
   , listMessagesResponseLastUnderscoreid :: Text -- ^ 
   , listMessagesResponseHasUnderscoremore :: Bool -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListMessagesResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listMessagesResponse")
@@ -1723,7 +1723,7 @@ instance ToJSON ListMessagesResponse where
 data ListModelsResponse = ListModelsResponse
   { listModelsResponseObject :: Text -- ^ 
   , listModelsResponseData :: [Model] -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListModelsResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listModelsResponse")
@@ -1736,7 +1736,7 @@ data ListPaginatedFineTuningJobsResponse = ListPaginatedFineTuningJobsResponse
   { listPaginatedFineTuningJobsResponseData :: [FineTuningJob] -- ^ 
   , listPaginatedFineTuningJobsResponseHasUnderscoremore :: Bool -- ^ 
   , listPaginatedFineTuningJobsResponseObject :: Text -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListPaginatedFineTuningJobsResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listPaginatedFineTuningJobsResponse")
@@ -1751,7 +1751,7 @@ data ListRunStepsResponse = ListRunStepsResponse
   , listRunStepsResponseFirstUnderscoreid :: Text -- ^ 
   , listRunStepsResponseLastUnderscoreid :: Text -- ^ 
   , listRunStepsResponseHasUnderscoremore :: Bool -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListRunStepsResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listRunStepsResponse")
@@ -1766,7 +1766,7 @@ data ListRunsResponse = ListRunsResponse
   , listRunsResponseFirstUnderscoreid :: Text -- ^ 
   , listRunsResponseLastUnderscoreid :: Text -- ^ 
   , listRunsResponseHasUnderscoremore :: Bool -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListRunsResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listRunsResponse")
@@ -1781,7 +1781,7 @@ data ListThreadsResponse = ListThreadsResponse
   , listThreadsResponseFirstUnderscoreid :: Text -- ^ 
   , listThreadsResponseLastUnderscoreid :: Text -- ^ 
   , listThreadsResponseHasUnderscoremore :: Bool -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ListThreadsResponse where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "listThreadsResponse")
@@ -1793,7 +1793,7 @@ instance ToJSON ListThreadsResponse where
 data MessageContentImageFileObject = MessageContentImageFileObject
   { messageContentImageFileObjectType :: Text -- ^ Always `image_file`.
   , messageContentImageFileObjectImageUnderscorefile :: MessageContentImageFileObjectImageFile -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentImageFileObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentImageFileObject")
@@ -1804,7 +1804,7 @@ instance ToJSON MessageContentImageFileObject where
 -- | 
 data MessageContentImageFileObjectImageFile = MessageContentImageFileObjectImageFile
   { messageContentImageFileObjectImageFileFileUnderscoreid :: Text -- ^ The [File](/docs/api-reference/files) ID of the image in the message content.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentImageFileObjectImageFile where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentImageFileObjectImageFile")
@@ -1819,7 +1819,7 @@ data MessageContentTextAnnotationsFileCitationObject = MessageContentTextAnnotat
   , messageContentTextAnnotationsFileCitationObjectFileUnderscorecitation :: MessageContentTextAnnotationsFileCitationObjectFileCitation -- ^ 
   , messageContentTextAnnotationsFileCitationObjectStartUnderscoreindex :: Int -- ^ 
   , messageContentTextAnnotationsFileCitationObjectEndUnderscoreindex :: Int -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentTextAnnotationsFileCitationObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFileCitationObject")
@@ -1831,7 +1831,7 @@ instance ToJSON MessageContentTextAnnotationsFileCitationObject where
 data MessageContentTextAnnotationsFileCitationObjectFileCitation = MessageContentTextAnnotationsFileCitationObjectFileCitation
   { messageContentTextAnnotationsFileCitationObjectFileCitationFileUnderscoreid :: Text -- ^ The ID of the specific File the citation is from.
   , messageContentTextAnnotationsFileCitationObjectFileCitationQuote :: Text -- ^ The specific quote in the file.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentTextAnnotationsFileCitationObjectFileCitation where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFileCitationObjectFileCitation")
@@ -1846,7 +1846,7 @@ data MessageContentTextAnnotationsFilePathObject = MessageContentTextAnnotations
   , messageContentTextAnnotationsFilePathObjectFileUnderscorepath :: MessageContentTextAnnotationsFilePathObjectFilePath -- ^ 
   , messageContentTextAnnotationsFilePathObjectStartUnderscoreindex :: Int -- ^ 
   , messageContentTextAnnotationsFilePathObjectEndUnderscoreindex :: Int -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentTextAnnotationsFilePathObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFilePathObject")
@@ -1857,7 +1857,7 @@ instance ToJSON MessageContentTextAnnotationsFilePathObject where
 -- | 
 data MessageContentTextAnnotationsFilePathObjectFilePath = MessageContentTextAnnotationsFilePathObjectFilePath
   { messageContentTextAnnotationsFilePathObjectFilePathFileUnderscoreid :: Text -- ^ The ID of the file that was generated.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentTextAnnotationsFilePathObjectFilePath where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextAnnotationsFilePathObjectFilePath")
@@ -1869,7 +1869,7 @@ instance ToJSON MessageContentTextAnnotationsFilePathObjectFilePath where
 data MessageContentTextObject = MessageContentTextObject
   { messageContentTextObjectType :: Text -- ^ Always `text`.
   , messageContentTextObjectText :: MessageContentTextObjectText -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentTextObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextObject")
@@ -1881,7 +1881,7 @@ instance ToJSON MessageContentTextObject where
 data MessageContentTextObjectText = MessageContentTextObjectText
   { messageContentTextObjectTextValue :: Text -- ^ The data that makes up the text.
   , messageContentTextObjectTextAnnotations :: [MessageContentTextObjectTextAnnotationsInner] -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentTextObjectText where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextObjectText")
@@ -1897,7 +1897,7 @@ data MessageContentTextObjectTextAnnotationsInner = MessageContentTextObjectText
   , messageContentTextObjectTextAnnotationsInnerStartUnderscoreindex :: Int -- ^ 
   , messageContentTextObjectTextAnnotationsInnerEndUnderscoreindex :: Int -- ^ 
   , messageContentTextObjectTextAnnotationsInnerFileUnderscorepath :: MessageContentTextAnnotationsFilePathObjectFilePath -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageContentTextObjectTextAnnotationsInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageContentTextObjectTextAnnotationsInner")
@@ -1911,7 +1911,7 @@ data MessageFileObject = MessageFileObject
   , messageFileObjectObject :: Text -- ^ The object type, which is always `thread.message.file`.
   , messageFileObjectCreatedUnderscoreat :: Int -- ^ The Unix timestamp (in seconds) for when the message file was created.
   , messageFileObjectMessageUnderscoreid :: Text -- ^ The ID of the [message](/docs/api-reference/messages) that the [File](/docs/api-reference/files) is attached to.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageFileObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageFileObject")
@@ -1931,7 +1931,7 @@ data MessageObject = MessageObject
   , messageObjectRunUnderscoreid :: Text -- ^ If applicable, the ID of the [run](/docs/api-reference/runs) associated with the authoring of this message.
   , messageObjectFileUnderscoreids :: [Text] -- ^ A list of [file](/docs/api-reference/files) IDs that the assistant should use. Useful for tools like retrieval and code_interpreter that can access files. A maximum of 10 files can be attached to a message.
   , messageObjectMetadata :: Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageObject")
@@ -1944,7 +1944,7 @@ data MessageObjectContentInner = MessageObjectContentInner
   { messageObjectContentInnerType :: Text -- ^ Always `text`.
   , messageObjectContentInnerImageUnderscorefile :: MessageContentImageFileObjectImageFile -- ^ 
   , messageObjectContentInnerText :: MessageContentTextObjectText -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON MessageObjectContentInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "messageObjectContentInner")
@@ -1958,7 +1958,7 @@ data Model = Model
   , modelCreated :: Int -- ^ The Unix timestamp (in seconds) when the model was created.
   , modelObject :: Text -- ^ The object type, which is always \"model\".
   , modelOwnedUnderscoreby :: Text -- ^ The organization that owns the model.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON Model where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "model")
@@ -1975,7 +1975,7 @@ data ModifyAssistantRequest = ModifyAssistantRequest
   , modifyAssistantRequestTools :: Maybe [AssistantObjectToolsInner] -- ^ A list of tool enabled on the assistant. There can be a maximum of 128 tools per assistant. Tools can be of types `code_interpreter`, `retrieval`, or `function`. 
   , modifyAssistantRequestFileUnderscoreids :: Maybe [Text] -- ^ A list of [File](/docs/api-reference/files) IDs attached to this assistant. There can be a maximum of 20 files attached to the assistant. Files are ordered by their creation date in ascending order. If a file was previously attached to the list but does not show up in the list, it will be deleted from the assistant. 
   , modifyAssistantRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ModifyAssistantRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "modifyAssistantRequest")
@@ -1986,7 +1986,7 @@ instance ToJSON ModifyAssistantRequest where
 -- | 
 data ModifyMessageRequest = ModifyMessageRequest
   { modifyMessageRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ModifyMessageRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "modifyMessageRequest")
@@ -1997,7 +1997,7 @@ instance ToJSON ModifyMessageRequest where
 -- | 
 data ModifyRunRequest = ModifyRunRequest
   { modifyRunRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ModifyRunRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "modifyRunRequest")
@@ -2008,7 +2008,7 @@ instance ToJSON ModifyRunRequest where
 -- | 
 data ModifyThreadRequest = ModifyThreadRequest
   { modifyThreadRequestMetadata :: Maybe Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ModifyThreadRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "modifyThreadRequest")
@@ -2026,7 +2026,7 @@ data OpenAIFile = OpenAIFile
   , openAIFilePurpose :: Text -- ^ The intended purpose of the file. Supported values are `fine-tune`, `fine-tune-results`, `assistants`, and `assistants_output`.
   , openAIFileStatus :: Text -- ^ Deprecated. The current status of the file, which can be either `uploaded`, `processed`, or `error`.
   , openAIFileStatusUnderscoredetails :: Maybe Text -- ^ Deprecated. For details on why a fine-tuning training file failed validation, see the `error` field on `fine_tuning.job`.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON OpenAIFile where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "openAIFile")
@@ -2039,7 +2039,7 @@ data RunCompletionUsage = RunCompletionUsage
   { runCompletionUsageCompletionUnderscoretokens :: Int -- ^ Number of completion tokens used over the course of the run.
   , runCompletionUsagePromptUnderscoretokens :: Int -- ^ Number of prompt tokens used over the course of the run.
   , runCompletionUsageTotalUnderscoretokens :: Int -- ^ Total number of tokens used (prompt + completion).
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunCompletionUsage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runCompletionUsage")
@@ -2068,7 +2068,7 @@ data RunObject = RunObject
   , runObjectFileUnderscoreids :: [Text] -- ^ The list of [File](/docs/api-reference/files) IDs the [assistant](/docs/api-reference/assistants) used for this run.
   , runObjectMetadata :: Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
   , runObjectUsage :: RunCompletionUsage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runObject")
@@ -2080,7 +2080,7 @@ instance ToJSON RunObject where
 data RunObjectLastError = RunObjectLastError
   { runObjectLastErrorCode :: Text -- ^ One of `server_error`, `rate_limit_exceeded`, or `invalid_prompt`.
   , runObjectLastErrorMessage :: Text -- ^ A human-readable description of the error.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunObjectLastError where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runObjectLastError")
@@ -2092,7 +2092,7 @@ instance ToJSON RunObjectLastError where
 data RunObjectRequiredAction = RunObjectRequiredAction
   { runObjectRequiredActionType :: Text -- ^ For now, this is always `submit_tool_outputs`.
   , runObjectRequiredActionSubmitUnderscoretoolUnderscoreoutputs :: RunObjectRequiredActionSubmitToolOutputs -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunObjectRequiredAction where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runObjectRequiredAction")
@@ -2103,7 +2103,7 @@ instance ToJSON RunObjectRequiredAction where
 -- | Details on the tool outputs needed for this run to continue.
 data RunObjectRequiredActionSubmitToolOutputs = RunObjectRequiredActionSubmitToolOutputs
   { runObjectRequiredActionSubmitToolOutputsToolUnderscorecalls :: [RunToolCallObject] -- ^ A list of the relevant tool calls.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunObjectRequiredActionSubmitToolOutputs where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runObjectRequiredActionSubmitToolOutputs")
@@ -2116,7 +2116,7 @@ data RunStepCompletionUsage = RunStepCompletionUsage
   { runStepCompletionUsageCompletionUnderscoretokens :: Int -- ^ Number of completion tokens used over the course of the run step.
   , runStepCompletionUsagePromptUnderscoretokens :: Int -- ^ Number of prompt tokens used over the course of the run step.
   , runStepCompletionUsageTotalUnderscoretokens :: Int -- ^ Total number of tokens used (prompt + completion).
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepCompletionUsage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepCompletionUsage")
@@ -2128,7 +2128,7 @@ instance ToJSON RunStepCompletionUsage where
 data RunStepDetailsMessageCreationObject = RunStepDetailsMessageCreationObject
   { runStepDetailsMessageCreationObjectType :: Text -- ^ Always `message_creation`.
   , runStepDetailsMessageCreationObjectMessageUnderscorecreation :: RunStepDetailsMessageCreationObjectMessageCreation -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsMessageCreationObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsMessageCreationObject")
@@ -2139,7 +2139,7 @@ instance ToJSON RunStepDetailsMessageCreationObject where
 -- | 
 data RunStepDetailsMessageCreationObjectMessageCreation = RunStepDetailsMessageCreationObjectMessageCreation
   { runStepDetailsMessageCreationObjectMessageCreationMessageUnderscoreid :: Text -- ^ The ID of the message that was created by this run step.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsMessageCreationObjectMessageCreation where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsMessageCreationObjectMessageCreation")
@@ -2152,7 +2152,7 @@ data RunStepDetailsToolCallsCodeObject = RunStepDetailsToolCallsCodeObject
   { runStepDetailsToolCallsCodeObjectId :: Text -- ^ The ID of the tool call.
   , runStepDetailsToolCallsCodeObjectType :: Text -- ^ The type of tool call. This is always going to be `code_interpreter` for this type of tool call.
   , runStepDetailsToolCallsCodeObjectCodeUnderscoreinterpreter :: RunStepDetailsToolCallsCodeObjectCodeInterpreter -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObject")
@@ -2164,7 +2164,7 @@ instance ToJSON RunStepDetailsToolCallsCodeObject where
 data RunStepDetailsToolCallsCodeObjectCodeInterpreter = RunStepDetailsToolCallsCodeObjectCodeInterpreter
   { runStepDetailsToolCallsCodeObjectCodeInterpreterInput :: Text -- ^ The input to the Code Interpreter tool call.
   , runStepDetailsToolCallsCodeObjectCodeInterpreterOutputs :: [RunStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner] -- ^ The outputs from the Code Interpreter tool call. Code Interpreter can output one or more items, including text (`logs`) or images (`image`). Each of these are represented by a different object type.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeObjectCodeInterpreter where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObjectCodeInterpreter")
@@ -2177,7 +2177,7 @@ data RunStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner = RunStepDetai
   { runStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInnerType :: Text -- ^ Always `image`.
   , runStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInnerLogs :: Text -- ^ The text output from the Code Interpreter tool call.
   , runStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInnerImage :: RunStepDetailsToolCallsCodeOutputImageObjectImage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner")
@@ -2189,7 +2189,7 @@ instance ToJSON RunStepDetailsToolCallsCodeObjectCodeInterpreterOutputsInner whe
 data RunStepDetailsToolCallsCodeOutputImageObject = RunStepDetailsToolCallsCodeOutputImageObject
   { runStepDetailsToolCallsCodeOutputImageObjectType :: Text -- ^ Always `image`.
   , runStepDetailsToolCallsCodeOutputImageObjectImage :: RunStepDetailsToolCallsCodeOutputImageObjectImage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeOutputImageObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputImageObject")
@@ -2200,7 +2200,7 @@ instance ToJSON RunStepDetailsToolCallsCodeOutputImageObject where
 -- | 
 data RunStepDetailsToolCallsCodeOutputImageObjectImage = RunStepDetailsToolCallsCodeOutputImageObjectImage
   { runStepDetailsToolCallsCodeOutputImageObjectImageFileUnderscoreid :: Text -- ^ The [file](/docs/api-reference/files) ID of the image.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeOutputImageObjectImage where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputImageObjectImage")
@@ -2212,7 +2212,7 @@ instance ToJSON RunStepDetailsToolCallsCodeOutputImageObjectImage where
 data RunStepDetailsToolCallsCodeOutputLogsObject = RunStepDetailsToolCallsCodeOutputLogsObject
   { runStepDetailsToolCallsCodeOutputLogsObjectType :: Text -- ^ Always `logs`.
   , runStepDetailsToolCallsCodeOutputLogsObjectLogs :: Text -- ^ The text output from the Code Interpreter tool call.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsCodeOutputLogsObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsCodeOutputLogsObject")
@@ -2225,7 +2225,7 @@ data RunStepDetailsToolCallsFunctionObject = RunStepDetailsToolCallsFunctionObje
   { runStepDetailsToolCallsFunctionObjectId :: Text -- ^ The ID of the tool call object.
   , runStepDetailsToolCallsFunctionObjectType :: Text -- ^ The type of tool call. This is always going to be `function` for this type of tool call.
   , runStepDetailsToolCallsFunctionObjectFunction :: RunStepDetailsToolCallsFunctionObjectFunction -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsFunctionObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsFunctionObject")
@@ -2238,7 +2238,7 @@ data RunStepDetailsToolCallsFunctionObjectFunction = RunStepDetailsToolCallsFunc
   { runStepDetailsToolCallsFunctionObjectFunctionName :: Text -- ^ The name of the function.
   , runStepDetailsToolCallsFunctionObjectFunctionArguments :: Text -- ^ The arguments passed to the function.
   , runStepDetailsToolCallsFunctionObjectFunctionOutput :: Text -- ^ The output of the function. This will be `null` if the outputs have not been [submitted](/docs/api-reference/runs/submitToolOutputs) yet.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsFunctionObjectFunction where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsFunctionObjectFunction")
@@ -2250,7 +2250,7 @@ instance ToJSON RunStepDetailsToolCallsFunctionObjectFunction where
 data RunStepDetailsToolCallsObject = RunStepDetailsToolCallsObject
   { runStepDetailsToolCallsObjectType :: Text -- ^ Always `tool_calls`.
   , runStepDetailsToolCallsObjectToolUnderscorecalls :: [RunStepDetailsToolCallsObjectToolCallsInner] -- ^ An array of tool calls the run step was involved in. These can be associated with one of three types of tools: `code_interpreter`, `retrieval`, or `function`. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsObject")
@@ -2265,7 +2265,7 @@ data RunStepDetailsToolCallsObjectToolCallsInner = RunStepDetailsToolCallsObject
   , runStepDetailsToolCallsObjectToolCallsInnerCodeUnderscoreinterpreter :: RunStepDetailsToolCallsCodeObjectCodeInterpreter -- ^ 
   , runStepDetailsToolCallsObjectToolCallsInnerRetrieval :: Value -- ^ For now, this is always going to be an empty object.
   , runStepDetailsToolCallsObjectToolCallsInnerFunction :: RunStepDetailsToolCallsFunctionObjectFunction -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsObjectToolCallsInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsObjectToolCallsInner")
@@ -2278,7 +2278,7 @@ data RunStepDetailsToolCallsRetrievalObject = RunStepDetailsToolCallsRetrievalOb
   { runStepDetailsToolCallsRetrievalObjectId :: Text -- ^ The ID of the tool call object.
   , runStepDetailsToolCallsRetrievalObjectType :: Text -- ^ The type of tool call. This is always going to be `retrieval` for this type of tool call.
   , runStepDetailsToolCallsRetrievalObjectRetrieval :: Value -- ^ For now, this is always going to be an empty object.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepDetailsToolCallsRetrievalObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepDetailsToolCallsRetrievalObject")
@@ -2304,7 +2304,7 @@ data RunStepObject = RunStepObject
   , runStepObjectCompletedUnderscoreat :: Int -- ^ The Unix timestamp (in seconds) for when the run step completed.
   , runStepObjectMetadata :: Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
   , runStepObjectUsage :: RunStepCompletionUsage -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepObject")
@@ -2316,7 +2316,7 @@ instance ToJSON RunStepObject where
 data RunStepObjectLastError = RunStepObjectLastError
   { runStepObjectLastErrorCode :: Text -- ^ One of `server_error` or `rate_limit_exceeded`.
   , runStepObjectLastErrorMessage :: Text -- ^ A human-readable description of the error.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepObjectLastError where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepObjectLastError")
@@ -2329,7 +2329,7 @@ data RunStepObjectStepDetails = RunStepObjectStepDetails
   { runStepObjectStepDetailsType :: Text -- ^ Always `tool_calls`.
   , runStepObjectStepDetailsMessageUnderscorecreation :: RunStepDetailsMessageCreationObjectMessageCreation -- ^ 
   , runStepObjectStepDetailsToolUnderscorecalls :: [RunStepDetailsToolCallsObjectToolCallsInner] -- ^ An array of tool calls the run step was involved in. These can be associated with one of three types of tools: `code_interpreter`, `retrieval`, or `function`. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunStepObjectStepDetails where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runStepObjectStepDetails")
@@ -2342,7 +2342,7 @@ data RunToolCallObject = RunToolCallObject
   { runToolCallObjectId :: Text -- ^ The ID of the tool call. This ID must be referenced when you submit the tool outputs in using the [Submit tool outputs to run](/docs/api-reference/runs/submitToolOutputs) endpoint.
   , runToolCallObjectType :: Text -- ^ The type of tool call the output is required for. For now, this is always `function`.
   , runToolCallObjectFunction :: RunToolCallObjectFunction -- ^ 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunToolCallObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runToolCallObject")
@@ -2354,7 +2354,7 @@ instance ToJSON RunToolCallObject where
 data RunToolCallObjectFunction = RunToolCallObjectFunction
   { runToolCallObjectFunctionName :: Text -- ^ The name of the function.
   , runToolCallObjectFunctionArguments :: Text -- ^ The arguments that the model expects you to pass to the function.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON RunToolCallObjectFunction where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "runToolCallObjectFunction")
@@ -2365,7 +2365,7 @@ instance ToJSON RunToolCallObjectFunction where
 -- | 
 data SubmitToolOutputsRunRequest = SubmitToolOutputsRunRequest
   { submitToolOutputsRunRequestToolUnderscoreoutputs :: [SubmitToolOutputsRunRequestToolOutputsInner] -- ^ A list of tools for which the outputs are being submitted.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON SubmitToolOutputsRunRequest where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "submitToolOutputsRunRequest")
@@ -2377,7 +2377,7 @@ instance ToJSON SubmitToolOutputsRunRequest where
 data SubmitToolOutputsRunRequestToolOutputsInner = SubmitToolOutputsRunRequestToolOutputsInner
   { submitToolOutputsRunRequestToolOutputsInnerToolUnderscorecallUnderscoreid :: Maybe Text -- ^ The ID of the tool call in the `required_action` object within the run object the output is being submitted for.
   , submitToolOutputsRunRequestToolOutputsInnerOutput :: Maybe Text -- ^ The output of the tool call to be submitted to continue the run.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON SubmitToolOutputsRunRequestToolOutputsInner where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "submitToolOutputsRunRequestToolOutputsInner")
@@ -2391,7 +2391,7 @@ data ThreadObject = ThreadObject
   , threadObjectObject :: Text -- ^ The object type, which is always `thread`.
   , threadObjectCreatedUnderscoreat :: Int -- ^ The Unix timestamp (in seconds) for when the thread was created.
   , threadObjectMetadata :: Value -- ^ Set of 16 key-value pairs that can be attached to an object. This can be useful for storing additional information about the object in a structured format. Keys can be a maximum of 64 characters long and values can be a maxium of 512 characters long. 
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON ThreadObject where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "threadObject")
@@ -2411,7 +2411,7 @@ data TranscriptionSegment = TranscriptionSegment
   , transcriptionSegmentAvgUnderscorelogprob :: Float -- ^ Average logprob of the segment. If the value is lower than -1, consider the logprobs failed.
   , transcriptionSegmentCompressionUnderscoreratio :: Float -- ^ Compression ratio of the segment. If the value is greater than 2.4, consider the compression failed.
   , transcriptionSegmentNoUnderscorespeechUnderscoreprob :: Float -- ^ Probability of no speech in the segment. If the value is higher than 1.0 and the `avg_logprob` is below -1, consider this segment silent.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON TranscriptionSegment where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "transcriptionSegment")
@@ -2424,7 +2424,7 @@ data TranscriptionWord = TranscriptionWord
   { transcriptionWordWord :: Text -- ^ The text content of the word.
   , transcriptionWordStart :: Float -- ^ Start time of the word in seconds.
   , transcriptionWordEnd :: Float -- ^ End time of the word in seconds.
-  } deriving (Show, Eq, Generic, Data)
+  } deriving (Show, Eq, Ord, Generic, Data)
 
 instance FromJSON TranscriptionWord where
   parseJSON = genericParseJSON (removeFieldLabelPrefix "transcriptionWord")

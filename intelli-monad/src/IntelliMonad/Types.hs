@@ -44,7 +44,7 @@ import Database.Persist.TH
 import GHC.Generics
 import qualified OpenAI.Types as API
 
-data User = User | System | Assistant | Tool deriving (Eq, Show, Generic)
+data User = User | System | Assistant | Tool deriving (Eq, Show, Ord, Generic)
 
 instance ToJSON User
 
@@ -85,7 +85,7 @@ data Message
         toolName :: Text,
         toolContent :: Text
       }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Ord, Generic)
 
 instance ToJSON Message
 
@@ -95,7 +95,7 @@ newtype Model = Model Text deriving (Eq, Show)
 
 class ChatCompletion a where
   toRequest :: API.CreateChatCompletionRequest -> a -> API.CreateChatCompletionRequest
-  fromResponse :: API.CreateChatCompletionResponse -> a
+  fromResponse :: Text -> API.CreateChatCompletionResponse -> a
 
 class (ChatCompletion a) => Validate a b where
   tryConvert :: a -> Either a b
@@ -148,6 +148,7 @@ Content
     created UTCTime default=CURRENT_TIME
     deriving Show
     deriving Eq
+    deriving Ord
 Context
     request API.CreateChatCompletionRequest
     response API.CreateChatCompletionResponse Maybe
@@ -159,6 +160,7 @@ Context
     created UTCTime default=CURRENT_TIME
     deriving Show
     deriving Eq
+    deriving Ord
 |]
 
 type Contents = [Content]

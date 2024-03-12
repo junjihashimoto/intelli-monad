@@ -33,6 +33,7 @@ import Data.ByteString (ByteString, fromStrict, toStrict)
 import Data.Either (either)
 import Data.List (maximumBy)
 import Data.Maybe (catMaybes, maybe)
+import qualified Data.Set as S
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -54,6 +55,8 @@ class PersistentBackend p where
   loadByKey :: (MonadIO m, MonadFail m) => Conn p -> (Key Context) -> m (Maybe Context)
   save :: (MonadIO m, MonadFail m) => Conn p -> Context -> m (Key Context)
   saveContents :: (MonadIO m, MonadFail m) => Conn p -> [Content] -> m ()
+  listSessions :: (MonadIO m, MonadFail m) => Conn p -> m [Text]
+  deleteSession :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m ()
 
 instance PersistentBackend SqliteConf where
   type Conn SqliteConf = ConnectionPool
@@ -86,6 +89,14 @@ instance PersistentBackend SqliteConf where
 
   saveContents conn contents = do
     liftIO $ runPool (config @SqliteConf) (putMany contents) conn
+
+  listSessions conn = do
+    (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [] []) conn
+    return $ S.toList $ S.fromList $ map (\(Entity k v) -> contextSessionName v) a
+
+  deleteSession conn sessionName = do
+    liftIO $ runPool (config @SqliteConf) (deleteWhere [ContextSessionName ==. sessionName]) conn
+    
 
 withDB :: (MonadIO m, MonadFail m) => (Conn SqliteConf -> m a) -> m a
 withDB func =

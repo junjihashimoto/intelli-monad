@@ -18,6 +18,7 @@ main = do
       Just model -> return $ T.pack model
       Nothing -> return "gpt-4"
   runRepl
+    "default"
     defaultRequest
       { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
       }
