@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -25,6 +26,7 @@
 
 module IntelliMonad.Types where
 
+import qualified Data.Aeson as A
 import qualified Codec.Picture as P
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
@@ -36,6 +38,7 @@ import Data.Maybe (catMaybes, maybe)
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Coerce
 import Data.Time
 import Database.Persist
 import Database.Persist.PersistValue
@@ -43,6 +46,7 @@ import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
 import qualified OpenAI.Types as API
+import Data.Kind (Type)
 
 data User = User | System | Assistant | Tool deriving (Eq, Show, Ord, Generic)
 
@@ -163,9 +167,23 @@ Context
     deriving Ord
 |]
 
+data ToolProxy = forall t. (Tool t, A.FromJSON t, A.ToJSON t, A.FromJSON (Output t), A.ToJSON (Output t)) => ToolProxy (Proxy t)
+
+class CustomInstruction a where
+  customHeader :: Contents
+  customFooter :: Contents
+
+data CustomInstructionProxy = forall t. (CustomInstruction t) => CustomInstructionProxy (Proxy t)
+
+data PromptEnv = PromptEnv
+  { tools :: [ToolProxy]
+  , customInstructions :: [CustomInstructionProxy]
+  , context :: Context
+  }
+
 type Contents = [Content]
 
-type Prompt = StateT Context
+type Prompt = StateT PromptEnv
 
 -- data TypedPrompt tools task output =
 
@@ -196,15 +214,21 @@ defaultRequest =
       API.createChatCompletionRequestFunctions = Nothing
     }
 
-class Tool a b | a -> b where
+class Tool a where
+  data Output a :: Type
   toolFunctionName :: Text
   toolSchema :: API.ChatCompletionTool
-  toolExec :: a -> IO b
+  toolExec :: a -> IO (Output a)
 
-toolAdd :: forall a b. (Tool a b) => API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
+toolAdd :: forall a. (Tool a) => API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
 toolAdd req =
   let prevTools = case API.createChatCompletionRequestTools req of
         Nothing -> []
         Just v -> v
-      newTools = prevTools ++ [toolSchema @a @b]
+      newTools = prevTools ++ [toolSchema @a]
    in req {API.createChatCompletionRequestTools = Just newTools}
+
+defaultUTCTime :: UTCTime
+defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
+
+

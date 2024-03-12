@@ -13,12 +13,21 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module IntelliMonad.Tools where
 
+import Data.Maybe (catMaybes, fromMaybe)
+import Control.Monad (forM, forM_)
+import Data.Aeson (encode)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
+import Data.Text (Text)
+import qualified Data.Text.Encoding as T
+import Control.Monad.IO.Class
 import GHC.Generics
 import GHC.IO.Exception
 import IntelliMonad.Types
@@ -30,28 +39,30 @@ import Servant.API
 import Servant.Client
 import System.Environment (getEnv)
 import System.Process
+import Data.Proxy
+import Data.Time
 
-data BashInput = BashInput
+data Bash = Bash
   { script :: String
   }
   deriving (Eq, Show, Generic)
 
-data BashOutput = BashOutput
-  { code :: Int,
-    stdout :: String,
-    stderr :: String
-  }
-  deriving (Eq, Show, Generic)
 
-instance A.FromJSON BashInput
+instance A.FromJSON Bash
 
-instance A.ToJSON BashInput
+instance A.ToJSON Bash
 
-instance A.FromJSON BashOutput
+instance A.FromJSON (Output Bash)
 
-instance A.ToJSON BashOutput
+instance A.ToJSON (Output Bash)
 
-instance Tool BashInput BashOutput where
+instance Tool Bash where
+  data Output Bash = BashOutput
+     { code :: Int,
+       stdout :: String,
+       stderr :: String
+     } deriving (Eq, Show, Generic)
+
   toolFunctionName = "call_bash_script"
   toolSchema =
     API.ChatCompletionTool
@@ -59,7 +70,7 @@ instance Tool BashInput BashOutput where
         chatCompletionToolFunction =
           API.FunctionObject
             { functionObjectDescription = Just "Call a bash script in a local environment",
-              functionObjectName = toolFunctionName @BashInput,
+              functionObjectName = toolFunctionName @Bash,
               functionObjectParameters =
                 Just $
                   [ ("type", "object"),
@@ -84,27 +95,27 @@ instance Tool BashInput BashOutput where
           ExitFailure v -> v
     return $ BashOutput code' stdout stderr
 
-data TextToSpeechInput = TextToSpeechInput
+data TextToSpeech = TextToSpeech
   { script :: T.Text
   }
   deriving (Eq, Show, Generic)
 
-data TextToSpeechOutput = TextToSpeechOutput
-  { code :: Int,
-    stdout :: String,
-    stderr :: String
-  }
-  deriving (Eq, Show, Generic)
 
-instance A.FromJSON TextToSpeechInput
+instance A.FromJSON TextToSpeech
 
-instance A.ToJSON TextToSpeechInput
+instance A.ToJSON TextToSpeech
 
-instance A.FromJSON TextToSpeechOutput
+instance A.FromJSON (Output TextToSpeech)
 
-instance A.ToJSON TextToSpeechOutput
+instance A.ToJSON (Output TextToSpeech)
 
-instance Tool TextToSpeechInput TextToSpeechOutput where
+instance Tool TextToSpeech where
+  data Output TextToSpeech = TextToSpeechOutput
+    { code :: Int,
+      stdout :: String,
+      stderr :: String
+    }
+    deriving (Eq, Show, Generic)
   toolFunctionName = "text_to_speech"
   toolSchema =
     API.ChatCompletionTool
@@ -112,7 +123,7 @@ instance Tool TextToSpeechInput TextToSpeechOutput where
         chatCompletionToolFunction =
           API.FunctionObject
             { functionObjectDescription = Just "Speak text",
-              functionObjectName = toolFunctionName @TextToSpeechInput,
+              functionObjectName = toolFunctionName @TextToSpeech,
               functionObjectParameters =
                 Just $
                   [ ("type", "object"),
@@ -150,3 +161,66 @@ instance Tool TextToSpeechInput TextToSpeechOutput where
           ExitSuccess -> 0
           ExitFailure v -> v
     return $ TextToSpeechOutput code' stdout stderr
+
+defaultTools :: [ToolProxy]
+defaultTools =
+  [ ToolProxy (Proxy :: Proxy Bash)
+  , ToolProxy (Proxy :: Proxy TextToSpeech)
+  ]
+
+addTools :: [ToolProxy] -> API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
+addTools [] v = v
+addTools (tool:tools') v =
+  case tool of
+    (ToolProxy (_ :: Proxy a)) -> addTools tools' (toolAdd @a v)
+
+toolExec'
+  :: forall t to m. (MonadIO m, MonadFail m, Tool t, A.FromJSON t, A.ToJSON (Output t))
+  => Text -> Text -> Text -> Text -> Prompt m (Maybe Content)
+toolExec' sessionName id' name' args' = do
+  if name' == toolFunctionName @t
+    then case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String t) of
+           Left err -> return Nothing
+           Right input -> do
+             output <- liftIO $ toolExec input
+             time <- liftIO getCurrentTime
+             return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) sessionName time)
+    else return Nothing
+
+(<||>)
+  :: forall m. (MonadIO m, MonadFail m)
+  => (Text -> Text -> Text -> Text -> Prompt m (Maybe Content))
+  -> (Text -> Text -> Text -> Text -> Prompt m (Maybe Content))
+  -> Text -> Text -> Text -> Text -> Prompt m (Maybe Content)
+(<||>) tool0 tool1 sessionName id' name' args' = do
+  a <- tool0 sessionName id' name' args'
+  case a of
+    Just v -> return (Just v)
+    Nothing -> tool1 sessionName id' name' args'
+
+mergeToolCall :: (MonadIO m, MonadFail m) => [ToolProxy] -> Text -> Text -> Text -> Text -> Prompt m (Maybe Content)
+mergeToolCall [] _ _ _ _ = return Nothing
+mergeToolCall (tool:tools') sessionName id' name' args' = do
+  case tool of
+    (ToolProxy (_ :: Proxy a)) -> (toolExec' @a <||> mergeToolCall tools') sessionName id' name' args'
+   
+hasToolCall :: Contents -> Bool
+hasToolCall cs =
+  let loop [] = False
+      loop ((Content _ (ToolCall _ _ _) _ _) : _) = True
+      loop (_ : cs') = loop cs'
+   in loop cs
+
+filterToolCall :: Contents -> Contents
+filterToolCall cs =
+  let loop [] = []
+      loop (m@(Content _ (ToolCall _ _ _) _ _) : cs') = m : loop cs'
+      loop (_ : cs') = loop cs'
+   in loop cs
+
+
+tryToolExec :: (MonadIO m, MonadFail m) => [ToolProxy] -> Text -> Contents -> Prompt m Contents
+tryToolExec tools sessionName contents = do
+  cs <- forM (filterToolCall contents) $ \c@(Content user (ToolCall id' name' args') _ _) -> do
+    mergeToolCall tools sessionName id' name' args'
+  return $ catMaybes cs

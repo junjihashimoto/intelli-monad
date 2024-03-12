@@ -19,7 +19,7 @@ module IntelliMonad.Repl where
 import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (MonadTrans, lift)
-import Control.Monad.Trans.State (put)
+import Control.Monad.Trans.State (put, get)
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
 import Data.Text (Text)
@@ -38,9 +38,9 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
 
-import Database.Persist
+import Database.Persist hiding (get)
 import Database.Persist.PersistValue
-import Database.Persist.Sqlite
+import Database.Persist.Sqlite hiding (get)
 import Database.Persist.TH
 
 type Parser = Parsec Void Text
@@ -90,12 +90,9 @@ parseRepl =
 getTextInputLine :: (MonadTrans t) => String -> t (InputT IO) (Maybe T.Text)
 getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
 
-runRepl :: Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
-runRepl sessionName defaultReq contents = do
-  let settings =
-        toolAdd @BashInput $
-          toolAdd @TextToSpeechInput $
-            defaultReq
+runRepl :: forall p. PersistentBackend p => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
+runRepl tools customs sessionName defaultReq contents = do
+  let settings = addTools tools defaultReq
   runInputT
     ( Settings
         { complete = completeFilename,
@@ -103,7 +100,7 @@ runRepl sessionName defaultReq contents = do
           autoAddHistory = True
         }
     )
-    (runPrompt sessionName settings (push contents >> loop))
+    (runPrompt @p tools customs sessionName settings (push @p contents >> loop))
   where
     loop :: Prompt (InputT IO) ()
     loop = do
@@ -119,7 +116,7 @@ runRepl sessionName defaultReq contents = do
               Right Quit -> return ()
               Right Clear -> do
                 prev <- getContext
-                setContext $ prev {contextBody = []}
+                setContext @p $ prev {contextBody = []}
                 loop
               Right ShowContents -> do
                 context <- getContext
@@ -149,27 +146,28 @@ runRepl sessionName defaultReq contents = do
                 loop
               Right ListSessions -> do
                 liftIO $ do
-                  list <- withDB $ \conn -> listSessions @SqliteConf conn
+                  list <- withDB @p $ \conn -> listSessions @p conn
                   forM_ list $ \sessionName -> T.putStrLn sessionName
                 loop
               Right (CopySession (from',to')) -> do
                 liftIO $ do
-                  withDB $ \conn -> do
-                    mv <- load @SqliteConf conn from'
+                  withDB @p $ \conn -> do
+                    mv <- load @p conn from'
                     case mv of
                       Just v -> do
-                        _ <- save @SqliteConf conn (v {contextSessionName = to'})
+                        _ <- save @p conn (v {contextSessionName = to'})
                         return ()
                       Nothing -> T.putStrLn $ "Failed to load " <> from'
                 loop
               Right (DeleteSession session) -> do
-                withDB $ \conn -> deleteSession @SqliteConf conn session
+                withDB @p $ \conn -> deleteSession @p conn session
                 loop
               Right (SwitchSession session) -> do
-                mv <- withDB $ \conn -> load @SqliteConf conn session
+                mv <- withDB @p $ \conn -> load @p conn session
                 case mv of
                   Just v -> do
-                    put v
+                    (env :: PromptEnv) <- get
+                    put $ env {context = v}
                   Nothing -> liftIO $ T.putStrLn $ "Failed to load " <> session
                 loop
               Right Help -> do
@@ -191,7 +189,7 @@ runRepl sessionName defaultReq contents = do
             time <- liftIO getCurrentTime
             context <- getContext
             let contents = [Content User (Message input) context.contextSessionName time]
-            push contents
-            ret <- call
+            push @p contents
+            ret <- call @p
             showContents ret
             loop

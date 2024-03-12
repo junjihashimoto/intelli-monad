@@ -26,7 +26,6 @@ import qualified Data.Aeson as A
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base64 as Base64
-import Data.Coerce
 import qualified Data.Map as M
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (Text)
@@ -39,6 +38,7 @@ import Database.Persist.Sqlite (SqliteConf)
 import IntelliMonad.Persist
 import IntelliMonad.Tools
 import IntelliMonad.Types
+import IntelliMonad.CustomInstructions
 import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified OpenAI.API as API
@@ -46,19 +46,23 @@ import qualified OpenAI.Types as API
 import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Environment (getEnv, lookupEnv)
 
-defaultUTCTime :: UTCTime
-defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
-
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
-getContext = get
+getContext = context <$> get
 
-setContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
+setContext :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Context -> Prompt m ()
 setContext context = do
-  put context
-  withDB $ \conn -> save @SqliteConf conn context
+  env <- get
+  put $ env {context = context}
+  withDB @p $ \conn -> save @p (conn :: Conn p) context
   return ()
 
-push :: (MonadIO m, MonadFail m) => Contents -> Prompt m ()
+switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
+switchContext context = do
+  env <- get
+  put $ env {context = context}
+  return ()
+
+push :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Contents -> Prompt m ()
 push contents = do
   prev <- getContext
   let nextContents = prev.contextBody <> contents
@@ -67,12 +71,12 @@ push contents = do
           { contextBody = nextContents,
             contextRequest = toRequest prev.contextRequest (prev.contextHeader <> nextContents <> prev.contextFooter)
           }
-  setContext next
+  setContext @p next
 
-  withDB $ \conn -> saveContents @SqliteConf conn contents
+  withDB @p $ \conn -> saveContents @p conn contents
   return ()
 
-pushToolReturn :: (MonadIO m, MonadFail m) => Contents -> Prompt m ()
+pushToolReturn :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Contents -> Prompt m ()
 pushToolReturn contents = do
   prev <- getContext
   let toolMap = M.fromList (map (\v@(Content _ (ToolReturn id' _ _) _ _) -> (id', v)) contents)
@@ -94,12 +98,12 @@ pushToolReturn contents = do
           { contextBody = nextContents,
             contextRequest = toRequest prev.contextRequest (prev.contextHeader <> nextContents <> prev.contextFooter)
           }
-  setContext next
+  setContext @p next
 
-  withDB $ \conn -> saveContents @SqliteConf conn contents
+  withDB @p $ \conn -> saveContents @p conn contents
   return ()
 
-call :: (MonadIO m, MonadFail m) => Prompt m Contents
+call :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m Contents
 call = do
   prev <- getContext
   (contents, res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest prev.contextBody
@@ -109,71 +113,43 @@ call = do
           { contextResponse = Just res,
             contextTotalTokens = current_total_tokens
           }
-  setContext next
-  push contents
+  setContext @p next
+  push @p contents
   if hasToolCall contents
     then do
       showContents contents
-      retTool <- tryToolExec next.contextSessionName contents
+      retTool <- tryToolExec defaultTools next.contextSessionName contents
       showContents retTool
-      pushToolReturn retTool
-      call
+      pushToolReturn @p retTool
+      call @p
     else return contents
 
-hasToolCall :: Contents -> Bool
-hasToolCall cs =
-  let loop [] = False
-      loop ((Content _ (ToolCall _ _ _) _ _) : _) = True
-      loop (_ : cs') = loop cs'
-   in loop cs
-
-filterToolCall :: Contents -> Contents
-filterToolCall cs =
-  let loop [] = []
-      loop (m@(Content _ (ToolCall _ _ _) _ _) : cs') = m : loop cs'
-      loop (_ : cs') = loop cs'
-   in loop cs
-
-tryToolExec :: (MonadIO m, MonadFail m) => Text -> Contents -> Prompt m Contents
-tryToolExec sessionName contents = do
-  cs <- forM (filterToolCall contents) $ \c@(Content user (ToolCall id' name' args') _ _) -> do
-    if name' == toolFunctionName @BashInput
-      then case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String BashInput) of
-        Left err -> return Nothing
-        Right input -> do
-          output <- liftIO $ toolExec input
-          time <- liftIO getCurrentTime
-          return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) sessionName time)
-      else
-        if name' == toolFunctionName @TextToSpeechInput
-          then case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String TextToSpeechInput) of
-            Left err -> return Nothing
-            Right input -> do
-              output <- liftIO $ toolExec input
-              time <- liftIO getCurrentTime
-              return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) sessionName time)
-          else return Nothing
-  return $ catMaybes cs
-
-runPrompt :: (MonadIO m, MonadFail m) => Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
-runPrompt sessionName req func = do
-  context <- withDB $ \conn -> do
-    load @SqliteConf conn sessionName >>= \case
-      Just v -> return v
+runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
+runPrompt tools customs sessionName req func = do
+  context <- withDB @p $ \conn -> do
+    load @p conn sessionName >>= \case
+      Just v -> return $ PromptEnv
+              { context = v
+              , tools = tools
+              , customInstructions = customs
+              }
       Nothing -> do
         time <- liftIO getCurrentTime
-        let init =
-              Context
+        let init = PromptEnv
+              { context = Context
                 { contextRequest = req,
                   contextResponse = Nothing,
-                  contextHeader = [],
+                  contextHeader = headers customs,
                   contextBody = [],
-                  contextFooter = [],
+                  contextFooter = footers customs,
                   contextTotalTokens = 0,
                   contextSessionName = sessionName,
                   contextCreated = time
                 }
-        initialize @SqliteConf conn init
+              , tools = tools
+              , customInstructions = customs
+              }
+        initialize @p conn (init.context)
         return init
   fst <$> runStateT func context
 
@@ -280,3 +256,4 @@ showContents res = do
             Image _ _ -> "Image: ..."
             c@(ToolCall _ _ _) -> T.pack $ show c
             c@(ToolReturn _ _ _) -> T.pack $ show c
+
