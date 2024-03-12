@@ -23,6 +23,7 @@ import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.State (get, put, runStateT)
 import Data.Aeson (encode)
 import qualified Data.Aeson as A
+import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base64 as Base64
 import Data.Coerce
@@ -42,7 +43,6 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 import Servant.Client (mkClientEnv, parseBaseUrl)
-import System.Console.Haskeline
 import System.Environment (getEnv, lookupEnv)
 
 defaultUTCTime :: UTCTime
@@ -267,9 +267,6 @@ runRequest defaultReq request = do
   res <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
   return (fromResponse res, res)
 
-getTextInputLine :: (MonadTrans t) => String -> t (InputT IO) (Maybe T.Text)
-getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
-
 showContents :: (MonadIO m) => Contents -> m ()
 showContents res = do
   forM_ res $ \(Content user message _ _) ->
@@ -282,65 +279,3 @@ showContents res = do
             Image _ _ -> "Image: ..."
             c@(ToolCall _ _ _) -> T.pack $ show c
             c@(ToolReturn _ _ _) -> T.pack $ show c
-
-data ReplCommand
-  = Quit
-  | Clear
-  | ShowContents
-  | ShowUsage
-  | ShowContext
-  | ShowContextAsJson
-  | RenameSession
-  | DeleteSession
-  | ChangeSession
-  | ShowSession
-  | Help
-  | UserInput T.Text
-  deriving (Eq, Show)
-
--- parseUserInput :: Parsec e s a ->
-
-runRepl :: API.CreateChatCompletionRequest -> Contents -> IO ()
-runRepl defaultReq contents = do
-  let settings =
-        toolAdd @BashInput $
-          toolAdd @TextToSpeechInput $
-            defaultReq
-  runInputT defaultSettings (runPrompt settings (push contents >> loop))
-  where
-    loop :: Prompt (InputT IO) ()
-    loop = do
-      minput <- getTextInputLine "% "
-
-      case minput of
-        Nothing -> return ()
-        Just "quit" -> return ()
-        Just "clear" -> do
-          loop
-        Just "show-contents" -> do
-          context <- getContext
-          showContents context.contextBody
-          loop
-        Just "show-usage" -> do
-          context <- getContext
-          liftIO $ do
-            print context.contextTotalTokens
-          loop
-        Just "show-context" -> do
-          context <- getContext
-          liftIO $ do
-            print context
-          loop
-        Just "show-context-as-json" -> do
-          prev <- getContext
-          let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
-          liftIO $ do
-            BS.putStr $ BS.toStrict $ encode req
-          loop
-        Just input -> do
-          time <- liftIO getCurrentTime
-          let contents = [Content User (Message input) "default" time]
-          push contents
-          ret <- call
-          showContents ret
-          loop

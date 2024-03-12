@@ -63,6 +63,7 @@ library
                     , IntelliMonad.Types
                     , IntelliMonad.Tools
                     , IntelliMonad.Persist
+                    , IntelliMonad.Repl
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -79,6 +80,7 @@ library
                     , http-client-tls
                     , servant-client
                     , aeson
+                    , aeson-pretty
                     , bytestring
                     , haskeline
                     , transformers
