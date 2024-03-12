@@ -1,9 +1,11 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -14,16 +16,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module IntelliMonad.CustomInstructions where
 
-import IntelliMonad.Types
+import qualified Data.Aeson as A
 import Data.Proxy
 import GHC.Generics
-import qualified Data.Aeson as A
+import IntelliMonad.Types
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 
@@ -37,10 +37,11 @@ data ValidateNumber = ValidateNumber
 
 instance Tool ValidateNumber where
   data Output ValidateNumber = ValidateNumberOutput
-     { code :: Int,
-       stdout :: String,
-       stderr :: String
-     } deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
+    { code :: Int,
+      stdout :: String,
+      stderr :: String
+    }
+    deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
   toolFunctionName = "output_number"
   toolSchema =
@@ -68,22 +69,22 @@ instance Tool ValidateNumber where
             }
       }
   toolExec args = do
-     return $ ValidateNumberOutput 0 "" ""
+    return $ ValidateNumberOutput 0 "" ""
 
 data Math = Math
 
 instance CustomInstruction Math where
-  customHeader = [ (Content System (Message "Calcurate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime) ]
+  customHeader = [(Content System (Message "Calcurate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime)]
   customFooter = []
 
 headers :: [CustomInstructionProxy] -> Contents
 headers [] = []
-headers (tool:tools') =
+headers (tool : tools') =
   case tool of
     (CustomInstructionProxy (_ :: Proxy a)) -> customHeader @a <> headers tools'
 
 footers :: [CustomInstructionProxy] -> Contents
 footers [] = []
-footers (tool:tools') =
+footers (tool : tools') =
   case tool of
     (CustomInstructionProxy (_ :: Proxy a)) -> customFooter @a <> footers tools'

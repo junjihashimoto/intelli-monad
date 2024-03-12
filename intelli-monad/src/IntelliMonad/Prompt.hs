@@ -1,8 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -29,6 +29,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Map as M
 import Data.Maybe (catMaybes, fromMaybe)
+import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -36,17 +37,16 @@ import qualified Data.Text.IO as T
 import Data.Time
 import Data.Time.Calendar
 import Database.Persist.Sqlite (SqliteConf)
+import IntelliMonad.CustomInstructions
 import IntelliMonad.Persist
 import IntelliMonad.Tools
 import IntelliMonad.Types
-import IntelliMonad.CustomInstructions
 import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Environment (getEnv, lookupEnv)
-import Data.Proxy
 
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = context <$> get
@@ -141,23 +141,23 @@ callPrompt input = do
   push @p contents
   call @p
 
-runPromptWithValidation
-  :: forall validation p m a.
-     ( MonadIO m
-     , MonadFail m
-     , PersistentBackend p
-     , Tool validation
-     , A.FromJSON validation
-     , A.FromJSON (Output validation)
-     , A.ToJSON validation
-     , A.ToJSON (Output validation)
-     )
-  => [ToolProxy]
-  -> [CustomInstructionProxy]
-  -> Text
-  -> API.CreateChatCompletionRequest
-  -> Text
-  -> m (Maybe validation)
+runPromptWithValidation ::
+  forall validation p m a.
+  ( MonadIO m,
+    MonadFail m,
+    PersistentBackend p,
+    Tool validation,
+    A.FromJSON validation,
+    A.FromJSON (Output validation),
+    A.ToJSON validation,
+    A.ToJSON (Output validation)
+  ) =>
+  [ToolProxy] ->
+  [CustomInstructionProxy] ->
+  Text ->
+  API.CreateChatCompletionRequest ->
+  Text ->
+  m (Maybe validation)
 runPromptWithValidation tools customs sessionName req input = do
   let valid = ToolProxy (Proxy :: Proxy validation)
   context <- runPrompt @p (valid : tools) customs sessionName req (callPrompt @p input >> getContext)
@@ -173,30 +173,34 @@ runPromptWithValidation tools customs sessionName req input = do
 
 runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
 runPrompt tools customs sessionName req func = do
-  let settings = addTools tools (req { API.createChatCompletionRequestTools = Nothing })
+  let settings = addTools tools (req {API.createChatCompletionRequestTools = Nothing})
   context <- withDB @p $ \conn -> do
     load @p conn sessionName >>= \case
-      Just v -> return $ PromptEnv
-              { context = v
-              , tools = tools
-              , customInstructions = customs
-              }
+      Just v ->
+        return $
+          PromptEnv
+            { context = v,
+              tools = tools,
+              customInstructions = customs
+            }
       Nothing -> do
         time <- liftIO getCurrentTime
-        let init = PromptEnv
-              { context = Context
-                { contextRequest = settings,
-                  contextResponse = Nothing,
-                  contextHeader = headers customs,
-                  contextBody = [],
-                  contextFooter = footers customs,
-                  contextTotalTokens = 0,
-                  contextSessionName = sessionName,
-                  contextCreated = time
+        let init =
+              PromptEnv
+                { context =
+                    Context
+                      { contextRequest = settings,
+                        contextResponse = Nothing,
+                        contextHeader = headers customs,
+                        contextBody = [],
+                        contextFooter = footers customs,
+                        contextTotalTokens = 0,
+                        contextSessionName = sessionName,
+                        contextCreated = time
+                      },
+                  tools = tools,
+                  customInstructions = customs
                 }
-              , tools = tools
-              , customInstructions = customs
-              }
         initialize @p conn (init.context)
         return init
   fst <$> runStateT func context
@@ -273,9 +277,9 @@ instance ChatCompletion Contents where
         content = API.chatCompletionResponseMessageContent message
         finishReason = textToFinishReason $ API.createChatCompletionResponseChoicesInnerFinishUnderscorereason res
         v = case API.chatCompletionResponseMessageToolUnderscorecalls message of
-              Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
-              Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
-    in (v, finishReason)
+          Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
+          Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
+     in (v, finishReason)
 
 runRequest :: (ChatCompletion a) => Text -> API.CreateChatCompletionRequest -> a -> IO ((a, FinishReason), API.CreateChatCompletionResponse)
 runRequest sessionName defaultReq request = do
@@ -315,8 +319,8 @@ showContents res = do
             c@(ToolCall _ _ _) -> T.pack $ show c
             c@(ToolReturn _ _ _) -> T.pack $ show c
 
-
 fromModel :: Text -> API.CreateChatCompletionRequest
-fromModel model = defaultRequest
-                  { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
-                  }
+fromModel model =
+  defaultRequest
+    { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
+    }

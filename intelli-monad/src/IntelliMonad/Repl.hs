@@ -19,15 +19,20 @@ module IntelliMonad.Repl where
 import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (MonadTrans, lift)
-import Control.Monad.Trans.State (put, get)
+import Control.Monad.Trans.State (get, put)
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base64 as Base64
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO as T
 import Data.Time
 import Data.Void
+import Database.Persist hiding (get)
+import Database.Persist.PersistValue
+import Database.Persist.Sqlite hiding (get)
+import Database.Persist.TH
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Tools
@@ -38,14 +43,6 @@ import System.Console.Haskeline
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
-
-import Database.Persist hiding (get)
-import Database.Persist.PersistValue
-import Database.Persist.Sqlite hiding (get)
-import Database.Persist.TH
-
-import qualified Data.ByteString.Base64 as Base64
-
 
 type Parser = Parsec Void Text
 
@@ -97,7 +94,7 @@ parseRepl =
 getTextInputLine :: (MonadTrans t) => String -> t (InputT IO) (Maybe T.Text)
 getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
 
-runRepl :: forall p. PersistentBackend p => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
+runRepl :: forall p. (PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl tools customs sessionName defaultReq contents = do
   runInputT
     ( Settings
@@ -114,8 +111,8 @@ runRepl tools customs sessionName defaultReq contents = do
       case minput of
         Nothing -> return ()
         Just input ->
-          if T.isPrefixOf ":" input then
-            case runParser parseRepl "stdin" input of
+          if T.isPrefixOf ":" input
+            then case runParser parseRepl "stdin" input of
               Left err -> do
                 liftIO $ print err
                 loop
@@ -128,24 +125,24 @@ runRepl tools customs sessionName defaultReq contents = do
                 context <- getContext
                 showContents context.contextBody
                 loop
-              Right ShowUsage -> do 
+              Right ShowUsage -> do
                 context <- getContext
                 liftIO $ do
                   print context.contextTotalTokens
                 loop
-              Right ShowRequest -> do 
+              Right ShowRequest -> do
                 prev <- getContext
                 let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
                 liftIO $ do
                   BS.putStr $ BS.toStrict $ encodePretty req
                   T.putStrLn ""
                 loop
-              Right ShowContext -> do 
+              Right ShowContext -> do
                 prev <- getContext
                 liftIO $ do
                   putStrLn $ show prev
                 loop
-              Right ShowSession -> do 
+              Right ShowSession -> do
                 prev <- getContext
                 liftIO $ do
                   T.putStrLn $ prev.contextSessionName
@@ -155,7 +152,7 @@ runRepl tools customs sessionName defaultReq contents = do
                   list <- withDB @p $ \conn -> listSessions @p conn
                   forM_ list $ \sessionName -> T.putStrLn sessionName
                 loop
-              Right (CopySession (from',to')) -> do
+              Right (CopySession (from', to')) -> do
                 liftIO $ do
                   withDB @p $ \conn -> do
                     mv <- load @p conn from'
@@ -178,16 +175,19 @@ runRepl tools customs sessionName defaultReq contents = do
                 loop
               Right (ReadImage imagePath) -> do
                 let tryReadFile = T.decodeUtf8Lenient . Base64.encode <$> BS.readFile (T.unpack imagePath)
-                    imageType = 
-                      if T.isSuffixOf ".png" imagePath  then "png"
-                      else if T.isSuffixOf ".jpg" imagePath || T.isSuffixOf ".jpeg" imagePath then "jpeg"
-                      else "jpeg"
+                    imageType =
+                      if T.isSuffixOf ".png" imagePath
+                        then "png"
+                        else
+                          if T.isSuffixOf ".jpg" imagePath || T.isSuffixOf ".jpeg" imagePath
+                            then "jpeg"
+                            else "jpeg"
                 file <- liftIO $ tryReadFile
                 time <- liftIO getCurrentTime
                 context <- getContext
                 let contents = [Content User (Image imageType file) context.contextSessionName time]
                 push @p contents
-                ret <- call @p                 
+                ret <- call @p
                 showContents ret
                 loop
               Right Help -> do
@@ -205,7 +205,6 @@ runRepl tools customs sessionName defaultReq contents = do
                   putStrLn ":switch session <session name>"
                   putStrLn ":help"
                 loop
-          else do
-            callPrompt @p input >>= showContents
-            loop
-
+            else do
+              callPrompt @p input >>= showContents
+              loop

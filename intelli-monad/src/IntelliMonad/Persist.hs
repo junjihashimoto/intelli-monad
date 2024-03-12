@@ -33,8 +33,8 @@ import Data.ByteString (ByteString, fromStrict, toStrict)
 import Data.Either (either)
 import Data.List (maximumBy)
 import Data.Maybe (catMaybes, maybe)
-import qualified Data.Set as S
 import Data.Proxy
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
@@ -110,7 +110,6 @@ instance PersistentBackend StateLessConf where
   saveContents _ _ = return ()
   listSessions _ = return []
   deleteSession _ _ = return ()
-    
 
 withDB :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => (Conn p -> m a) -> m a
 withDB func =

@@ -152,7 +152,7 @@ executable calc
         intelli-monad,
         openai-servant-gen,
         text,
-        process
+        aeson
 
     -- Directories containing source files.
     hs-source-dirs:   app

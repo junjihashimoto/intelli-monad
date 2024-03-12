@@ -3,8 +3,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -26,19 +26,20 @@
 
 module IntelliMonad.Types where
 
-import qualified Data.Aeson as A
 import qualified Codec.Picture as P
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
 import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode)
+import qualified Data.Aeson as A
 import Data.ByteString (ByteString, fromStrict, toStrict)
+import Data.Coerce
 import Data.Either (either)
+import Data.Kind (Type)
 import Data.List (maximumBy)
 import Data.Maybe (catMaybes, maybe)
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Coerce
 import Data.Time
 import Database.Persist
 import Database.Persist.PersistValue
@@ -46,7 +47,6 @@ import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
 import qualified OpenAI.Types as API
-import Data.Kind (Type)
 
 data User = User | System | Assistant | Tool deriving (Eq, Show, Ord, Generic)
 
@@ -117,7 +117,6 @@ textToFinishReason = \case
   "function_call" -> FunctionCall
   "content_filter" -> ContentFilter
   "null" -> Null
-
 
 instance ToJSON Message
 
@@ -204,9 +203,9 @@ class CustomInstruction a where
 data CustomInstructionProxy = forall t. (CustomInstruction t) => CustomInstructionProxy (Proxy t)
 
 data PromptEnv = PromptEnv
-  { tools :: [ToolProxy]
-  , customInstructions :: [CustomInstructionProxy]
-  , context :: Context
+  { tools :: [ToolProxy],
+    customInstructions :: [CustomInstructionProxy],
+    context :: Context
   }
 
 type Contents = [Content]
@@ -258,5 +257,3 @@ toolAdd req =
 
 defaultUTCTime :: UTCTime
 defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
-
-
