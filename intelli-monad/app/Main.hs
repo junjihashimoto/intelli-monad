@@ -21,6 +21,7 @@ main = do
   model <- do
     lookupEnv "OPENAI_MODEL" >>= \case
       Just model -> return $ T.pack model
+--      Nothing -> return "gpt-4-vision-preview"
       Nothing -> return "gpt-4"
   runRepl @SqliteConf
     defaultTools

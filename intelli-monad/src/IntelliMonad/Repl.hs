@@ -25,6 +25,7 @@ import qualified Data.ByteString as BS
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Void
 import IntelliMonad.Persist
@@ -43,6 +44,9 @@ import Database.Persist.PersistValue
 import Database.Persist.Sqlite hiding (get)
 import Database.Persist.TH
 
+import qualified Data.ByteString.Base64 as Base64
+
+
 type Parser = Parsec Void Text
 
 data ReplCommand
@@ -57,6 +61,7 @@ data ReplCommand
   | CopySession (Text, Text)
   | DeleteSession Text
   | SwitchSession Text
+  | ReadImage Text
   | Help
   deriving (Eq, Show)
 
@@ -69,6 +74,7 @@ parseRepl =
     <|> (try (lexm (string ":show") >> lexm (string "request")) >> pure ShowRequest)
     <|> (try (lexm (string ":show") >> lexm (string "context")) >> pure ShowContext)
     <|> (try (lexm (string ":show") >> lexm (string "session")) >> pure ShowSession)
+    <|> (try (lexm (string ":read") >> lexm (string "image") >> lexm imagePath) >>= pure . ReadImage . T.pack)
     <|> (try (lexm (string ":list") >> lexm (string "sessions")) >> pure ListSessions)
     <|> (try (lexm (string ":list")) >> pure ListSessions)
     <|> ( try
@@ -86,6 +92,7 @@ parseRepl =
     sc = L.space space1 empty empty
     lexm = lexeme sc
     sessionName = many alphaNumChar
+    imagePath = many (alphaNumChar <|> char '.' <|> char '/' <|> char '-')
 
 getTextInputLine :: (MonadTrans t) => String -> t (InputT IO) (Maybe T.Text)
 getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
@@ -169,6 +176,20 @@ runRepl tools customs sessionName defaultReq contents = do
                     (env :: PromptEnv) <- get
                     put $ env {context = v}
                   Nothing -> liftIO $ T.putStrLn $ "Failed to load " <> session
+                loop
+              Right (ReadImage imagePath) -> do
+                let tryReadFile = T.decodeUtf8Lenient . Base64.encode <$> BS.readFile (T.unpack imagePath)
+                    imageType = 
+                      if T.isSuffixOf ".png" imagePath  then "png"
+                      else if T.isSuffixOf ".jpg" imagePath || T.isSuffixOf ".jpeg" imagePath then "jpeg"
+                      else "jpeg"
+                file <- liftIO $ tryReadFile
+                time <- liftIO getCurrentTime
+                context <- getContext
+                let contents = [Content User (Image imageType file) context.contextSessionName time]
+                push @p contents
+                ret <- call @p                 
+                showContents ret
                 loop
               Right Help -> do
                 liftIO $ do

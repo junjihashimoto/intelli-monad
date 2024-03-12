@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -106,7 +107,7 @@ pushToolReturn contents = do
 call :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m Contents
 call = do
   prev <- getContext
-  (contents, res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest prev.contextBody
+  ((contents, finishReason), res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest prev.contextBody
   let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
       next =
         prev
@@ -115,14 +116,21 @@ call = do
           }
   setContext @p next
   push @p contents
-  if hasToolCall contents
-    then do
+
+  case finishReason of
+    Stop -> return contents
+    ToolCalls -> callTool next contents
+    FunctionCall -> callTool next contents
+    Length -> call @p
+    _ -> return contents
+  where
+    callTool next contents = do
       showContents contents
-      retTool <- tryToolExec defaultTools next.contextSessionName contents
+      env <- get
+      retTool <- tryToolExec env.tools next.contextSessionName contents
       showContents retTool
       pushToolReturn @p retTool
       call @p
-    else return contents
 
 runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
 runPrompt tools customs sessionName req func = do
@@ -172,11 +180,12 @@ instance ChatCompletion Contents where
                     API.ChatCompletionRequestMessageContentParts
                       [ API.ChatCompletionRequestMessageContentPart
                           { API.chatCompletionRequestMessageContentPartType = "image_url",
+                            API.chatCompletionRequestMessageContentPartText = Nothing,
                             API.chatCompletionRequestMessageContentPartImageUnderscoreurl =
                               Just $
                                 API.ChatCompletionRequestMessageContentPartImageImageUrl
                                   { API.chatCompletionRequestMessageContentPartImageImageUrlUrl =
-                                      "data:image/png;base64," <> img,
+                                      "data:image/" <> type' <> ";base64," <> img,
                                     API.chatCompletionRequestMessageContentPartImageImageUrlDetail = Nothing
                                   }
                           }
@@ -218,15 +227,17 @@ instance ChatCompletion Contents where
               }
      in orgRequest {API.createChatCompletionRequestMessages = messages}
   fromResponse sessionName response =
-    concat $ flip map (API.createChatCompletionResponseChoices response) $ \res ->
-      let message = API.createChatCompletionResponseChoicesInnerMessage res
-          role = textToUser $ API.chatCompletionResponseMessageRole message
-          content = API.chatCompletionResponseMessageContent message
-       in case API.chatCompletionResponseMessageToolUnderscorecalls message of
-            Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
-            Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
+    let res = head (API.createChatCompletionResponseChoices response)
+        message = API.createChatCompletionResponseChoicesInnerMessage res
+        role = textToUser $ API.chatCompletionResponseMessageRole message
+        content = API.chatCompletionResponseMessageContent message
+        finishReason = textToFinishReason $ API.createChatCompletionResponseChoicesInnerFinishUnderscorereason res
+        v = case API.chatCompletionResponseMessageToolUnderscorecalls message of
+              Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
+              Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
+    in (v, finishReason)
 
-runRequest :: (ChatCompletion a) => Text -> API.CreateChatCompletionRequest -> a -> IO (a, API.CreateChatCompletionResponse)
+runRequest :: (ChatCompletion a) => Text -> API.CreateChatCompletionRequest -> a -> IO ((a, FinishReason), API.CreateChatCompletionResponse)
 runRequest sessionName defaultReq request = do
   api_key <- (API.clientAuth . T.pack) <$> getEnv "OPENAI_API_KEY"
   url <- do
@@ -241,6 +252,13 @@ runRequest sessionName defaultReq request = do
       )
   let API.OpenAIBackend {..} = API.createOpenAIClient
       req = (toRequest defaultReq request)
+
+  lookupEnv "OPENAI_DEBUG" >>= \case
+    Just "1" -> do
+      liftIO $ do
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
+    _ -> return ()
   res <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
   return (fromResponse sessionName res, res)
 

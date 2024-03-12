@@ -91,6 +91,34 @@ data Message
       }
   deriving (Eq, Show, Ord, Generic)
 
+data FinishReason
+  = Stop
+  | Length
+  | ToolCalls
+  | FunctionCall
+  | ContentFilter
+  | Null
+  deriving (Eq, Show)
+
+finishReasonToText :: FinishReason -> Text
+finishReasonToText = \case
+  Stop -> "stop"
+  Length -> "length"
+  ToolCalls -> "tool_calls"
+  FunctionCall -> "function_call"
+  ContentFilter -> "content_fileter"
+  Null -> "null"
+
+textToFinishReason :: Text -> FinishReason
+textToFinishReason = \case
+  "stop" -> Stop
+  "length" -> Length
+  "tool_calls" -> ToolCalls
+  "function_call" -> FunctionCall
+  "content_filter" -> ContentFilter
+  "null" -> Null
+
+
 instance ToJSON Message
 
 instance FromJSON Message
@@ -99,7 +127,7 @@ newtype Model = Model Text deriving (Eq, Show)
 
 class ChatCompletion a where
   toRequest :: API.CreateChatCompletionRequest -> a -> API.CreateChatCompletionRequest
-  fromResponse :: Text -> API.CreateChatCompletionResponse -> a
+  fromResponse :: Text -> API.CreateChatCompletionResponse -> (a, FinishReason)
 
 class (ChatCompletion a) => Validate a b where
   tryConvert :: a -> Either a b
