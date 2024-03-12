@@ -50,7 +50,7 @@ instance Tool ValidateNumber where
                           )
                         ]
                     ),
-                    ("required", Array ["output"])
+                    ("required", Array ["number"])
                   ]
             }
       }

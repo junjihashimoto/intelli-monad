@@ -64,7 +64,7 @@ instance Tool ValidateNumber where
                           )
                         ]
                     ),
-                    ("required", A.Array ["output"])
+                    ("required", A.Array ["number"])
                   ]
             }
       }
