@@ -22,6 +22,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.ByteString as BS
+import qualified Data.Map as M
 import           Codec.Picture.Png (encodePng)
 
 
@@ -80,7 +81,28 @@ push contents = do
   
   withDB $ \conn -> saveContents @SqliteConf conn contents
   return ()
+
+pushToolReturn :: (MonadIO m, MonadFail m) => Contents -> Prompt m ()
+pushToolReturn contents = do
+  prev <- getContext
+  let toolMap = M.fromList (map (\v@(Content _ (ToolCall id' _ _) _ _) -> (id',v)) contents)
+      nextContents = concat $ map (\v -> case v of
+                                           Content _ (Message _) _ _ -> [v]
+                                           Content _ (Image _ _) _ _ -> [v]
+                                           Content _ (ToolCall id' _ _) _ _ ->
+                                             case M.lookup id' toolMap of
+                                               Just v' -> [v, v']
+                                               Nothing -> [v]
+                                           Content _ (ToolReturn _ _ _) _ _ -> [v]
+                                  ) prev.contextContents
+      next = prev
+        { contextContents = nextContents
+        , contextRequest = toRequest prev.contextRequest nextContents
+        }
+  setContext next
   
+  withDB $ \conn -> saveContents @SqliteConf conn contents
+  return ()
 
 call :: (MonadIO m, MonadFail m) => Prompt m Contents
 call = do
@@ -98,7 +120,7 @@ call = do
       showContents contents
       retTool <- tryToolExec contents
       showContents retTool
-      push retTool
+      pushToolReturn retTool
       call
     else return contents
   
@@ -138,7 +160,6 @@ tryToolExec contents = do
     
 runPrompt :: (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> Prompt m a -> m a
 runPrompt req func = do
-  -- let context = Context req Nothing mempty [] [] 0 "default" 0
   context <- withDB $ \conn -> do
     load @SqliteConf conn "default" >>= \case
       Just v -> return v
@@ -242,7 +263,6 @@ runRequest defaultReq request = do
     })
   let API.OpenAIBackend{..} = API.createOpenAIClient
       req = (toRequest defaultReq request)
-  -- print $ encode req
   res <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
   return (fromResponse res, res)
 
@@ -289,6 +309,12 @@ runRepl defaultReq contents = do
           context <- getContext
           liftIO $ do
             print context
+          loop
+        Just "show-context-as-json" -> do
+          prev <- getContext
+          let req = toRequest prev.contextRequest prev.contextContents
+          liftIO $ do
+            BS.putStr $ BS.toStrict $ encode req
           loop
         Just input -> do
           let contents = [Content User (Message input) "default" defaultUTCTime]

@@ -158,6 +158,8 @@ Context
 
 type Prompt = StateT Context
 
+-- data TypedPrompt tools task output = 
+
 type SessionName = Text
 
 class PersistentBackend p where

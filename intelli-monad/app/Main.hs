@@ -14,7 +14,7 @@ main = do
   model <- do
     lookupEnv "OPENAI_MODEL" >>= \case
       Just model -> return $ T.pack model
-      Nothing -> return "gpt-4"
+      Nothing -> return "gpt-4-vision-preview"
   runRepl defaultRequest {
     API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
   } mempty
