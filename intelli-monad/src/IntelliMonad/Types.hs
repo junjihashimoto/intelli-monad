@@ -23,7 +23,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Prompt.Types where
+module IntelliMonad.Types where
 
 import qualified Codec.Picture as P
 import Control.Monad.IO.Class
@@ -151,7 +151,9 @@ Content
 Context
     request API.CreateChatCompletionRequest
     response API.CreateChatCompletionResponse Maybe
-    contents [Content]
+    header [Content]
+    body [Content]
+    footer [Content]
     totalTokens Int
     sessionName Text
     created UTCTime default=CURRENT_TIME
@@ -159,21 +161,13 @@ Context
     deriving Eq
 |]
 
+type Contents = [Content]
+
 type Prompt = StateT Context
 
 -- data TypedPrompt tools task output =
 
 type SessionName = Text
-
-class PersistentBackend p where
-  type Conn p
-  config :: p
-  setup :: (MonadIO m, MonadFail m) => p -> m (Maybe (Conn p))
-  initialize :: (MonadIO m, MonadFail m) => Conn p -> Context -> m ()
-  load :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m (Maybe Context)
-  loadByKey :: (MonadIO m, MonadFail m) => Conn p -> (Key Context) -> m (Maybe Context)
-  save :: (MonadIO m, MonadFail m) => Conn p -> Context -> m (Key Context)
-  saveContents :: (MonadIO m, MonadFail m) => Conn p -> [Content] -> m ()
 
 defaultRequest :: API.CreateChatCompletionRequest
 defaultRequest =
@@ -199,38 +193,6 @@ defaultRequest =
       API.createChatCompletionRequestFunctionUnderscorecall = Nothing,
       API.createChatCompletionRequestFunctions = Nothing
     }
-
-instance PersistentBackend SqliteConf where
-  type Conn SqliteConf = ConnectionPool
-  config =
-    SqliteConf
-      { sqlDatabase = "intelli-monad.sqlite3",
-        sqlPoolSize = 5
-      }
-  setup p = do
-    conn <- liftIO $ createPoolConfig p
-    liftIO $ runPool p (runMigration migrateAll) conn
-    return $ Just conn
-  initialize conn context = do
-    _ <- liftIO $ runPool (config @SqliteConf) (insert context) conn
-    return ()
-  load conn sessionName = do
-    (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [ContextSessionName ==. sessionName] []) conn
-    if length a == 0
-      then return Nothing
-      else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity k v) -> v) a
-
-  loadByKey conn key = do
-    (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [ContextId ==. key] []) conn
-    if length a == 0
-      then return Nothing
-      else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity k v) -> v) a
-
-  save conn context = do
-    liftIO $ runPool (config @SqliteConf) (insert context) conn
-
-  saveContents conn contents = do
-    liftIO $ runPool (config @SqliteConf) (putMany contents) conn
 
 class Tool a b | a -> b where
   toolFunctionName :: Text

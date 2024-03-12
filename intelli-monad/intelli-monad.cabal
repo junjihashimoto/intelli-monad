@@ -59,9 +59,10 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  Prompt
-                    , Prompt.Types
-                    , Prompt.Tools
+    exposed-modules:  IntelliMonad.Prompt
+                    , IntelliMonad.Types
+                    , IntelliMonad.Tools
+                    , IntelliMonad.Persist
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -88,6 +89,7 @@ library
                     , time
                     , servant
                     , containers
+                    , megaparsec
 
     -- Directories containing source files.
     hs-source-dirs:   src

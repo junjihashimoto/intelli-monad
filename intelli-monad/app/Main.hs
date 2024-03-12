@@ -4,10 +4,10 @@
 module Main where
 
 import qualified Data.Text as T
+import IntelliMonad.Prompt
+import IntelliMonad.Types
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
-import Prompt
-import Prompt.Types
 import System.Environment (lookupEnv)
 
 main :: IO ()

@@ -14,18 +14,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Prompt.Tools where
+module IntelliMonad.Tools where
 
 import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import GHC.Generics
 import GHC.IO.Exception
+import IntelliMonad.Types
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
-import Prompt.Types
 import Servant.API
 import Servant.Client
 import System.Environment (getEnv)

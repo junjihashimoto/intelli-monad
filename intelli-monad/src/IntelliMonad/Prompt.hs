@@ -14,7 +14,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Prompt where
+module IntelliMonad.Prompt where
 
 import Codec.Picture.Png (encodePng)
 import Control.Monad (forM, forM_)
@@ -34,29 +34,22 @@ import qualified Data.Text.IO as T
 import Data.Time
 import Data.Time.Calendar
 import Database.Persist.Sqlite (SqliteConf)
+import IntelliMonad.Persist
+import IntelliMonad.Tools
+import IntelliMonad.Types
 import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
-import Prompt.Tools
-import Prompt.Types
 import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Console.Haskeline
 import System.Environment (getEnv, lookupEnv)
-
-type Contents = [Content]
 
 defaultUTCTime :: UTCTime
 defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
 
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = get
-
-withDB :: (MonadIO m, MonadFail m) => (Conn SqliteConf -> m a) -> m a
-withDB func =
-  setup (config @SqliteConf) >>= \case
-    Nothing -> fail "Can not open a database."
-    Just (conn :: Conn SqliteConf) -> func conn
 
 setContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
 setContext context = do
@@ -67,11 +60,11 @@ setContext context = do
 push :: (MonadIO m, MonadFail m) => Contents -> Prompt m ()
 push contents = do
   prev <- getContext
-  let nextContents = prev.contextContents <> contents
+  let nextContents = prev.contextBody <> contents
       next =
         prev
-          { contextContents = nextContents,
-            contextRequest = toRequest prev.contextRequest nextContents
+          { contextBody = nextContents,
+            contextRequest = toRequest prev.contextRequest (prev.contextHeader <> nextContents <> prev.contextFooter)
           }
   setContext next
 
@@ -94,11 +87,11 @@ pushToolReturn contents = do
                     Nothing -> [v]
                 Content _ (ToolReturn _ _ _) _ _ -> [v]
             )
-            prev.contextContents
+            prev.contextBody
       next =
         prev
-          { contextContents = nextContents,
-            contextRequest = toRequest prev.contextRequest nextContents
+          { contextBody = nextContents,
+            contextRequest = toRequest prev.contextRequest (prev.contextHeader <> nextContents <> prev.contextFooter)
           }
   setContext next
 
@@ -108,7 +101,7 @@ pushToolReturn contents = do
 call :: (MonadIO m, MonadFail m) => Prompt m Contents
 call = do
   prev <- getContext
-  (contents, res) <- liftIO $ runRequest prev.contextRequest prev.contextContents
+  (contents, res) <- liftIO $ runRequest prev.contextRequest prev.contextBody
   let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
       next =
         prev
@@ -172,7 +165,9 @@ runPrompt req func = do
               Context
                 { contextRequest = req,
                   contextResponse = Nothing,
-                  contextContents = [],
+                  contextHeader = [],
+                  contextBody = [],
+                  contextFooter = [],
                   contextTotalTokens = 0,
                   contextSessionName = "default",
                   contextCreated = time
@@ -288,6 +283,23 @@ showContents res = do
             c@(ToolCall _ _ _) -> T.pack $ show c
             c@(ToolReturn _ _ _) -> T.pack $ show c
 
+data ReplCommand
+  = Quit
+  | Clear
+  | ShowContents
+  | ShowUsage
+  | ShowContext
+  | ShowContextAsJson
+  | RenameSession
+  | DeleteSession
+  | ChangeSession
+  | ShowSession
+  | Help
+  | UserInput T.Text
+  deriving (Eq, Show)
+
+-- parseUserInput :: Parsec e s a ->
+
 runRepl :: API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl defaultReq contents = do
   let settings =
@@ -299,6 +311,7 @@ runRepl defaultReq contents = do
     loop :: Prompt (InputT IO) ()
     loop = do
       minput <- getTextInputLine "% "
+
       case minput of
         Nothing -> return ()
         Just "quit" -> return ()
@@ -306,7 +319,7 @@ runRepl defaultReq contents = do
           loop
         Just "show-contents" -> do
           context <- getContext
-          showContents context.contextContents
+          showContents context.contextBody
           loop
         Just "show-usage" -> do
           context <- getContext
@@ -320,12 +333,13 @@ runRepl defaultReq contents = do
           loop
         Just "show-context-as-json" -> do
           prev <- getContext
-          let req = toRequest prev.contextRequest prev.contextContents
+          let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
           liftIO $ do
             BS.putStr $ BS.toStrict $ encode req
           loop
         Just input -> do
-          let contents = [Content User (Message input) "default" defaultUTCTime]
+          time <- liftIO getCurrentTime
+          let contents = [Content User (Message input) "default" time]
           push contents
           ret <- call
           showContents ret
