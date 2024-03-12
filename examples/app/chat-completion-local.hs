@@ -1,16 +1,13 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
+import Data.Text as T
+import Network.HTTP.Client (newManager)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 import OpenAI.API as API
 import OpenAI.Types as API
-
-
-import           Network.HTTP.Client     (newManager)
-import           Network.HTTP.Client.TLS (tlsManagerSettings)
-import           Servant.Client          (ClientEnv, mkClientEnv, parseBaseUrl, responseBody)
-import           System.Environment      (getEnv)
-import           Data.Text as T
-
+import Servant.Client (ClientEnv, mkClientEnv, parseBaseUrl, responseBody)
+import System.Environment (getEnv)
 
 main :: IO ()
 main = do
@@ -24,7 +21,7 @@ main = do
   manager <- newManager tlsManagerSettings
 
   -- Create the client (all endpoint functions will be available)
-  let OpenAIBackend{..} = API.createOpenAIClient
+  let OpenAIBackend {..} = API.createOpenAIClient
 
   -- Any OpenAI API call can go here, e.g. here we call `createChatCompletion`
   -- --
@@ -34,41 +31,42 @@ main = do
   -- --
   -- createChatCompletion :: a -> CreateChatCompletionRequest -> m CreateChatCompletionResponse{- ^  -}
   -- --
-  response <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key API.CreateChatCompletionRequest
-    { createChatCompletionRequestMessages = [
-        ChatCompletionRequestMessage
-        { chatCompletionRequestMessageContent = Just $ API.ChatCompletionRequestMessageContentText "Hello"
-        -- 'User' is not one of ['system', 'assistant', 'user', 'function']
-        , chatCompletionRequestMessageRole = "user"
-        , chatCompletionRequestMessageName = Nothing
-        , chatCompletionRequestMessageToolUnderscorecalls = Nothing
-        , chatCompletionRequestMessageFunctionUnderscorecall = Nothing
-        , chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
-        }
-        ]
-    , createChatCompletionRequestModel = CreateChatCompletionRequestModel "gpt-3.5-turbo"
-    , createChatCompletionRequestFrequencyUnderscorepenalty = Nothing
-    , createChatCompletionRequestLogitUnderscorebias = Nothing
-    , createChatCompletionRequestLogprobs = Nothing
-    , createChatCompletionRequestTopUnderscorelogprobs  = Nothing
-    , createChatCompletionRequestMaxUnderscoretokens  = Nothing
-    , createChatCompletionRequestN  = Nothing
-    , createChatCompletionRequestPresenceUnderscorepenalty  = Nothing
-    , createChatCompletionRequestResponseUnderscoreformat  = Nothing
-    , createChatCompletionRequestSeed = Just 0
-    , createChatCompletionRequestStop = Nothing
-    , createChatCompletionRequestStream = Nothing
-    , createChatCompletionRequestTemperature = Nothing
-    , createChatCompletionRequestTopUnderscorep = Nothing
-    , createChatCompletionRequestTools = Nothing
-    , createChatCompletionRequestToolUnderscorechoice = Nothing
-    , createChatCompletionRequestUser = Nothing
-    , createChatCompletionRequestFunctionUnderscorecall = Nothing
-    , createChatCompletionRequestFunctions = Nothing
-    }
+  response <-
+    API.callOpenAI (mkClientEnv manager url) $
+      createChatCompletion
+        api_key
+        API.CreateChatCompletionRequest
+          { createChatCompletionRequestMessages =
+              [ ChatCompletionRequestMessage
+                  { chatCompletionRequestMessageContent = Just $ API.ChatCompletionRequestMessageContentText "Hello",
+                    -- 'User' is not one of ['system', 'assistant', 'user', 'function']
+                    chatCompletionRequestMessageRole = "user",
+                    chatCompletionRequestMessageName = Nothing,
+                    chatCompletionRequestMessageToolUnderscorecalls = Nothing,
+                    chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
+                    chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
+                  }
+              ],
+            createChatCompletionRequestModel = CreateChatCompletionRequestModel "gpt-3.5-turbo",
+            createChatCompletionRequestFrequencyUnderscorepenalty = Nothing,
+            createChatCompletionRequestLogitUnderscorebias = Nothing,
+            createChatCompletionRequestLogprobs = Nothing,
+            createChatCompletionRequestTopUnderscorelogprobs = Nothing,
+            createChatCompletionRequestMaxUnderscoretokens = Nothing,
+            createChatCompletionRequestN = Nothing,
+            createChatCompletionRequestPresenceUnderscorepenalty = Nothing,
+            createChatCompletionRequestResponseUnderscoreformat = Nothing,
+            createChatCompletionRequestSeed = Just 0,
+            createChatCompletionRequestStop = Nothing,
+            createChatCompletionRequestStream = Nothing,
+            createChatCompletionRequestTemperature = Nothing,
+            createChatCompletionRequestTopUnderscorep = Nothing,
+            createChatCompletionRequestTools = Nothing,
+            createChatCompletionRequestToolUnderscorechoice = Nothing,
+            createChatCompletionRequestUser = Nothing,
+            createChatCompletionRequestFunctionUnderscorecall = Nothing,
+            createChatCompletionRequestFunctions = Nothing
+          }
   print $ response
-  
 
-  -- Chat with chatgpt.
-  
-
+-- Chat with chatgpt.

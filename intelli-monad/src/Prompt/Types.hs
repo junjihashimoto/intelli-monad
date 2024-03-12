@@ -1,9 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -12,12 +12,12 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes  #-}
-{-# LANGUAGE RankNTypes  #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -25,31 +25,29 @@
 
 module Prompt.Types where
 
-import qualified OpenAI.Types as API
-import           Data.Text (Text)
-import           Data.ByteString (ByteString, toStrict, fromStrict)
-import qualified Data.Text as T
 import qualified Codec.Picture as P
-import           Control.Monad.Trans.State (StateT)
-import           Data.Aeson (encode, eitherDecode, ToJSON, FromJSON)
-import           Data.Proxy
-import           Data.Maybe (catMaybes, maybe)
-import           Data.List (maximumBy)
-import           Data.Either (either)
-import           GHC.Generics
-import           Control.Monad.IO.Class
-
-
+import Control.Monad.IO.Class
+import Control.Monad.Trans.State (StateT)
+import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode)
+import Data.ByteString (ByteString, fromStrict, toStrict)
+import Data.Either (either)
+import Data.List (maximumBy)
+import Data.Maybe (catMaybes, maybe)
+import Data.Proxy
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Time
 import Database.Persist
 import Database.Persist.PersistValue
-import Database.Persist.TH
 import Database.Persist.Sqlite
-import Data.Time
-
+import Database.Persist.TH
+import GHC.Generics
+import qualified OpenAI.Types as API
 
 data User = User | System | Assistant | Tool deriving (Eq, Show, Generic)
 
 instance ToJSON User
+
 instance FromJSON User
 
 userToText :: User -> Text
@@ -58,7 +56,7 @@ userToText = \case
   System -> "system"
   Assistant -> "assistant"
   Tool -> "tool"
-  
+
 textToUser :: Text -> User
 textToUser = \case
   "user" -> User
@@ -69,25 +67,28 @@ textToUser = \case
 
 instance Show (P.Image P.PixelRGB8) where
   show _ = "Image: ..."
-  
+
 data Message
   = Message
-  { unText :: Text }
+      {unText :: Text}
   | Image
-  { imageType :: Text
-  , imageData :: Text
-  }
-  | ToolCall { toolId :: Text
-             , toolName :: Text
-             , toolArguments :: Text
-             }
-  | ToolReturn { toolId :: Text
-               , toolName :: Text
-               , toolContent :: Text
-               }
+      { imageType :: Text,
+        imageData :: Text
+      }
+  | ToolCall
+      { toolId :: Text,
+        toolName :: Text,
+        toolArguments :: Text
+      }
+  | ToolReturn
+      { toolId :: Text,
+        toolName :: Text,
+        toolContent :: Text
+      }
   deriving (Eq, Show, Generic)
 
 instance ToJSON Message
+
 instance FromJSON Message
 
 newtype Model = Model Text deriving (Eq, Show)
@@ -96,13 +97,13 @@ class ChatCompletion a where
   toRequest :: API.CreateChatCompletionRequest -> a -> API.CreateChatCompletionRequest
   fromResponse :: API.CreateChatCompletionResponse -> a
 
-class ChatCompletion a => Validate a b where
+class (ChatCompletion a) => Validate a b where
   tryConvert :: a -> Either a b
 
-toPV :: ToJSON a => a -> PersistValue
+toPV :: (ToJSON a) => a -> PersistValue
 toPV = toPersistValue . toStrict . encode
 
-fromPV :: FromJSON a => PersistValue -> Either Text a
+fromPV :: (FromJSON a) => PersistValue -> Either Text a
 fromPV json = do
   json' <- fmap fromStrict $ fromPersistValue json
   case eitherDecode json' of
@@ -137,7 +138,9 @@ instance PersistField Message where
 instance PersistFieldSql Message where
   sqlType _ = sqlType (Proxy @ByteString)
 
-share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
+share
+  [mkPersist sqlSettings, mkMigrate "migrateAll"]
+  [persistLowerCase|
 Content
     user User
     message Message
@@ -158,7 +161,7 @@ Context
 
 type Prompt = StateT Context
 
--- data TypedPrompt tools task output = 
+-- data TypedPrompt tools task output =
 
 type SessionName = Text
 
@@ -172,39 +175,38 @@ class PersistentBackend p where
   save :: (MonadIO m, MonadFail m) => Conn p -> Context -> m (Key Context)
   saveContents :: (MonadIO m, MonadFail m) => Conn p -> [Content] -> m ()
 
-
 defaultRequest :: API.CreateChatCompletionRequest
 defaultRequest =
   API.CreateChatCompletionRequest
-                    { API.createChatCompletionRequestMessages = []
-                    , API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel "gpt-4"
-                    , API.createChatCompletionRequestFrequencyUnderscorepenalty = Nothing
-                    , API.createChatCompletionRequestLogitUnderscorebias = Nothing
-                    , API.createChatCompletionRequestLogprobs = Nothing
-                    , API.createChatCompletionRequestTopUnderscorelogprobs  = Nothing
-                    , API.createChatCompletionRequestMaxUnderscoretokens  = Nothing
-                    , API.createChatCompletionRequestN  = Nothing
-                    , API.createChatCompletionRequestPresenceUnderscorepenalty  = Nothing
-                    , API.createChatCompletionRequestResponseUnderscoreformat  = Nothing
-                    , API.createChatCompletionRequestSeed = Just 0
-                    , API.createChatCompletionRequestStop = Nothing
-                    , API.createChatCompletionRequestStream = Nothing
-                    , API.createChatCompletionRequestTemperature = Nothing
-                    , API.createChatCompletionRequestTopUnderscorep = Nothing
-                    , API.createChatCompletionRequestTools = Nothing
-                    , API.createChatCompletionRequestToolUnderscorechoice = Nothing
-                    , API.createChatCompletionRequestUser = Nothing
-                    , API.createChatCompletionRequestFunctionUnderscorecall = Nothing
-                    , API.createChatCompletionRequestFunctions = Nothing
-                    }
-
+    { API.createChatCompletionRequestMessages = [],
+      API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel "gpt-4",
+      API.createChatCompletionRequestFrequencyUnderscorepenalty = Nothing,
+      API.createChatCompletionRequestLogitUnderscorebias = Nothing,
+      API.createChatCompletionRequestLogprobs = Nothing,
+      API.createChatCompletionRequestTopUnderscorelogprobs = Nothing,
+      API.createChatCompletionRequestMaxUnderscoretokens = Nothing,
+      API.createChatCompletionRequestN = Nothing,
+      API.createChatCompletionRequestPresenceUnderscorepenalty = Nothing,
+      API.createChatCompletionRequestResponseUnderscoreformat = Nothing,
+      API.createChatCompletionRequestSeed = Just 0,
+      API.createChatCompletionRequestStop = Nothing,
+      API.createChatCompletionRequestStream = Nothing,
+      API.createChatCompletionRequestTemperature = Nothing,
+      API.createChatCompletionRequestTopUnderscorep = Nothing,
+      API.createChatCompletionRequestTools = Nothing,
+      API.createChatCompletionRequestToolUnderscorechoice = Nothing,
+      API.createChatCompletionRequestUser = Nothing,
+      API.createChatCompletionRequestFunctionUnderscorecall = Nothing,
+      API.createChatCompletionRequestFunctions = Nothing
+    }
 
 instance PersistentBackend SqliteConf where
   type Conn SqliteConf = ConnectionPool
-  config = SqliteConf
-    { sqlDatabase = "intelli-monad.sqlite3"
-    , sqlPoolSize = 5
-    }
+  config =
+    SqliteConf
+      { sqlDatabase = "intelli-monad.sqlite3",
+        sqlPoolSize = 5
+      }
   setup p = do
     conn <- liftIO $ createPoolConfig p
     liftIO $ runPool p (runMigration migrateAll) conn
@@ -213,34 +215,32 @@ instance PersistentBackend SqliteConf where
     _ <- liftIO $ runPool (config @SqliteConf) (insert context) conn
     return ()
   load conn sessionName = do
-     (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [ContextSessionName ==. sessionName] []) conn
-     if length a == 0
-       then return Nothing
-       else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity k v) -> v) a
+    (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [ContextSessionName ==. sessionName] []) conn
+    if length a == 0
+      then return Nothing
+      else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity k v) -> v) a
 
   loadByKey conn key = do
-     (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [ContextId ==. key] []) conn
-     if length a == 0
-       then return Nothing
-       else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity k v) -> v) a
+    (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [ContextId ==. key] []) conn
+    if length a == 0
+      then return Nothing
+      else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity k v) -> v) a
 
   save conn context = do
-     liftIO $ runPool (config @SqliteConf) (insert context) conn
+    liftIO $ runPool (config @SqliteConf) (insert context) conn
 
   saveContents conn contents = do
     liftIO $ runPool (config @SqliteConf) (putMany contents) conn
 
-    
 class Tool a b | a -> b where
   toolFunctionName :: Text
   toolSchema :: API.ChatCompletionTool
   toolExec :: a -> IO b
 
-toolAdd :: forall a b. Tool a b => API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest 
+toolAdd :: forall a b. (Tool a b) => API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
 toolAdd req =
   let prevTools = case API.createChatCompletionRequestTools req of
         Nothing -> []
         Just v -> v
       newTools = prevTools ++ [toolSchema @a @b]
-  in req { API.createChatCompletionRequestTools = Just newTools } 
-
+   in req {API.createChatCompletionRequestTools = Just newTools}
