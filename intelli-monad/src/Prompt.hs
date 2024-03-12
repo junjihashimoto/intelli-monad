@@ -81,7 +81,7 @@ push contents = do
 pushToolReturn :: (MonadIO m, MonadFail m) => Contents -> Prompt m ()
 pushToolReturn contents = do
   prev <- getContext
-  let toolMap = M.fromList (map (\v@(Content _ (ToolCall id' _ _) _ _) -> (id', v)) contents)
+  let toolMap = M.fromList (map (\v@(Content _ (ToolReturn id' _ _) _ _) -> (id', v)) contents)
       nextContents =
         concat $
           map
