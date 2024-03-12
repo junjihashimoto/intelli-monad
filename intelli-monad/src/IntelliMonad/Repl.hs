@@ -99,7 +99,6 @@ getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
 
 runRepl :: forall p. PersistentBackend p => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl tools customs sessionName defaultReq contents = do
-  let settings = addTools tools defaultReq
   runInputT
     ( Settings
         { complete = completeFilename,
@@ -107,7 +106,7 @@ runRepl tools customs sessionName defaultReq contents = do
           autoAddHistory = True
         }
     )
-    (runPrompt @p tools customs sessionName settings (push @p contents >> loop))
+    (runPrompt @p tools customs sessionName defaultReq (push @p contents >> loop))
   where
     loop :: Prompt (InputT IO) ()
     loop = do
@@ -206,11 +205,7 @@ runRepl tools customs sessionName defaultReq contents = do
                   putStrLn ":switch session <session name>"
                   putStrLn ":help"
                 loop
-          else do 
-            time <- liftIO getCurrentTime
-            context <- getContext
-            let contents = [Content User (Message input) context.contextSessionName time]
-            push @p contents
-            ret <- call @p
-            showContents ret
+          else do
+            callPrompt @p input >>= showContents
             loop
+

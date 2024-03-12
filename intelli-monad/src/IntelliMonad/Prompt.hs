@@ -46,6 +46,7 @@ import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Environment (getEnv, lookupEnv)
+import Data.Proxy
 
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = context <$> get
@@ -107,7 +108,7 @@ pushToolReturn contents = do
 call :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m Contents
 call = do
   prev <- getContext
-  ((contents, finishReason), res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest prev.contextBody
+  ((contents, finishReason), res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
   let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
       next =
         prev
@@ -132,8 +133,47 @@ call = do
       pushToolReturn @p retTool
       call @p
 
+callPrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Text -> Prompt m Contents
+callPrompt input = do
+  time <- liftIO getCurrentTime
+  context <- getContext
+  let contents = [Content User (Message input) context.contextSessionName time]
+  push @p contents
+  call @p
+
+runPromptWithValidation
+  :: forall validation p m a.
+     ( MonadIO m
+     , MonadFail m
+     , PersistentBackend p
+     , Tool validation
+     , A.FromJSON validation
+     , A.FromJSON (Output validation)
+     , A.ToJSON validation
+     , A.ToJSON (Output validation)
+     )
+  => [ToolProxy]
+  -> [CustomInstructionProxy]
+  -> Text
+  -> API.CreateChatCompletionRequest
+  -> Text
+  -> m (Maybe validation)
+runPromptWithValidation tools customs sessionName req input = do
+  let valid = ToolProxy (Proxy :: Proxy validation)
+  context <- runPrompt @p (valid : tools) customs sessionName req (callPrompt @p input >> getContext)
+  case findToolCall valid context.contextBody of
+    Just (Content _ (ToolCall id' name' args') _ _) -> do
+      let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
+      case v of
+        Left err -> do
+          liftIO $ putStrLn err
+          return Nothing
+        Right v' -> return $ Just v'
+    _ -> return Nothing
+
 runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
 runPrompt tools customs sessionName req func = do
+  let settings = addTools tools (req { API.createChatCompletionRequestTools = Nothing })
   context <- withDB @p $ \conn -> do
     load @p conn sessionName >>= \case
       Just v -> return $ PromptEnv
@@ -145,7 +185,7 @@ runPrompt tools customs sessionName req func = do
         time <- liftIO getCurrentTime
         let init = PromptEnv
               { context = Context
-                { contextRequest = req,
+                { contextRequest = settings,
                   contextResponse = Nothing,
                   contextHeader = headers customs,
                   contextBody = [],
@@ -275,3 +315,8 @@ showContents res = do
             c@(ToolCall _ _ _) -> T.pack $ show c
             c@(ToolReturn _ _ _) -> T.pack $ show c
 
+
+fromModel :: Text -> API.CreateChatCompletionRequest
+fromModel model = defaultRequest
+                  { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
+                  }

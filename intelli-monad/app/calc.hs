@@ -21,12 +21,5 @@ main = do
     lookupEnv "OPENAI_MODEL" >>= \case
       Just model -> return $ T.pack model
       Nothing -> return "gpt-4"
-  runRepl
-    @StateLessConf
-    [ToolProxy (Proxy @ValidateNumber)]
-    [CustomInstructionProxy (Proxy @Math)]
-    "default"
-    defaultRequest
-      { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
-      }
-    mempty
+  v <- runPromptWithValidation @ValidateNumber @StateLessConf [] [CustomInstructionProxy (Proxy @Math)] "default" (fromModel model) "2+3+3+sin(3)"
+  print (v :: Maybe ValidateNumber)

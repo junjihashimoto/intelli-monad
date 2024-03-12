@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -29,26 +30,17 @@ import qualified OpenAI.Types as API
 defaultCustomInstructions :: [CustomInstructionProxy]
 defaultCustomInstructions = []
 
-
 data ValidateNumber = ValidateNumber
   { number :: Double
   }
-  deriving (Eq, Show, Generic)
-
-instance A.FromJSON ValidateNumber
-
-instance A.ToJSON ValidateNumber
-
-instance A.FromJSON (Output ValidateNumber)
-
-instance A.ToJSON (Output ValidateNumber)
+  deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
 instance Tool ValidateNumber where
   data Output ValidateNumber = ValidateNumberOutput
      { code :: Int,
        stdout :: String,
        stderr :: String
-     } deriving (Eq, Show, Generic)
+     } deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
   toolFunctionName = "output_number"
   toolSchema =

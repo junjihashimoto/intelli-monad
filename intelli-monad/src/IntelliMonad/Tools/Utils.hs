@@ -92,9 +92,20 @@ filterToolCall cs =
       loop (_ : cs') = loop cs'
    in loop cs
 
-
 tryToolExec :: (MonadIO m, MonadFail m) => [ToolProxy] -> Text -> Contents -> Prompt m Contents
 tryToolExec tools sessionName contents = do
   cs <- forM (filterToolCall contents) $ \c@(Content user (ToolCall id' name' args') _ _) -> do
     mergeToolCall tools sessionName id' name' args'
   return $ catMaybes cs
+
+findToolCall :: ToolProxy -> Contents -> Maybe Content
+findToolCall _ [] = Nothing
+findToolCall t@(ToolProxy (Proxy :: Proxy a)) (c:cs) =
+  case c of
+    Content _ (Message _) _ _ -> findToolCall t cs
+    Content _ (Image _ _) _ _ -> findToolCall t cs
+    Content _ (ToolCall id' name' args') _ _ ->
+      if name' == toolFunctionName @a
+      then Just c
+      else findToolCall t cs
+    Content _ (ToolReturn _ _ _) _ _ -> findToolCall t cs
