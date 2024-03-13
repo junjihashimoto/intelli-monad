@@ -22,7 +22,6 @@ import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.State (get, put)
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base64 as Base64
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -113,8 +112,7 @@ runRepl tools customs sessionName defaultReq contents = do
                 loop
               Right Quit -> return ()
               Right Clear -> do
-                prev <- getContext
-                setContext @p $ prev {contextBody = []}
+                clear @p
                 loop
               Right ShowContents -> do
                 context <- getContext
@@ -169,20 +167,7 @@ runRepl tools customs sessionName defaultReq contents = do
                   Nothing -> liftIO $ T.putStrLn $ "Failed to load " <> session
                 loop
               Right (ReadImage imagePath) -> do
-                let tryReadFile = T.decodeUtf8Lenient . Base64.encode <$> BS.readFile (T.unpack imagePath)
-                    imageType =
-                      if T.isSuffixOf ".png" imagePath
-                        then "png"
-                        else
-                          if T.isSuffixOf ".jpg" imagePath || T.isSuffixOf ".jpeg" imagePath
-                            then "jpeg"
-                            else "jpeg"
-                file <- liftIO $ tryReadFile
-                time <- liftIO getCurrentTime
-                context <- getContext
-                let contents' = [Content User (Image imageType file) context.contextSessionName time]
-                ret <- callWithContents @p contents'
-                showContents ret
+                callWithImage @p imagePath >>= showContents
                 loop
               Right Help -> do
                 liftIO $ do

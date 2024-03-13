@@ -23,6 +23,7 @@ import Control.Monad.Trans.State (get, put, runStateT)
 import qualified Data.Aeson as A
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.Proxy
@@ -332,3 +333,24 @@ fromModel model =
   defaultRequest
     { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
     }
+
+clear :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m ()
+clear = do
+  prev <- getContext
+  setContext @p $ prev {contextBody = []}
+
+callWithImage :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Text -> Prompt m Contents
+callWithImage imagePath = do
+  let tryReadFile = T.decodeUtf8Lenient . Base64.encode <$> BS.readFile (T.unpack imagePath)
+      imageType =
+        if T.isSuffixOf ".png" imagePath
+          then "png"
+          else
+            if T.isSuffixOf ".jpg" imagePath || T.isSuffixOf ".jpeg" imagePath
+              then "jpeg"
+              else "jpeg"
+  file <- liftIO $ tryReadFile
+  time <- liftIO getCurrentTime
+  context <- getContext
+  let contents' = [Content User (Image imageType file) context.contextSessionName time]
+  callWithContents @p contents'
