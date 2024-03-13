@@ -16,7 +16,7 @@
 
 module IntelliMonad.Repl where
 
-import Control.Monad (forM, forM_)
+import Control.Monad (forM_)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.State (get, put)
@@ -29,15 +29,10 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import Data.Time
 import Data.Void
-import Database.Persist hiding (get)
-import Database.Persist.PersistValue
-import Database.Persist.Sqlite hiding (get)
-import Database.Persist.TH
+-- import Database.Persist hiding (get)
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
-import IntelliMonad.Tools
 import IntelliMonad.Types
-import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 import System.Console.Haskeline
 import Text.Megaparsec
@@ -99,7 +94,7 @@ runRepl tools customs sessionName defaultReq contents = do
   runInputT
     ( Settings
         { complete = completeFilename,
-          historyFile = Just "intellimonad.history",
+          historyFile = Just "intelli-monad.history",
           autoAddHistory = True
         }
     )
@@ -150,7 +145,7 @@ runRepl tools customs sessionName defaultReq contents = do
               Right ListSessions -> do
                 liftIO $ do
                   list <- withDB @p $ \conn -> listSessions @p conn
-                  forM_ list $ \sessionName -> T.putStrLn sessionName
+                  forM_ list $ \sessionName' -> T.putStrLn sessionName'
                 loop
               Right (CopySession (from', to')) -> do
                 liftIO $ do
@@ -185,9 +180,8 @@ runRepl tools customs sessionName defaultReq contents = do
                 file <- liftIO $ tryReadFile
                 time <- liftIO getCurrentTime
                 context <- getContext
-                let contents = [Content User (Image imageType file) context.contextSessionName time]
-                push @p contents
-                ret <- call @p
+                let contents' = [Content User (Image imageType file) context.contextSessionName time]
+                ret <- callWithContents @p contents'
                 showContents ret
                 loop
               Right Help -> do
@@ -206,5 +200,5 @@ runRepl tools customs sessionName defaultReq contents = do
                   putStrLn ":help"
                 loop
             else do
-              callPrompt @p input >>= showContents
+              callWithText @p input >>= showContents
               loop

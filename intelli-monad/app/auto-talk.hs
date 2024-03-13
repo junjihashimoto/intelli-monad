@@ -8,14 +8,11 @@
 
 module Main where
 
-import Data.Aeson
 import Data.Proxy
-import GHC.Generics
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
-import OpenAI.Types
-import Control.Monad.Trans.State (get, put, runStateT)
+import Control.Monad.Trans.State (runStateT)
 
 data Haruhi = Haruhi
 
@@ -47,18 +44,18 @@ main = do
   e <- initializePrompt @StatelessConf [] [CustomInstructionProxy (Proxy @Env)] "env" (fromModel "gpt-4")
   h <- initializePrompt @StatelessConf [] [CustomInstructionProxy (Proxy @Haruhi)] "haruhi" (fromModel "gpt-4")
   k <- initializePrompt @StatelessConf [] [CustomInstructionProxy (Proxy @Kyon)] "kyon" (fromModel "gpt-4")
-  let init = [Content User (Message "ある駄菓子屋の前での出来ことで話を作ってください。Let's start!") "default" defaultUTCTime]
-  loop init [] [] [] e h k
+  let init' = [Content User (Message "ある駄菓子屋の前での出来ことで話を作ってください。Let's start!") "default" defaultUTCTime]
+  loop init' [] [] [] e h k
 
   where
-    loop init env haruhi kyon e h k = do
-      (env, e) <- runStateT (callPrompt' @StatelessConf (map toUser (init <> haruhi <> kyon))) e
+    loop init' env haruhi kyon e h k = do
+      (env, e) <- runStateT (callWithContents @StatelessConf (map toUser (init' <> haruhi <> kyon))) e
       print "--env--"
       showContents env
-      (haruhi, h) <- runStateT (callPrompt' @StatelessConf (map toUser (kyon <> env))) h
+      (haruhi, h) <- runStateT (callWithContents @StatelessConf (map toUser (kyon <> env))) h
       print "--haruhi--"
       showContents haruhi
-      (kyon, k) <- runStateT (callPrompt' @StatelessConf (map toUser (env <> haruhi))) k
+      (kyon, k) <- runStateT (callWithContents @StatelessConf (map toUser (env <> haruhi))) k
       print "--kyon--"
       showContents kyon
       loop [] env haruhi kyon e h k

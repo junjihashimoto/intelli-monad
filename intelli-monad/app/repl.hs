@@ -4,15 +4,12 @@
 
 module Main where
 
-import Data.Proxy
 import qualified Data.Text as T
 import Database.Persist.Sqlite (SqliteConf)
 import IntelliMonad.CustomInstructions
-import IntelliMonad.Prompt
 import IntelliMonad.Repl
 import IntelliMonad.Tools
 import IntelliMonad.Types
-import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 import System.Environment (lookupEnv)
 

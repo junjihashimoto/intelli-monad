@@ -20,31 +20,22 @@
 module IntelliMonad.Tools.DallE3 where
 
 import Codec.Picture
-import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class
-import Data.Aeson (encode)
 import qualified Data.Aeson as A
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (fromMaybe)
 import qualified Data.OSC1337 as OSC
-import Data.Proxy
 import qualified Data.Sixel as Sixel
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Data.Time
 import GHC.Generics
-import GHC.IO.Exception
 import IntelliMonad.Types
 import Network.HTTP.Client (httpLbs, newManager, parseUrlThrow, responseBody)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
-import Servant.API
 import Servant.Client
 import System.Environment (getEnv, lookupEnv)
-import System.Process
 
 putImage :: FilePath -> IO (Either String ())
 putImage image' = do
@@ -136,13 +127,13 @@ instance Tool DallE3 where
               createImageRequestUser = Nothing
             }
     res <- API.callOpenAI (mkClientEnv manager url) $ createImage api_key request
-    let url = case res of
+    let url' = case res of
           (API.ImagesResponse _ (img : _)) -> fromMaybe "" (API.imageUrl img)
           _ -> ""
     let downloadImage = do
-          request <- parseUrlThrow $ T.unpack url
-          manager <- newManager tlsManagerSettings
-          response <- httpLbs request manager
+          request' <- parseUrlThrow $ T.unpack url'
+          manager' <- newManager tlsManagerSettings
+          response <- httpLbs request' manager'
           let imageBytes = Network.HTTP.Client.responseBody response
           LBS.writeFile "image.png" imageBytes
     downloadImage
@@ -151,4 +142,4 @@ instance Tool DallE3 where
         putImage "image.png" >>= \case
           Left err -> return err
           Right _ -> return ""
-    return $ DallE3Output 0 "" err url
+    return $ DallE3Output 0 "" err url'

@@ -19,17 +19,9 @@
 
 module IntelliMonad.Tools.TextToSpeech where
 
-import Control.Monad (forM, forM_)
-import Control.Monad.IO.Class
-import Data.Aeson (encode)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
-import Data.Maybe (catMaybes, fromMaybe)
-import Data.Proxy
-import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Data.Time
 import GHC.Generics
 import GHC.IO.Exception
 import IntelliMonad.Types
@@ -37,7 +29,6 @@ import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
-import Servant.API
 import Servant.Client
 import System.Environment (getEnv)
 import System.Process

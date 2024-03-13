@@ -19,28 +19,18 @@
 
 module IntelliMonad.Tools.Utils where
 
-import Control.Monad (forM, forM_)
+import Control.Monad (forM)
 import Control.Monad.IO.Class
 import Data.Aeson (encode)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes)
 import Data.Proxy
 import Data.Text (Text)
-import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
-import GHC.Generics
-import GHC.IO.Exception
 import IntelliMonad.Types
-import Network.HTTP.Client (newManager)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
-import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
-import Servant.API
-import Servant.Client
-import System.Environment (getEnv)
-import System.Process
 
 addTools :: [ToolProxy] -> API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
 addTools [] v = v
@@ -49,7 +39,7 @@ addTools (tool : tools') v =
     (ToolProxy (_ :: Proxy a)) -> addTools tools' (toolAdd @a v)
 
 toolExec' ::
-  forall t to m.
+  forall t m.
   (MonadIO m, MonadFail m, Tool t, A.FromJSON t, A.ToJSON (Output t)) =>
   Text ->
   Text ->
@@ -59,7 +49,7 @@ toolExec' ::
 toolExec' sessionName id' name' args' = do
   if name' == toolFunctionName @t
     then case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String t) of
-      Left err -> return Nothing
+      Left _ -> return Nothing
       Right input -> do
         output <- liftIO $ toolExec input
         time <- liftIO getCurrentTime
@@ -104,7 +94,7 @@ filterToolCall cs =
 
 tryToolExec :: (MonadIO m, MonadFail m) => [ToolProxy] -> Text -> Contents -> Prompt m Contents
 tryToolExec tools sessionName contents = do
-  cs <- forM (filterToolCall contents) $ \c@(Content user (ToolCall id' name' args') _ _) -> do
+  cs <- forM (filterToolCall contents) $ \(Content _ (ToolCall id' name' args') _ _) -> do
     mergeToolCall tools sessionName id' name' args'
   return $ catMaybes cs
 
@@ -114,7 +104,7 @@ findToolCall t@(ToolProxy (Proxy :: Proxy a)) (c : cs) =
   case c of
     Content _ (Message _) _ _ -> findToolCall t cs
     Content _ (Image _ _) _ _ -> findToolCall t cs
-    Content _ (ToolCall id' name' args') _ _ ->
+    Content _ (ToolCall _ name' _) _ _ ->
       if name' == toolFunctionName @a
         then Just c
         else findToolCall t cs

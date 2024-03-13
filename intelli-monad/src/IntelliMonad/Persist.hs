@@ -25,26 +25,13 @@
 
 module IntelliMonad.Persist where
 
-import qualified Codec.Picture as P
 import Control.Monad.IO.Class
-import Control.Monad.Trans.State (StateT)
-import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode)
-import Data.ByteString (ByteString, fromStrict, toStrict)
-import Data.Either (either)
 import Data.List (maximumBy)
-import Data.Maybe (catMaybes, maybe)
-import Data.Proxy
 import qualified Data.Set as S
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Time
 import Database.Persist
-import Database.Persist.PersistValue
 import Database.Persist.Sqlite
-import Database.Persist.TH
-import GHC.Generics
 import IntelliMonad.Types
-import qualified OpenAI.Types as API
+import Data.Text (Text)
 
 data StatelessConf = StatelessConf
 
@@ -78,13 +65,13 @@ instance PersistentBackend SqliteConf where
     (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [ContextSessionName ==. sessionName] []) conn
     if length a == 0
       then return Nothing
-      else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity k v) -> v) a
+      else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity _ v) -> v) a
 
   loadByKey conn key = do
     (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [ContextId ==. key] []) conn
     if length a == 0
       then return Nothing
-      else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity k v) -> v) a
+      else return $ Just $ maximumBy (\a0 a1 -> compare (contextCreated a1) (contextCreated a0)) $ map (\(Entity _ v) -> v) a
 
   save conn context = do
     liftIO $ runPool (config @SqliteConf) (Just <$> insert context) conn
@@ -94,7 +81,7 @@ instance PersistentBackend SqliteConf where
 
   listSessions conn = do
     (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [] []) conn
-    return $ S.toList $ S.fromList $ map (\(Entity k v) -> contextSessionName v) a
+    return $ S.toList $ S.fromList $ map (\(Entity _ v) -> contextSessionName v) a
 
   deleteSession conn sessionName = do
     liftIO $ runPool (config @SqliteConf) (deleteWhere [ContextSessionName ==. sessionName]) conn
@@ -103,7 +90,7 @@ instance PersistentBackend StatelessConf where
   type Conn StatelessConf = ()
   config = StatelessConf
   setup _ = return $ Just ()
-  initialize conn context = return ()
+  initialize _ _ = return ()
   load _ _ = return Nothing
   loadByKey _ _ = return Nothing
   save _ _ = return Nothing

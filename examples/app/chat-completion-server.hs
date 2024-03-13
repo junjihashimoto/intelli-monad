@@ -4,13 +4,14 @@
 {-# LANGUAGE TypeFamilies #-}
 
 import Control.Monad.IO.Class (liftIO)
-import Data.ByteString (ByteString)
+import Control.Monad.Trans.Except (ExceptT)
 import OpenAI.API
 import OpenAI.Types
 import Servant (ServerError, err404)
 import Servant.API.Experimental.Auth (AuthProtect)
-import Servant.Server.Experimental.Auth (AuthHandler, AuthServerData, mkAuthHandler)
+import Servant.Server.Experimental.Auth (AuthServerData)
 
+config :: Config
 config =
   Config
     { --  { configUrl :: String  -- ^ scheme://hostname:port/path, e.g. "http://localhost:8080/"
@@ -28,11 +29,12 @@ auth :: OpenAIAuth
 auth =
   OpenAIAuth
     { --  { lookupUser :: ByteString -> Handler AuthServer
-      lookupUser = \key -> return AuthData,
+      lookupUser = \_ -> return AuthData,
       --  , authError :: Request -> ServerError
-      authError = \req -> err404
+      authError = \_ -> err404
     }
 
+backend :: OpenAIBackend a (ExceptT ServerError IO)
 backend =
   OpenAIBackend
     { --  { cancelRun :: a -> Text -> Text -> m RunObject{- ^  -}
@@ -98,7 +100,7 @@ backend =
       --  , createTranslation :: a -> FormCreateTranslation -> m CreateTranslation200Response{- ^  -}
       createTranslation = undefined,
       --  , createChatCompletion :: a -> CreateChatCompletionRequest -> m CreateChatCompletionResponse{- ^  -}
-      createChatCompletion = \auth req -> do
+      createChatCompletion = \_ req -> do
         liftIO $ print req
         return
           CreateChatCompletionResponse

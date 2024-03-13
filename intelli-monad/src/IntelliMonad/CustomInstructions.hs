@@ -24,7 +24,6 @@ import qualified Data.Aeson as A
 import Data.Proxy
 import GHC.Generics
 import IntelliMonad.Types
-import qualified OpenAI.API as API
 import qualified OpenAI.Types as API
 
 defaultCustomInstructions :: [CustomInstructionProxy]
@@ -68,7 +67,7 @@ instance Tool ValidateNumber where
                   ]
             }
       }
-  toolExec args = do
+  toolExec _ = do
     return $ ValidateNumberOutput 0 "" ""
 
 data Math = Math

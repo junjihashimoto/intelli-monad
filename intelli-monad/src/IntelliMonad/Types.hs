@@ -23,26 +23,23 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 
 module IntelliMonad.Types where
 
 import qualified Codec.Picture as P
-import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
 import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode)
 import qualified Data.Aeson as A
 import Data.ByteString (ByteString, fromStrict, toStrict)
 import Data.Coerce
-import Data.Either (either)
 import Data.Kind (Type)
-import Data.List (maximumBy)
-import Data.Maybe (catMaybes, maybe)
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import Database.Persist
-import Database.Persist.PersistValue
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
@@ -117,6 +114,7 @@ textToFinishReason = \case
   "function_call" -> FunctionCall
   "content_filter" -> ContentFilter
   "null" -> Null
+  _ -> Null
 
 instance ToJSON Message
 

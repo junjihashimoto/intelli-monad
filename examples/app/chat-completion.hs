@@ -7,7 +7,7 @@ import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import OpenAI.API as API
 import OpenAI.Types as API
-import Servant.Client (ClientEnv, mkClientEnv, parseBaseUrl, responseBody)
+import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Environment (getEnv)
 
 main :: IO ()

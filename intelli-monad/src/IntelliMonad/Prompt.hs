@@ -17,26 +17,20 @@
 
 module IntelliMonad.Prompt where
 
-import Codec.Picture.Png (encodePng)
-import Control.Monad (forM, forM_)
+import Control.Monad (forM_)
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.State (get, put, runStateT)
-import Data.Aeson (encode)
 import qualified Data.Aeson as A
 import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Map as M
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (fromMaybe)
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import Data.Time
-import Data.Time.Calendar
-import Database.Persist.Sqlite (SqliteConf)
 import IntelliMonad.CustomInstructions
 import IntelliMonad.Persist
 import IntelliMonad.Tools
@@ -55,7 +49,7 @@ setContext :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Conte
 setContext context = do
   env <- get
   put $ env {context = context}
-  withDB @p $ \conn -> save @p (conn :: Conn p) context
+  _ <- withDB @p $ \conn -> save @p (conn :: Conn p) context
   return ()
 
 switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
@@ -138,21 +132,21 @@ call = loop []
       v <- call @p
       return $ ret <> retTool <> v
 
-callPrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Text -> Prompt m Contents
-callPrompt input = do
+callWithText :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Text -> Prompt m Contents
+callWithText input = do
   time <- liftIO getCurrentTime
   context <- getContext
   let contents = [Content User (Message input) context.contextSessionName time]
   push @p contents
   call @p
 
-callPrompt' :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Contents -> Prompt m Contents
-callPrompt' input = do
+callWithContents :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Contents -> Prompt m Contents
+callWithContents input = do
   push @p input
   call @p
 
 runPromptWithValidation ::
-  forall validation p m a.
+  forall validation p m.
   ( MonadIO m,
     MonadFail m,
     PersistentBackend p,
@@ -170,9 +164,9 @@ runPromptWithValidation ::
   m (Maybe validation)
 runPromptWithValidation tools customs sessionName req input = do
   let valid = ToolProxy (Proxy :: Proxy validation)
-  contents <- runPrompt @p (valid : tools) customs sessionName req (callPrompt @p input)
+  contents <- runPrompt @p (valid : tools) customs sessionName req (callWithText @p input)
   case findToolCall valid contents of
-    Just (Content _ (ToolCall id' name' args') _ _) -> do
+    Just (Content _ (ToolCall _ _ args') _ _) -> do
       let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
       case v of
         Left err -> do
@@ -181,7 +175,7 @@ runPromptWithValidation tools customs sessionName req input = do
         Right v' -> return $ Just v'
     _ -> return Nothing
 
-initializePrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> m PromptEnv
+initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> m PromptEnv
 initializePrompt tools customs sessionName req = do
   let settings = addTools tools (req {API.createChatCompletionRequestTools = Nothing})
   withDB @p $ \conn -> do
@@ -195,7 +189,7 @@ initializePrompt tools customs sessionName req = do
             }
       Nothing -> do
         time <- liftIO getCurrentTime
-        let init =
+        let init' =
               PromptEnv
                 { context =
                     Context
@@ -211,8 +205,8 @@ initializePrompt tools customs sessionName req = do
                   tools = tools,
                   customInstructions = customs
                 }
-        initialize @p conn (init.context)
-        return init
+        initialize @p conn (init'.context)
+        return init'
 
 runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
 runPrompt tools customs sessionName req func = do
