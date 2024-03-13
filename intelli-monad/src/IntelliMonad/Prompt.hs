@@ -106,32 +106,37 @@ pushToolReturn contents = do
   return ()
 
 call :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m Contents
-call = do
-  prev <- getContext
-  ((contents, finishReason), res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
-  let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
-      next =
-        prev
-          { contextResponse = Just res,
-            contextTotalTokens = current_total_tokens
-          }
-  setContext @p next
-  push @p contents
-
-  case finishReason of
-    Stop -> return contents
-    ToolCalls -> callTool next contents
-    FunctionCall -> callTool next contents
-    Length -> call @p
-    _ -> return contents
+call = loop []
   where
-    callTool next contents = do
+    loop ret = do
+      prev <- getContext
+      ((contents, finishReason), res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
+      let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
+          next =
+            prev
+              { contextResponse = Just res,
+                contextTotalTokens = current_total_tokens
+              }
+      setContext @p next
+      push @p contents
+
+      let ret' = ret <> contents
+    
+      case finishReason of
+        Stop -> return ret'
+        ToolCalls -> callTool next contents ret'
+        FunctionCall -> callTool next contents  ret'
+        Length -> loop ret'
+        _ -> return ret'
+          
+    callTool next contents ret = do
       showContents contents
       env <- get
       retTool <- tryToolExec env.tools next.contextSessionName contents
       showContents retTool
       pushToolReturn @p retTool
-      call @p
+      v <- call @p
+      return $ ret <> retTool <> v
 
 callPrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Text -> Prompt m Contents
 callPrompt input = do
@@ -160,8 +165,8 @@ runPromptWithValidation ::
   m (Maybe validation)
 runPromptWithValidation tools customs sessionName req input = do
   let valid = ToolProxy (Proxy :: Proxy validation)
-  context <- runPrompt @p (valid : tools) customs sessionName req (callPrompt @p input >> getContext)
-  case findToolCall valid context.contextBody of
+  contents <- runPrompt @p (valid : tools) customs sessionName req (callPrompt @p input)
+  case findToolCall valid contents of
     Just (Content _ (ToolCall id' name' args') _ _) -> do
       let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
       case v of
@@ -171,17 +176,17 @@ runPromptWithValidation tools customs sessionName req input = do
         Right v' -> return $ Just v'
     _ -> return Nothing
 
-runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
-runPrompt tools customs sessionName req func = do
+initializePrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> m PromptEnv
+initializePrompt tools customs sessionName req = do
   let settings = addTools tools (req {API.createChatCompletionRequestTools = Nothing})
-  context <- withDB @p $ \conn -> do
+  withDB @p $ \conn -> do
     load @p conn sessionName >>= \case
       Just v ->
         return $
           PromptEnv
-            { context = v,
-              tools = tools,
-              customInstructions = customs
+            { context = v
+            , tools = tools
+            , customInstructions = customs
             }
       Nothing -> do
         time <- liftIO getCurrentTime
@@ -203,6 +208,10 @@ runPrompt tools customs sessionName req func = do
                 }
         initialize @p conn (init.context)
         return init
+
+runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
+runPrompt tools customs sessionName req func = do
+  context <- initializePrompt @p tools customs sessionName req
   fst <$> runStateT func context
 
 instance ChatCompletion Contents where
