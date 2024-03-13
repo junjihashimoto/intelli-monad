@@ -146,6 +146,11 @@ callPrompt input = do
   push @p contents
   call @p
 
+callPrompt' :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Contents -> Prompt m Contents
+callPrompt' input = do
+  push @p input
+  call @p
+
 runPromptWithValidation ::
   forall validation p m a.
   ( MonadIO m,
