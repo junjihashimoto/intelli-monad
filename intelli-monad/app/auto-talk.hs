@@ -8,11 +8,11 @@
 
 module Main where
 
+import Control.Monad.Trans.State (runStateT)
 import Data.Proxy
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
-import Control.Monad.Trans.State (runStateT)
 
 data Haruhi = Haruhi
 
@@ -26,7 +26,6 @@ instance CustomInstruction Kyon where
   customHeader = [(Content System (Message "あなたは涼宮ハルヒの同級生のキョンとして会話してください。話す時は'kyon: 'をつけて話してください。") "" defaultUTCTime)]
   customFooter = []
 
-
 data Env = Env
 
 instance CustomInstruction Env where
@@ -36,8 +35,8 @@ instance CustomInstruction Env where
 toUser :: Content -> Content
 toUser c =
   if contentUser c == Assistant
-  then c {contentUser = User}
-  else c
+    then c {contentUser = User}
+    else c
 
 main :: IO ()
 main = do
@@ -46,7 +45,6 @@ main = do
   k <- initializePrompt @StatelessConf [] [CustomInstructionProxy (Proxy @Kyon)] "kyon" (fromModel "gpt-4")
   let init' = [Content User (Message "ある駄菓子屋の前での出来ことで話を作ってください。Let's start!") "default" defaultUTCTime]
   loop init' [] [] [] e h k
-
   where
     loop init' env haruhi kyon e h k = do
       (env, e) <- runStateT (callWithContents @StatelessConf (map toUser (init' <> haruhi <> kyon))) e

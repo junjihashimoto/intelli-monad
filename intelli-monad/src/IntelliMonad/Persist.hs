@@ -28,10 +28,10 @@ module IntelliMonad.Persist where
 import Control.Monad.IO.Class
 import Data.List (maximumBy)
 import qualified Data.Set as S
+import Data.Text (Text)
 import Database.Persist
 import Database.Persist.Sqlite
 import IntelliMonad.Types
-import Data.Text (Text)
 
 data StatelessConf = StatelessConf
 

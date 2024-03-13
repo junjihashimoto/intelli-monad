@@ -24,11 +24,8 @@ import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
-import Data.Time
 import Data.Void
--- import Database.Persist hiding (get)
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
@@ -53,6 +50,7 @@ data ReplCommand
   | DeleteSession Text
   | SwitchSession Text
   | ReadImage Text
+  | UserInput Text
   | Help
   deriving (Eq, Show)
 
@@ -85,8 +83,104 @@ parseRepl =
     sessionName = many alphaNumChar
     imagePath = many (alphaNumChar <|> char '.' <|> char '/' <|> char '-')
 
-getTextInputLine :: (MonadTrans t) => String -> t (InputT IO) (Maybe T.Text)
-getTextInputLine prompt = fmap (fmap T.pack) (lift $ getInputLine prompt)
+getTextInputLine :: (MonadTrans t) => t (InputT IO) (Maybe T.Text)
+getTextInputLine = fmap (fmap T.pack) (lift $ getInputLine "% ")
+
+getUserCommand :: forall p t. (PersistentBackend p, MonadTrans t) => t (InputT IO) (Either (ParseErrorBundle Text Void) ReplCommand)
+getUserCommand = do
+  minput <- getTextInputLine
+  case minput of
+    Nothing -> return $ Right Quit
+    Just input ->
+      if T.isPrefixOf ":" input
+        then case runParser parseRepl "stdin" input of
+          Right v -> return $ Right v
+          Left err -> return $ Left err
+        else return $ Right (UserInput input)
+
+runRepl' :: forall p. (PersistentBackend p) => Prompt (InputT IO) ()
+runRepl' = do
+  getUserCommand @p >>= \case
+    Left err -> do
+      liftIO $ print err
+      runRepl' @p
+    Right Quit -> return ()
+    Right Clear -> do
+      clear @p
+      runRepl' @p
+    Right ShowContents -> do
+      context <- getContext
+      showContents context.contextBody
+      runRepl' @p
+    Right ShowUsage -> do
+      context <- getContext
+      liftIO $ do
+        print context.contextTotalTokens
+      runRepl' @p
+    Right ShowRequest -> do
+      prev <- getContext
+      let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
+      liftIO $ do
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
+      runRepl' @p
+    Right ShowContext -> do
+      prev <- getContext
+      liftIO $ do
+        putStrLn $ show prev
+      runRepl' @p
+    Right ShowSession -> do
+      prev <- getContext
+      liftIO $ do
+        T.putStrLn $ prev.contextSessionName
+      runRepl' @p
+    Right ListSessions -> do
+      liftIO $ do
+        list <- withDB @p $ \conn -> listSessions @p conn
+        forM_ list $ \sessionName' -> T.putStrLn sessionName'
+      runRepl' @p
+    Right (CopySession (from', to')) -> do
+      liftIO $ do
+        withDB @p $ \conn -> do
+          mv <- load @p conn from'
+          case mv of
+            Just v -> do
+              _ <- save @p conn (v {contextSessionName = to'})
+              return ()
+            Nothing -> T.putStrLn $ "Failed to load " <> from'
+      runRepl' @p
+    Right (DeleteSession session) -> do
+      withDB @p $ \conn -> deleteSession @p conn session
+      runRepl' @p
+    Right (SwitchSession session) -> do
+      mv <- withDB @p $ \conn -> load @p conn session
+      case mv of
+        Just v -> do
+          (env :: PromptEnv) <- get
+          put $ env {context = v}
+        Nothing -> liftIO $ T.putStrLn $ "Failed to load " <> session
+      runRepl' @p
+    Right (ReadImage imagePath) -> do
+      callWithImage @p imagePath >>= showContents
+      runRepl' @p
+    Right Help -> do
+      liftIO $ do
+        putStrLn ":quit"
+        putStrLn ":clear"
+        putStrLn ":show contents"
+        putStrLn ":show usage"
+        putStrLn ":show request"
+        putStrLn ":show context"
+        putStrLn ":show session"
+        putStrLn ":list sessions"
+        putStrLn ":copy session <from> <to>"
+        putStrLn ":delete session <session name>"
+        putStrLn ":switch session <session name>"
+        putStrLn ":help"
+      runRepl' @p
+    Right (UserInput input) -> do
+      callWithText @p input >>= showContents
+      runRepl' @p
 
 runRepl :: forall p. (PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl tools customs sessionName defaultReq contents = do
@@ -97,93 +191,4 @@ runRepl tools customs sessionName defaultReq contents = do
           autoAddHistory = True
         }
     )
-    (runPrompt @p tools customs sessionName defaultReq (push @p contents >> loop))
-  where
-    loop :: Prompt (InputT IO) ()
-    loop = do
-      minput <- getTextInputLine "% "
-      case minput of
-        Nothing -> return ()
-        Just input ->
-          if T.isPrefixOf ":" input
-            then case runParser parseRepl "stdin" input of
-              Left err -> do
-                liftIO $ print err
-                loop
-              Right Quit -> return ()
-              Right Clear -> do
-                clear @p
-                loop
-              Right ShowContents -> do
-                context <- getContext
-                showContents context.contextBody
-                loop
-              Right ShowUsage -> do
-                context <- getContext
-                liftIO $ do
-                  print context.contextTotalTokens
-                loop
-              Right ShowRequest -> do
-                prev <- getContext
-                let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
-                liftIO $ do
-                  BS.putStr $ BS.toStrict $ encodePretty req
-                  T.putStrLn ""
-                loop
-              Right ShowContext -> do
-                prev <- getContext
-                liftIO $ do
-                  putStrLn $ show prev
-                loop
-              Right ShowSession -> do
-                prev <- getContext
-                liftIO $ do
-                  T.putStrLn $ prev.contextSessionName
-                loop
-              Right ListSessions -> do
-                liftIO $ do
-                  list <- withDB @p $ \conn -> listSessions @p conn
-                  forM_ list $ \sessionName' -> T.putStrLn sessionName'
-                loop
-              Right (CopySession (from', to')) -> do
-                liftIO $ do
-                  withDB @p $ \conn -> do
-                    mv <- load @p conn from'
-                    case mv of
-                      Just v -> do
-                        _ <- save @p conn (v {contextSessionName = to'})
-                        return ()
-                      Nothing -> T.putStrLn $ "Failed to load " <> from'
-                loop
-              Right (DeleteSession session) -> do
-                withDB @p $ \conn -> deleteSession @p conn session
-                loop
-              Right (SwitchSession session) -> do
-                mv <- withDB @p $ \conn -> load @p conn session
-                case mv of
-                  Just v -> do
-                    (env :: PromptEnv) <- get
-                    put $ env {context = v}
-                  Nothing -> liftIO $ T.putStrLn $ "Failed to load " <> session
-                loop
-              Right (ReadImage imagePath) -> do
-                callWithImage @p imagePath >>= showContents
-                loop
-              Right Help -> do
-                liftIO $ do
-                  putStrLn ":quit"
-                  putStrLn ":clear"
-                  putStrLn ":show contents"
-                  putStrLn ":show usage"
-                  putStrLn ":show request"
-                  putStrLn ":show context"
-                  putStrLn ":show session"
-                  putStrLn ":list sessions"
-                  putStrLn ":copy session <from> <to>"
-                  putStrLn ":delete session <session name>"
-                  putStrLn ":switch session <session name>"
-                  putStrLn ":help"
-                loop
-            else do
-              callWithText @p input >>= showContents
-              loop
+    (runPrompt @p tools customs sessionName defaultReq (push @p contents >> runRepl' @p))

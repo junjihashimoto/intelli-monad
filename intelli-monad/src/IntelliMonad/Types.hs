@@ -25,7 +25,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-
 module IntelliMonad.Types where
 
 import qualified Codec.Picture as P

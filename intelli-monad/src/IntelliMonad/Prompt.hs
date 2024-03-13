@@ -116,14 +116,14 @@ call = loop []
       push @p contents
 
       let ret' = ret <> contents
-    
+
       case finishReason of
         Stop -> return ret'
         ToolCalls -> callTool next contents ret'
-        FunctionCall -> callTool next contents  ret'
+        FunctionCall -> callTool next contents ret'
         Length -> loop ret'
         _ -> return ret'
-          
+
     callTool next contents ret = do
       showContents contents
       env <- get
@@ -184,9 +184,9 @@ initializePrompt tools customs sessionName req = do
       Just v ->
         return $
           PromptEnv
-            { context = v
-            , tools = tools
-            , customInstructions = customs
+            { context = v,
+              tools = tools,
+              customInstructions = customs
             }
       Nothing -> do
         time <- liftIO getCurrentTime
