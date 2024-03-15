@@ -32,7 +32,12 @@ defaultCustomInstructions = []
 data ValidateNumber = ValidateNumber
   { number :: Double
   }
-  deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
+  deriving (Eq, Show, Generic, JSONSchema, A.FromJSON, A.ToJSON)
+
+instance HasFunctionObject ValidateNumber where
+  getFunctionName = "output_number"
+  getFunctionDescription = "validate input number"
+  getFieldDescription "number" = "A number that system outputs."
 
 instance Tool ValidateNumber where
   data Output ValidateNumber = ValidateNumberOutput
@@ -41,32 +46,6 @@ instance Tool ValidateNumber where
       stderr :: String
     }
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
-
-  toolFunctionName = "output_number"
-  toolSchema =
-    API.ChatCompletionTool
-      { chatCompletionToolType = "function",
-        chatCompletionToolFunction =
-          API.FunctionObject
-            { functionObjectDescription = Just "",
-              functionObjectName = toolFunctionName @ValidateNumber,
-              functionObjectParameters =
-                Just $
-                  [ ("type", "object"),
-                    ( "properties",
-                      A.Object
-                        [ ( "number",
-                            A.Object
-                              [ ("type", "number"),
-                                ("description", "A number that system outputs.")
-                              ]
-                          )
-                        ]
-                    ),
-                    ("required", A.Array ["number"])
-                  ]
-            }
-      }
   toolExec _ = do
     return $ ValidateNumberOutput 0 "" ""
 
