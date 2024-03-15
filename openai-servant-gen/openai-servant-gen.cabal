@@ -1,3 +1,4 @@
+cabal-version:      3.0
 name:                openai-servant-gen
 version:             0.1.0.0
 synopsis:            Auto-generated API bindings for openai
