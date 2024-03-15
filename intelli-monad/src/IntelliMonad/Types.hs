@@ -279,6 +279,7 @@ class HasFunctionObject r where
 class JSONSchema r where
   schema :: Schema
   default schema :: (HasFunctionObject r, Generic r, GSchema r (Rep r)) => Schema
+--  from :: a -> Rep a x
   schema = gschema @r (from (undefined :: r))
 
 class GSchema s f where
@@ -359,32 +360,32 @@ instance JSONSchema () where
   schema = Null'
   
 instance (HasFunctionObject s, JSONSchema c) => GSchema s U1 where
-  gschema U1 = Null'
+  gschema _ = Null'
 
 instance (HasFunctionObject s, JSONSchema c) => GSchema s (K1 i c) where
-  gschema (K1 _) = schema @c
+  gschema _ = schema @c
 
 instance (HasFunctionObject s, GSchema s a, GSchema s b) => GSchema s (a :*: b) where
-  gschema (x :*: y) = gschema @s x <> gschema @s y
+  gschema _ = gschema @s @a undefined <> gschema @s @b undefined
 
 instance (HasFunctionObject s, GSchema s a, GSchema s b) => GSchema s (a :+: b) where
-  gschema (L1 x) = gschema @s x
-  gschema (R1 x) = gschema @s x
+  gschema _ = gschema @s @a undefined
+  gschema _ = gschema @s @b undefined
 
 -- | Datatype
 instance (HasFunctionObject s, GSchema s f) => GSchema s (M1 D c f) where
-  gschema (M1 x) = gschema @s x
+  gschema _ = gschema @s @f undefined
 
 -- | Constructor Metadata
 instance (HasFunctionObject s, GSchema s f, Constructor c) => GSchema s (M1 C c f) where
-  gschema (M1 x) = gschema @s x
+  gschema _ = gschema @s @f undefined
 
 -- | Selector Metadata
 instance (HasFunctionObject s, GSchema s f, Selector c) => GSchema s (M1 S c f) where
-  gschema a@(M1 x) =
+  gschema a =
     let name = selName a
         desc = getFieldDescription @s name
-    in Object' [(name, desc,  (gschema @s x))]
+    in Object' [(name, desc,  (gschema @s @f undefined))]
 
 toolAdd :: forall a. (Tool a) => API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
 toolAdd req =

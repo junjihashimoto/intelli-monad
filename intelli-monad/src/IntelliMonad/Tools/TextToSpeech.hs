@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -36,15 +37,12 @@ import System.Process
 data TextToSpeech = TextToSpeech
   { script :: T.Text
   }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, JSONSchema, A.FromJSON, A.ToJSON)
 
-instance A.FromJSON TextToSpeech
-
-instance A.ToJSON TextToSpeech
-
-instance A.FromJSON (Output TextToSpeech)
-
-instance A.ToJSON (Output TextToSpeech)
+instance HasFunctionObject TextToSpeech where
+  getFunctionName = "text_to_speech"
+  getFunctionDescription = "Speak text"
+  getFieldDescription "script" = "A script for speech"
 
 instance Tool TextToSpeech where
   data Output TextToSpeech = TextToSpeechOutput
@@ -52,32 +50,7 @@ instance Tool TextToSpeech where
       stdout :: String,
       stderr :: String
     }
-    deriving (Eq, Show, Generic)
-  toolFunctionName = "text_to_speech"
-  toolSchema =
-    API.ChatCompletionTool
-      { chatCompletionToolType = "function",
-        chatCompletionToolFunction =
-          API.FunctionObject
-            { functionObjectDescription = Just "Speak text",
-              functionObjectName = toolFunctionName @TextToSpeech,
-              functionObjectParameters =
-                Just $
-                  [ ("type", "object"),
-                    ( "properties",
-                      A.Object
-                        [ ( "script",
-                            A.Object
-                              [ ("type", "string"),
-                                ("description", "A script for speech")
-                              ]
-                          )
-                        ]
-                    ),
-                    ("required", A.Array ["script"])
-                  ]
-            }
-      }
+    deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
   toolExec args = do
     api_key <- (API.clientAuth . T.pack) <$> getEnv "OPENAI_API_KEY"
     url <- parseBaseUrl "https://api.openai.com/v1/"
