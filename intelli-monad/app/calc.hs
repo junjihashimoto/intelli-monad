@@ -19,7 +19,12 @@ import OpenAI.Types
 data ValidateNumber = ValidateNumber
   { number :: Double
   }
-  deriving (Eq, Show, Generic, FromJSON, ToJSON)
+  deriving (Eq, Show, Generic, JSONSchema, FromJSON, ToJSON)
+
+instance HasFunctionObject ValidateNumber where
+  getFunctionName = "output_number"
+  getFunctionDescription = "validate input number"
+  getFieldDescription "number" = "A number that system outputs."
 
 instance Tool ValidateNumber where
   data Output ValidateNumber = ValidateNumberOutput
@@ -28,32 +33,6 @@ instance Tool ValidateNumber where
       stderr :: String
     }
     deriving (Eq, Show, Generic, FromJSON, ToJSON)
-
-  toolFunctionName = "output_number"
-  toolSchema =
-    ChatCompletionTool
-      { chatCompletionToolType = "function",
-        chatCompletionToolFunction =
-          FunctionObject
-            { functionObjectDescription = Just "",
-              functionObjectName = toolFunctionName @ValidateNumber,
-              functionObjectParameters =
-                Just $
-                  [ ("type", "object"),
-                    ( "properties",
-                      Object
-                        [ ( "number",
-                            Object
-                              [ ("type", "number"),
-                                ("description", "A number that system outputs.")
-                              ]
-                          )
-                        ]
-                    ),
-                    ("required", Array ["number"])
-                  ]
-            }
-      }
   toolExec _ = return $ ValidateNumberOutput 0 "" ""
 
 data Math = Math
