@@ -146,6 +146,29 @@ callWithContents input = do
   push @p input
   call @p
 
+callWithValidation ::
+  forall validation p m.
+  ( MonadIO m,
+    MonadFail m,
+    PersistentBackend p,
+    Tool validation,
+    A.FromJSON validation,
+    A.FromJSON (Output validation),
+    A.ToJSON validation,
+    A.ToJSON (Output validation)
+  ) => Contents -> Prompt m (Maybe validation)
+callWithValidation contents = do
+  let valid = ToolProxy (Proxy :: Proxy validation)
+  case findToolCall valid contents of
+    Just (Content _ (ToolCall _ _ args') _ _) -> do
+      let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
+      case v of
+        Left err -> do
+          liftIO $ putStrLn err
+          return Nothing
+        Right v' -> return $ Just v'
+    _ -> return Nothing
+
 runPromptWithValidation ::
   forall validation p m.
   ( MonadIO m,
@@ -165,16 +188,7 @@ runPromptWithValidation ::
   m (Maybe validation)
 runPromptWithValidation tools customs sessionName req input = do
   let valid = ToolProxy (Proxy :: Proxy validation)
-  contents <- runPrompt @p (valid : tools) customs sessionName req (callWithText @p input)
-  case findToolCall valid contents of
-    Just (Content _ (ToolCall _ _ args') _ _) -> do
-      let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
-      case v of
-        Left err -> do
-          liftIO $ putStrLn err
-          return Nothing
-        Right v' -> return $ Just v'
-    _ -> return Nothing
+  runPrompt @p (valid : tools) customs sessionName req (callWithText @p input >>= callWithValidation @validation @p)
 
 initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> m PromptEnv
 initializePrompt tools customs sessionName req = do
