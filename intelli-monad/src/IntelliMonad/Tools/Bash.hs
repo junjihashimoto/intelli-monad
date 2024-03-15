@@ -24,7 +24,6 @@ import qualified Data.Aeson as A
 import GHC.Generics
 import GHC.IO.Exception
 import IntelliMonad.Types
-import IntelliMonad.Tools.Schema
 import qualified OpenAI.Types as API
 import System.Process
 
