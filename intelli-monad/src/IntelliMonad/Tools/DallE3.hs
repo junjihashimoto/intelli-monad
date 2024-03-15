@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -61,15 +62,13 @@ data DallE3 = DallE3
   { prompt :: T.Text,
     size :: T.Text
   }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, JSONSchema, A.FromJSON, A.ToJSON)
 
-instance A.FromJSON DallE3
-
-instance A.ToJSON DallE3
-
-instance A.FromJSON (Output DallE3)
-
-instance A.ToJSON (Output DallE3)
+instance HasFunctionObject DallE3 where
+  getFunctionName = "image_generation"
+  getFunctionDescription = "Creating images from scratch based on a text prompt"
+  getFieldDescription "prompt" = "A text description of the desired image. The maximum length is 4000 characters."
+  getFieldDescription "size" = "The size of the generated images. Must be one of 1024x1024, 1792x1024, or 1024x1792 for dall-e-3 models."
 
 instance Tool DallE3 where
   data Output DallE3 = DallE3Output
@@ -78,38 +77,7 @@ instance Tool DallE3 where
       stderr :: String,
       url :: Text
     }
-    deriving (Eq, Show, Generic)
-  toolFunctionName = "image_generation"
-  toolSchema =
-    API.ChatCompletionTool
-      { chatCompletionToolType = "function",
-        chatCompletionToolFunction =
-          API.FunctionObject
-            { functionObjectDescription = Just "Creating images from scratch based on a text prompt",
-              functionObjectName = toolFunctionName @DallE3,
-              functionObjectParameters =
-                Just $
-                  [ ("type", "object"),
-                    ( "properties",
-                      A.Object
-                        [ ( "prompt",
-                            A.Object
-                              [ ("type", "string"),
-                                ("description", "A text description of the desired image. The maximum length is 4000 characters.")
-                              ]
-                          ),
-                          ( "size",
-                            A.Object
-                              [ ("type", "string"),
-                                ("description", "The size of the generated images. Must be one of 1024x1024, 1792x1024, or 1024x1792 for dall-e-3 models.")
-                              ]
-                          )
-                        ]
-                    ),
-                    ("required", A.Array ["prompt", "size"])
-                  ]
-            }
-      }
+    deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
   toolExec args = do
     api_key <- (API.clientAuth . T.pack) <$> getEnv "OPENAI_API_KEY"
     url <- parseBaseUrl "https://api.openai.com/v1/"

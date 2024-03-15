@@ -23,6 +23,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module IntelliMonad.Types where
@@ -43,6 +44,10 @@ import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
 import qualified OpenAI.Types as API
+import qualified Data.Map as M
+import qualified Data.Aeson.Key as A
+import qualified Data.Aeson.KeyMap as A
+import qualified Data.Vector as V
 
 data User = User | System | Assistant | Tool deriving (Eq, Show, Ord, Generic)
 
@@ -240,9 +245,146 @@ defaultRequest =
 
 class Tool a where
   data Output a :: Type
+  
   toolFunctionName :: Text
+  default toolFunctionName :: (HasFunctionObject a) => Text
+  toolFunctionName = T.pack $ getFunctionName @a
+  
   toolSchema :: API.ChatCompletionTool
+  default toolSchema :: (HasFunctionObject a, JSONSchema a, Generic a, GSchema a (Rep a)) => API.ChatCompletionTool
+  toolSchema = toChatCompletionTool @a
+  
   toolExec :: a -> IO (Output a)
+
+toChatCompletionTool :: forall a. (HasFunctionObject a, JSONSchema a) => API.ChatCompletionTool
+toChatCompletionTool =
+    API.ChatCompletionTool
+      { chatCompletionToolType = "function",
+        chatCompletionToolFunction =
+          API.FunctionObject
+            { functionObjectDescription = Just (T.pack $ getFunctionDescription @a),
+              functionObjectName = T.pack $ getFunctionName @a,
+              functionObjectParameters = Just $
+                                         case toAeson (schema @a) of
+                                           A.Object kv -> M.fromList $ map (\(k,v) -> (A.toString k, v) )$ A.toList kv
+                                           _ -> []
+            }
+      }
+
+class HasFunctionObject r where
+  getFunctionName :: String
+  getFunctionDescription :: String
+  getFieldDescription :: String -> String
+
+class JSONSchema r where
+  schema :: Schema
+  default schema :: (HasFunctionObject r, Generic r, GSchema r (Rep r)) => Schema
+  schema = gschema @r (from (undefined :: r))
+
+class GSchema s f where
+  gschema :: forall a. f a -> Schema
+
+
+data Schema =
+  Maybe' Schema |
+  String' |
+  Number' |
+  Integer' |
+  Object' [(String, String, Schema)] |
+  Array' Schema |
+  Boolean' |
+  Null'
+
+
+toAeson :: Schema -> A.Value
+toAeson = \case
+  Maybe' s -> toAeson s
+  String' -> A.Object [("type", "string")]
+  Number' -> A.Object [("type", "number")]
+  Integer' -> A.Object [("type", "integer")]
+  Object' properties ->
+    let notMaybes' :: [A.Value]
+        notMaybes' = concat $ map (\(name, desc, schema) ->
+                                     case schema of
+                                       Maybe' _ -> []
+                                       _ -> [A.String $ T.pack name]
+                                  ) properties
+    in A.Object [ ("type", "object"),
+                  ( "properties",
+                    A.Object $ A.fromList $ map (\(name,desc,schema) ->
+                                                   (A.fromString name , append (toAeson schema) (A.Object [("description", A.String $ T.pack desc)]))
+                                                ) properties
+                  ),
+                  ("required", A.Array (V.fromList notMaybes'))
+                ]
+
+  Array' s -> A.Object [ ("type", "array")
+                      , ( "items", toAeson s)
+                      ]
+  Boolean' -> A.Object [("type", "boolean")]
+  Null' -> A.Object [("type", "null")]
+
+instance Semigroup Schema where
+  (<>) (Object' a) (Object' b) = Object' (a <> b)
+  (<>) (Array' a) (Array' b) = Array' (a <> b)
+  (<>) _ _ = error "Can not concat json value."
+
+append :: A.Value -> A.Value -> A.Value
+append (A.Object a) (A.Object b) = A.Object (a <> b)
+append (A.Array a) (A.Array b) = A.Array (a <> b)
+append _ _ = error "Can not concat json value."
+
+instance {-# OVERLAPS #-} JSONSchema String where
+  schema = String'
+
+instance JSONSchema Text where
+  schema = String'
+
+instance (JSONSchema a) => JSONSchema (Maybe a) where
+  schema = Maybe' (schema @a)
+
+instance JSONSchema Integer where
+  schema = Integer'
+  
+instance JSONSchema Double where
+  schema = Number'
+  
+instance JSONSchema Bool where
+  schema = Boolean'
+  
+instance (JSONSchema a) => JSONSchema [a] where
+  schema = Array' (schema @a)
+  
+instance JSONSchema () where
+  schema = Null'
+  
+instance (HasFunctionObject s, JSONSchema c) => GSchema s U1 where
+  gschema U1 = Null'
+
+instance (HasFunctionObject s, JSONSchema c) => GSchema s (K1 i c) where
+  gschema (K1 _) = schema @c
+
+instance (HasFunctionObject s, GSchema s a, GSchema s b) => GSchema s (a :*: b) where
+  gschema (x :*: y) = gschema @s x <> gschema @s y
+
+instance (HasFunctionObject s, GSchema s a, GSchema s b) => GSchema s (a :+: b) where
+  gschema (L1 x) = gschema @s x
+  gschema (R1 x) = gschema @s x
+
+-- | Datatype
+instance (HasFunctionObject s, GSchema s f) => GSchema s (M1 D c f) where
+  gschema (M1 x) = gschema @s x
+
+-- | Constructor Metadata
+instance (HasFunctionObject s, GSchema s f, Constructor c) => GSchema s (M1 C c f) where
+  gschema (M1 x) = gschema @s x
+
+-- | Selector Metadata
+instance (HasFunctionObject s, GSchema s f, Selector c) => GSchema s (M1 S c f) where
+  gschema a@(M1 x) =
+    let name = selName a
+        desc = getFieldDescription @s name
+    in Object' [(name, desc,  (gschema @s x))]
 
 toolAdd :: forall a. (Tool a) => API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
 toolAdd req =
@@ -254,3 +396,4 @@ toolAdd req =
 
 defaultUTCTime :: UTCTime
 defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
+

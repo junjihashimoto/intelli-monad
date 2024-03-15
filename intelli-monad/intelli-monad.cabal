@@ -66,6 +66,7 @@ library
                     , IntelliMonad.Tools.TextToSpeech
                     , IntelliMonad.Tools.DallE3
                     , IntelliMonad.Tools.Utils
+                    , IntelliMonad.Tools.Schema
                     , IntelliMonad.Persist
                     , IntelliMonad.Repl
                     , IntelliMonad.CustomInstructions
@@ -98,6 +99,7 @@ library
                     , containers
                     , megaparsec
                     , sixel
+                    , vector
 
     -- Directories containing source files.
     hs-source-dirs:   src
