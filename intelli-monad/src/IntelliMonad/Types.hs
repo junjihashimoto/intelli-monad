@@ -404,3 +404,22 @@ toolAdd req =
 
 defaultUTCTime :: UTCTime
 defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
+
+data ReplCommand
+  = Quit
+  | Clear
+  | ShowContents
+  | ShowUsage
+  | ShowRequest
+  | ShowContext
+  | ShowSession
+  | Edit
+  | EditRequest
+  | ListSessions
+  | CopySession (Text, Text)
+  | DeleteSession Text
+  | SwitchSession Text
+  | ReadImage Text
+  | UserInput Text
+  | Help
+  deriving (Eq, Show)
