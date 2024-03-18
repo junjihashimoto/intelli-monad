@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -182,6 +183,9 @@ Content
     deriving Show
     deriving Eq
     deriving Ord
+    deriving ToJSON
+    deriving FromJSON
+    deriving Generic
 Context
     request API.CreateChatCompletionRequest
     response API.CreateChatCompletionResponse Maybe
@@ -415,6 +419,9 @@ data ReplCommand
   | ShowSession
   | Edit
   | EditRequest
+  | EditContents
+  | EditHeader
+  | EditFooter
   | ListSessions
   | CopySession (Text, Text)
   | DeleteSession Text

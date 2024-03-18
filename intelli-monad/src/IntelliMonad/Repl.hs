@@ -67,6 +67,9 @@ parseRepl =
     <|> (try (lexm (string ":switch") >> lexm (string "session") >> lexm sessionName) >>= pure . SwitchSession . T.pack)
     <|> (try (lexm (string ":help")) >> pure Help)
     <|> (try (lexm (string ":edit") >> lexm (string "request")) >> pure EditRequest)
+    <|> (try (lexm (string ":edit") >> lexm (string "contents")) >> pure EditContents)
+    <|> (try (lexm (string ":edit") >> lexm (string "header")) >> pure EditHeader)
+    <|> (try (lexm (string ":edit") >> lexm (string "footer")) >> pure EditFooter)
     <|> (try (lexm (string ":edit")) >> pure Edit)
   where
     sc = L.space space1 empty empty
@@ -117,6 +120,24 @@ editRequestWithEditor req = do
         newReq <- A.decodeFileStrict @API.CreateChatCompletionRequest filePath
         case newReq of
           Just newReq' -> return $ Just newReq'
+          Nothing -> return Nothing
+      ExitFailure _ -> return Nothing
+
+editContentsWithEditor :: forall m. ( MonadIO m, MonadFail m) => Contents -> m (Maybe Contents)
+editContentsWithEditor contents = do
+  liftIO $ withSystemTempFile "tempfile.json" $ \filePath fileHandle -> do
+    hClose fileHandle
+    BS.writeFile filePath $ BS.toStrict $ encodePretty contents
+    editor <- do
+      lookupEnv "EDITOR" >>= \case
+        Just editor' -> return editor'
+        Nothing -> return "vim"
+    code <- system (editor <> " " <> filePath)
+    case code of
+      ExitSuccess -> do
+        newContents <- A.decodeFileStrict @Contents filePath
+        case newContents of
+          Just newContents' -> return $ Just newContents'
           Nothing -> return Nothing
       ExitFailure _ -> return Nothing
 
@@ -228,7 +249,39 @@ runRepl' = do
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
           runRepl' @p
-
+    Right EditContents -> do
+      prev <- getContext
+      editContentsWithEditor prev.contextBody >>= \case
+        Just contents' -> do
+          (env :: PromptEnv) <- get
+          let newContext = prev {contextBody = contents'}
+          put $ env {context = newContext}
+          runRepl' @p
+        Nothing -> do
+          liftIO $ putStrLn "Failed to open the editor."
+          runRepl' @p
+    Right EditHeader -> do
+      prev <- getContext
+      editContentsWithEditor prev.contextHeader >>= \case
+        Just contents' -> do
+          (env :: PromptEnv) <- get
+          let newContext = prev {contextHeader = contents'}
+          put $ env {context = newContext}
+          runRepl' @p
+        Nothing -> do
+          liftIO $ putStrLn "Failed to open the editor."
+          runRepl' @p    
+    Right EditFooter -> do
+      prev <- getContext
+      editContentsWithEditor prev.contextFooter >>= \case
+        Just contents' -> do
+          (env :: PromptEnv) <- get
+          let newContext = prev {contextFooter = contents'}
+          put $ env {context = newContext}
+          runRepl' @p
+        Nothing -> do
+          liftIO $ putStrLn "Failed to open the editor."
+          runRepl' @p
 
 runRepl :: forall p. (PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl tools customs sessionName defaultReq contents = do
