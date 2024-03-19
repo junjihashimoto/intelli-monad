@@ -423,10 +423,21 @@ data ReplCommand
   | EditHeader
   | EditFooter
   | ListSessions
-  | CopySession (Text, Text)
-  | DeleteSession Text
-  | SwitchSession Text
+  | CopySession
+  { sessionNameFrom :: Text
+  , sessionNameTo :: Text
+  }
+  | DeleteSession
+  { sessionName :: Text
+  }
+  | SwitchSession
+  { sessionName :: Text
+  }
   | ReadImage Text
   | UserInput Text
   | Help
+  | Repl 
+  { sessionName :: Text
+  }
   deriving (Eq, Show)
+

@@ -3,6 +3,7 @@ name:               intelli-monad
 version:            0.1.0.0
 synopsis:           Type level prompt with openai.
 description:        Type level prompt with openai. This allows us to define function calls and value validation using types.
+homepage:           https://github.com/junjihashimoto/intelli-monad
 license:            MIT
 
 -- The file containing the license text.
@@ -43,6 +44,7 @@ library
                     , IntelliMonad.Tools.Utils
                     , IntelliMonad.Persist
                     , IntelliMonad.Repl
+                    , IntelliMonad.Cmd
                     , IntelliMonad.CustomInstructions
 
     -- Modules included in this library but not exported.

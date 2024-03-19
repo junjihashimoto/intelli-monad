@@ -59,9 +59,8 @@ parseRepl =
             ( lexm (string ":copy") >> lexm (string "session") >> do
                 from <- T.pack <$> lexm sessionName
                 to <- T.pack <$> lexm sessionName
-                return (from, to)
+                return $ CopySession from to
             )
-            >>= pure . CopySession
         )
     <|> (try (lexm (string ":delete") >> lexm (string "session") >> lexm sessionName) >>= pure . DeleteSession . T.pack)
     <|> (try (lexm (string ":switch") >> lexm (string "session") >> lexm sessionName) >>= pure . SwitchSession . T.pack)
@@ -141,48 +140,51 @@ editContentsWithEditor contents = do
           Nothing -> return Nothing
       ExitFailure _ -> return Nothing
 
-runRepl' :: forall p. (PersistentBackend p) => Prompt (InputT IO) ()
-runRepl' = do
-  getUserCommand @p >>= \case
+runCmd' :: forall p. (PersistentBackend p) => Either (ParseErrorBundle Text Void) ReplCommand -> Maybe (Prompt (InputT IO) ()) -> Prompt (InputT IO) ()
+runCmd' cmd ret = do
+  let repl = case ret of
+        Just ret' -> ret'
+        Nothing -> return ()
+  case cmd of
     Left err -> do
       liftIO $ print err
-      runRepl' @p
+      repl
     Right Quit -> return ()
     Right Clear -> do
       clear @p
-      runRepl' @p
+      repl
     Right ShowContents -> do
       context <- getContext
       showContents context.contextBody
-      runRepl' @p
+      repl
     Right ShowUsage -> do
       context <- getContext
       liftIO $ do
         print context.contextTotalTokens
-      runRepl' @p
+      repl
     Right ShowRequest -> do
       prev <- getContext
       let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
       liftIO $ do
         BS.putStr $ BS.toStrict $ encodePretty req
         T.putStrLn ""
-      runRepl' @p
+      repl
     Right ShowContext -> do
       prev <- getContext
       liftIO $ do
         putStrLn $ show prev
-      runRepl' @p
+      repl
     Right ShowSession -> do
       prev <- getContext
       liftIO $ do
         T.putStrLn $ prev.contextSessionName
-      runRepl' @p
+      repl
     Right ListSessions -> do
       liftIO $ do
         list <- withDB @p $ \conn -> listSessions @p conn
         forM_ list $ \sessionName' -> T.putStrLn sessionName'
-      runRepl' @p
-    Right (CopySession (from', to')) -> do
+      repl
+    Right (CopySession from' to') -> do
       liftIO $ do
         withDB @p $ \conn -> do
           mv <- load @p conn from'
@@ -191,10 +193,10 @@ runRepl' = do
               _ <- save @p conn (v {contextSessionName = to'})
               return ()
             Nothing -> T.putStrLn $ "Failed to load " <> from'
-      runRepl' @p
+      repl
     Right (DeleteSession session) -> do
       withDB @p $ \conn -> deleteSession @p conn session
-      runRepl' @p
+      repl
     Right (SwitchSession session) -> do
       mv <- withDB @p $ \conn -> load @p conn session
       case mv of
@@ -202,10 +204,10 @@ runRepl' = do
           (env :: PromptEnv) <- get
           put $ env {context = v}
         Nothing -> liftIO $ T.putStrLn $ "Failed to load " <> session
-      runRepl' @p
+      repl
     Right (ReadImage imagePath) -> do
       callWithImage @p imagePath >>= showContents
-      runRepl' @p
+      repl
     Right Help -> do
       liftIO $ do
         putStrLn ":quit"
@@ -220,20 +222,20 @@ runRepl' = do
         putStrLn ":delete session <session name>"
         putStrLn ":switch session <session name>"
         putStrLn ":help"
-      runRepl' @p
+      repl
     Right (UserInput input) -> do
       callWithText @p input >>= showContents
-      runRepl' @p
+      repl
     Right Edit -> do
       -- Open a temporary file with the default editor of the system.
       -- Then send it as user input.
       editWithEditor >>= \case
         Just input -> do
           callWithText @p input >>= showContents
-          runRepl' @p
+          repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
-          runRepl' @p
+          repl
     Right EditRequest -> do
       -- Open a json file of request and edit it with the default editor of the system.
       -- Then, read the file and parse it as a request.
@@ -245,10 +247,10 @@ runRepl' = do
           (env :: PromptEnv) <- get
           let newContext = prev {contextRequest = req'}
           put $ env {context = newContext}
-          runRepl' @p
+          repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
-          runRepl' @p
+          repl
     Right EditContents -> do
       prev <- getContext
       editContentsWithEditor prev.contextBody >>= \case
@@ -256,10 +258,10 @@ runRepl' = do
           (env :: PromptEnv) <- get
           let newContext = prev {contextBody = contents'}
           put $ env {context = newContext}
-          runRepl' @p
+          repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
-          runRepl' @p
+          repl
     Right EditHeader -> do
       prev <- getContext
       editContentsWithEditor prev.contextHeader >>= \case
@@ -267,10 +269,10 @@ runRepl' = do
           (env :: PromptEnv) <- get
           let newContext = prev {contextHeader = contents'}
           put $ env {context = newContext}
-          runRepl' @p
+          repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
-          runRepl' @p    
+          repl  
     Right EditFooter -> do
       prev <- getContext
       editContentsWithEditor prev.contextFooter >>= \case
@@ -278,10 +280,17 @@ runRepl' = do
           (env :: PromptEnv) <- get
           let newContext = prev {contextFooter = contents'}
           put $ env {context = newContext}
-          runRepl' @p
+          repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
-          runRepl' @p
+          repl
+    Right (Repl sessionName) -> do
+      runRepl' @p
+
+runRepl' :: forall p. (PersistentBackend p) => Prompt (InputT IO) ()
+runRepl' = do
+  cmd <- getUserCommand @p
+  runCmd' @p cmd (Just (runRepl' @p))
 
 runRepl :: forall p. (PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl tools customs sessionName defaultReq contents = do
@@ -293,3 +302,4 @@ runRepl tools customs sessionName defaultReq contents = do
         }
     )
     (runPrompt @p tools customs sessionName defaultReq (push @p contents >> runRepl' @p))
+
