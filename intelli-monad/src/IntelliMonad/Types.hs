@@ -358,6 +358,9 @@ instance (JSONSchema a) => JSONSchema (Maybe a) where
 instance JSONSchema Integer where
   schema = Integer'
 
+instance JSONSchema Int where
+  schema = Integer'
+
 instance JSONSchema Double where
   schema = Number'
 

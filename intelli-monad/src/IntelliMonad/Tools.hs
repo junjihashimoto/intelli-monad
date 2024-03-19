@@ -33,9 +33,13 @@ import IntelliMonad.Tools.TextToSpeech
 import IntelliMonad.Tools.Utils
 import IntelliMonad.Types
 
+bash = ToolProxy (Proxy :: Proxy Bash)
+
+textToSpeech = ToolProxy (Proxy :: Proxy TextToSpeech)
+
+dallE3 = ToolProxy (Proxy :: Proxy DallE3)
+
 defaultTools :: [ToolProxy]
 defaultTools =
-  [ ToolProxy (Proxy :: Proxy Bash),
-    ToolProxy (Proxy :: Proxy TextToSpeech),
-    ToolProxy (Proxy :: Proxy DallE3)
+  [ bash
   ]
