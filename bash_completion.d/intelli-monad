@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+PROGRAM=intelli-monad
+
+__intelli_monad_bash_complete() {
+    local cur prev opts base
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # The first argument is the command name
+    if [[ ${COMP_CWORD} == 1 ]] ; then
+        opts=$(intelli-monad 2>&1 | awk '{if (a) {print $1;} if ("Available commands:" == $0) {a = 1}}')
+        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+        return 0
+    else 
+        COMPREPLY=()
+    fi
+    return 0
+}
+
+complete  -o bashdefault -o default -F __intelli_monad_bash_complete intelli-monad
