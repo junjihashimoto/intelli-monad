@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               intelli-monad
-version:            0.1.0.0
+version:            0.1.0.1
 synopsis:           Type level prompt with openai.
 description:        Type level prompt with openai. This allows us to define function calls and value validation using types.
 homepage:           https://github.com/junjihashimoto/intelli-monad
