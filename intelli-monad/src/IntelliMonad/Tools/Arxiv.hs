@@ -43,6 +43,7 @@ import qualified Data.Map as M
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as T
 import Data.Time
 import qualified Data.Vector as V
@@ -58,42 +59,42 @@ import Network.HTTP.Simple (setRequestQueryString)
 -- import Network.HTTP.Conduit
 import IntelliMonad.Types
 import Text.XML
-import Text.XML.Cursor (Cursor, attributeIs, content, element, fromDocument, ($//), (&/), (&//))
+import Text.XML.Cursor (Cursor, attributeIs, content, element, fromDocument, ($//), (&/), (&//), Axis, checkName)
 import Control.Exception (SomeException, catch)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 
-data SearchArxiv = SearchArxiv
+data Arxiv = Arxiv
   { searchQuery :: Text
   , maxResults :: Maybe Int
   , start :: Maybe Int
   }
   deriving (Eq, Show, Generic, JSONSchema, A.FromJSON, A.ToJSON)
 
-instance HasFunctionObject SearchArxiv where
+instance HasFunctionObject Arxiv where
   getFunctionName = "search_arxiv"
   getFunctionDescription = "Search Arxiv with a keyword"
   getFieldDescription "searchQuery" = "The keyword to search for on Arxiv: This keyword is used as a input of 'http://export.arxiv.org/api/query?search_query='. "
   getFieldDescription "maxResults" = "The maximum number of results to return. If not specified, the default is 10."
   getFieldDescription "start" = "The start index of the results. If not specified, the default is 0."
 
-arxivSearch :: SearchArxiv -> IO ByteString
-arxivSearch SearchArxiv{..} = do
-  -- v <- simpleHttp $ "http://export.arxiv.org/api/query?search_query=all:" ++ keyword
-  -- Set query parameters, then make the request
+arxivSearch :: Arxiv -> IO ByteString
+arxivSearch Arxiv{..} = do
   manager <- newManager tlsManagerSettings
   let request = setRequestQueryString
-                  [ ("search_query", Just $ "all:" <> T.encodeUtf8 searchQuery)
-                  , ("max_results", (BC.pack . show <$> maxResults))
-                  , ("start", (BC.pack . show <$> start))
+                  [ ("search_query", Just $ T.encodeUtf8 searchQuery)
+                  , ("max_results", Just $ fromMaybe "10" (BC.pack . show <$> maxResults))
+                  , ("start", Just $ fromMaybe "0" (BC.pack . show <$> start))
                   ]
-                  "http://export.arxiv.org/api/query"
+                  "https://export.arxiv.org/api/query"
   response <- httpLbs request manager
   return $ toStrict $ responseBody response
 
+element' :: Text -> Axis
+element' name = checkName (\n ->  nameLocalName n == name)
 
-queryArxiv :: SearchArxiv -> IO [ArxivEntry]
+queryArxiv :: Arxiv -> IO [ArxivEntry]
 queryArxiv keyword = do
-  jsonSource <- arxivSearch keyword
+  jsonSource <- arxivSearch keyword :: IO ByteString
   return $ parseArxivXML jsonSource
 
 data ArxivEntry = ArxivEntry
@@ -110,28 +111,28 @@ headDef _ (x:_) = x
 -- | Parser for an Arxiv Entry in XML
 parseEntry :: Cursor -> Maybe ArxivEntry
 parseEntry c =
-  let arxivId   = headDef "" $ c $// element "id" &/ content
-      published = headDef "" $ c $// element "published" &/ content
-      title     = headDef "" $ c $// element "title" &/ content
-      summary   = headDef "" $ c $// element "summary" &/ content
+  let arxivId   = headDef "" $ c $// element' "id" &/ content
+      published = headDef "" $ c $// element' "published" &/ content
+      title     = headDef "" $ c $// element' "title" &/ content
+      summary   = headDef "" $ c $// element' "summary" &/ content
   in  Just $ ArxivEntry arxivId published title summary
 
 -- | Parser for an Arxiv Result in XML
 parseArxivResult :: Cursor -> [ArxivEntry]
-parseArxivResult c = mapMaybe parseEntry (c $// element "entry")
+parseArxivResult c = mapMaybe parseEntry (c $// element' "entry")
 
 parseArxivXML :: ByteString -> [ArxivEntry]
 parseArxivXML xml =
-  case parseLBS def (fromStrict xml) of
+  case parseText def (TL.fromStrict $ T.decodeUtf8 xml) of
     Left _ -> []
     Right v -> parseArxivResult $ fromDocument v
 
-instance Tool SearchArxiv where
-  data Output SearchArxiv = SearchArxivOutput
+instance Tool Arxiv where
+  data Output Arxiv = ArxivOutput
     { papers :: [ArxivEntry]
     }
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
   toolExec args = do
     papers <- queryArxiv args
-    return $ SearchArxivOutput papers
+    return $ ArxivOutput papers
