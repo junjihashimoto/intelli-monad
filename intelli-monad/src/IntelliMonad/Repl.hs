@@ -286,6 +286,34 @@ runCmd' cmd ret = do
           repl
     Right (Repl sessionName) -> do
       runRepl' @p
+    Right (ListKeys) -> do
+      liftIO $ do
+        list <- withDB @p $ \conn -> listKeys @p conn
+        forM_ list $ \(KeyName namespace keyName) -> T.putStrLn $ namespace <> ":" <> keyName
+      repl
+    Right (GetKey namespace keyName) -> do
+      namespace' <- case namespace of
+        Just v -> return v
+        Nothing -> getSessionName
+      mv <- withDB @p $ \conn -> getKey @p conn (KeyName namespace' keyName)
+      case mv of
+        Just v -> do
+          liftIO $ T.putStrLn v
+        Nothing -> do
+          liftIO $ T.putStrLn $ "Failed to get " <> keyName
+      repl
+    Right (SetKey namespace keyName keyValue) -> do
+      namespace' <- case namespace of
+        Just v -> return v
+        Nothing -> getSessionName
+      withDB @p $ \conn -> setKey @p conn (KeyName namespace' keyName) keyValue
+      repl
+    Right (DeleteKey namespace keyName) -> do
+      namespace' <- case namespace of
+        Just v -> return v
+        Nothing -> getSessionName
+      withDB @p $ \conn -> deleteKey @p conn (KeyName namespace' keyName)
+      repl
 
 runRepl' :: forall p. (PersistentBackend p) => Prompt (InputT IO) ()
 runRepl' = do

@@ -198,6 +198,14 @@ Context
     deriving Show
     deriving Eq
     deriving Ord
+KeyValue
+    namespace Text
+    key Text
+    value Text
+    KeyName namespace key
+    deriving Show
+    deriving Eq
+    deriving Ord
 |]
 
 data ToolProxy = forall t. (Tool t, A.FromJSON t, A.ToJSON t, A.FromJSON (Output t), A.ToJSON (Output t)) => ToolProxy (Proxy t)
@@ -441,6 +449,20 @@ data ReplCommand
   | Help
   | Repl 
   { sessionName :: Text
+  }
+  | ListKeys
+  | GetKey
+  { nameSpace :: Maybe Text
+  , keyName :: Text
+  }
+  | SetKey
+  { nameSpace :: Maybe Text
+  , keyName :: Text
+  , value :: Text
+  }
+  | DeleteKey
+  { nameSpace :: Maybe Text
+  , keyName :: Text
   }
   deriving (Eq, Show)
 

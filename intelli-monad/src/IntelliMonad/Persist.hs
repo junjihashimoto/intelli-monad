@@ -46,6 +46,10 @@ class PersistentBackend p where
   saveContents :: (MonadIO m, MonadFail m) => Conn p -> [Content] -> m ()
   listSessions :: (MonadIO m, MonadFail m) => Conn p -> m [Text]
   deleteSession :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m ()
+  listKeys :: (MonadIO m, MonadFail m) => Conn p -> m [Unique KeyValue]
+  getKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m (Maybe Text)
+  setKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> Text -> m()
+  deleteKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m()
 
 instance PersistentBackend SqliteConf where
   type Conn SqliteConf = ConnectionPool
@@ -86,6 +90,21 @@ instance PersistentBackend SqliteConf where
   deleteSession conn sessionName = do
     liftIO $ runPool (config @SqliteConf) (deleteWhere [ContextSessionName ==. sessionName]) conn
 
+  listKeys conn = do
+    (a :: [Entity KeyValue]) <- liftIO $ runPool (config @SqliteConf) (selectList [] []) conn
+    return $ concat $ map (\(Entity _ v) -> persistUniqueKeys v) a
+  getKey conn key = do
+    (a :: Maybe (Entity KeyValue)) <- liftIO $ runPool (config @SqliteConf) (getBy key) conn
+    case a  of
+      Nothing -> return Nothing
+      Just (Entity _ v) -> return $ Just $ keyValueValue v
+  setKey conn (KeyName n' k') value = do
+    let d = KeyValue n' k' value
+    liftIO $ runPool (config @SqliteConf) (putMany [d]) conn
+  deleteKey conn key = do
+    liftIO $ runPool (config @SqliteConf) (deleteBy key) conn
+
+
 instance PersistentBackend StatelessConf where
   type Conn StatelessConf = ()
   config = StatelessConf
@@ -97,6 +116,10 @@ instance PersistentBackend StatelessConf where
   saveContents _ _ = return ()
   listSessions _ = return []
   deleteSession _ _ = return ()
+  listKeys _ = return []
+  getKey _ _ = return Nothing
+  setKey _ _ _ = return ()
+  deleteKey _ _ = return ()
 
 withDB :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => (Conn p -> m a) -> m a
 withDB func =

@@ -67,6 +67,10 @@ opts =
     <> command "switch-session" (info (SwitchSession <$> argument str (metavar "SESSION_NAME")) (progDesc "Switch the session"))
     <> command "read-image" (info (ReadImage <$> argument str (metavar "IMAGE_PATH")) (progDesc "Read the image and call a prompt"))
     <> command "read-input" (info (UserInput <$> argument str (metavar "USER_INPUT")) (progDesc "User input as a text and call a prompt"))
+    <> command "list-keys" (info (pure ListKeys) (progDesc "List all keys")) 
+    <> command "get-key" (info (GetKey <$> optional (argument str (metavar "NAMESPACE")) <*> argument str (metavar "KEY_NAME")) (progDesc "Get the key"))
+    <> command "set-key" (info (SetKey <$> optional (argument str (metavar "NAMESPACE")) <*> argument str (metavar "KEY_NAME") <*> argument str (metavar "KEY_VALUE")) (progDesc "Set the key"))
+    <> command "delete-key" (info (DeleteKey <$> optional (argument str (metavar "NAMESPACE")) <*> argument str (metavar "KEY_NAME")) (progDesc "Delete the key"))
     <> command "help" (info (pure Help) (progDesc "Show the help"))
     )
 

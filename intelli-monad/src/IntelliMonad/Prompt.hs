@@ -53,6 +53,9 @@ setContext context = do
   _ <- withDB @p $ \conn -> save @p (conn :: Conn p) context
   return ()
 
+getSessionName :: (MonadIO m, MonadFail m) => Prompt m Text
+getSessionName = contextSessionName <$> getContext
+
 switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
 switchContext context = do
   env <- get
