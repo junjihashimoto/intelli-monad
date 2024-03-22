@@ -20,26 +20,26 @@ import Control.Monad (forM_)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.State (get, put)
-import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.Aeson as A
+import Data.Aeson.Encode.Pretty (encodePretty)
 import qualified Data.ByteString as BS
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Void
+import GHC.IO.Exception
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
 import qualified OpenAI.Types as API
 import System.Console.Haskeline
+import System.Environment (lookupEnv)
+import System.IO (hClose)
+import System.IO.Temp
+import System.Process
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
-import GHC.IO.Exception
-import System.Process
-import System.Environment (lookupEnv)
-import System.IO.Temp
-import System.IO (hClose)
 
 type Parser = Parsec Void Text
 
@@ -91,7 +91,7 @@ getUserCommand = do
           Left err -> return $ Left err
         else return $ Right (UserInput input)
 
-editWithEditor :: forall m. ( MonadIO m, MonadFail m) => m (Maybe T.Text)
+editWithEditor :: forall m. (MonadIO m, MonadFail m) => m (Maybe T.Text)
 editWithEditor = do
   liftIO $ withSystemTempFile "tempfile.txt" $ \filePath fileHandle -> do
     hClose fileHandle
@@ -104,7 +104,7 @@ editWithEditor = do
       ExitSuccess -> Just <$> T.readFile filePath
       ExitFailure _ -> return Nothing
 
-editRequestWithEditor :: forall m. ( MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> m (Maybe API.CreateChatCompletionRequest)
+editRequestWithEditor :: forall m. (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> m (Maybe API.CreateChatCompletionRequest)
 editRequestWithEditor req = do
   liftIO $ withSystemTempFile "tempfile.json" $ \filePath fileHandle -> do
     hClose fileHandle
@@ -122,7 +122,7 @@ editRequestWithEditor req = do
           Nothing -> return Nothing
       ExitFailure _ -> return Nothing
 
-editContentsWithEditor :: forall m. ( MonadIO m, MonadFail m) => Contents -> m (Maybe Contents)
+editContentsWithEditor :: forall m. (MonadIO m, MonadFail m) => Contents -> m (Maybe Contents)
 editContentsWithEditor contents = do
   liftIO $ withSystemTempFile "tempfile.json" $ \filePath fileHandle -> do
     hClose fileHandle
@@ -272,7 +272,7 @@ runCmd' cmd ret = do
           repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
-          repl  
+          repl
     Right EditFooter -> do
       prev <- getContext
       editContentsWithEditor prev.contextFooter >>= \case
@@ -330,4 +330,3 @@ runRepl tools customs sessionName defaultReq contents = do
         }
     )
     (runPrompt @p tools customs sessionName defaultReq (push @p contents >> runRepl' @p))
-

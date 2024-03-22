@@ -1,8 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -25,11 +25,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module IntelliMonad.Types where
 
 import qualified Codec.Picture as P
+import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
 import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode)
 import qualified Data.Aeson as A
@@ -216,10 +218,11 @@ class CustomInstruction a where
 
 data CustomInstructionProxy = forall t. (CustomInstruction t) => CustomInstructionProxy (Proxy t)
 
-data PromptEnv = PromptEnv
+data PromptEnv = forall p. PersistentBackend p => PromptEnv
   { tools :: [ToolProxy],
     customInstructions :: [CustomInstructionProxy],
-    context :: Context
+    context :: Context,
+    promptEnvBackend :: Proxy p 
   }
 
 type Contents = [Content]
@@ -266,7 +269,7 @@ class Tool a where
   default toolSchema :: (HasFunctionObject a, JSONSchema a, Generic a, GSchema a (Rep a)) => API.ChatCompletionTool
   toolSchema = toChatCompletionTool @a
 
-  toolExec :: a -> IO (Output a)
+  toolExec :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => a -> Prompt m (Output a)
 
 toChatCompletionTool :: forall a. (HasFunctionObject a, JSONSchema a) => API.ChatCompletionTool
 toChatCompletionTool =
@@ -435,34 +438,49 @@ data ReplCommand
   | EditFooter
   | ListSessions
   | CopySession
-  { sessionNameFrom :: Text
-  , sessionNameTo :: Text
-  }
+      { sessionNameFrom :: Text,
+        sessionNameTo :: Text
+      }
   | DeleteSession
-  { sessionName :: Text
-  }
+      { sessionName :: Text
+      }
   | SwitchSession
-  { sessionName :: Text
-  }
+      { sessionName :: Text
+      }
   | ReadImage Text
   | UserInput Text
   | Help
-  | Repl 
-  { sessionName :: Text
-  }
+  | Repl
+      { sessionName :: Text
+      }
   | ListKeys
   | GetKey
-  { nameSpace :: Maybe Text
-  , keyName :: Text
-  }
+      { nameSpace :: Maybe Text,
+        keyName :: Text
+      }
   | SetKey
-  { nameSpace :: Maybe Text
-  , keyName :: Text
-  , value :: Text
-  }
+      { nameSpace :: Maybe Text,
+        keyName :: Text,
+        value :: Text
+      }
   | DeleteKey
-  { nameSpace :: Maybe Text
-  , keyName :: Text
-  }
+      { nameSpace :: Maybe Text,
+        keyName :: Text
+      }
   deriving (Eq, Show)
 
+class PersistentBackend p where
+  type Conn p
+  config :: p
+  setup :: (MonadIO m, MonadFail m) => p -> m (Maybe (Conn p))
+  initialize :: (MonadIO m, MonadFail m) => Conn p -> Context -> m ()
+  load :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m (Maybe Context)
+  loadByKey :: (MonadIO m, MonadFail m) => Conn p -> (Key Context) -> m (Maybe Context)
+  save :: (MonadIO m, MonadFail m) => Conn p -> Context -> m (Maybe (Key Context))
+  saveContents :: (MonadIO m, MonadFail m) => Conn p -> [Content] -> m ()
+  listSessions :: (MonadIO m, MonadFail m) => Conn p -> m [Text]
+  deleteSession :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m ()
+  listKeys :: (MonadIO m, MonadFail m) => Conn p -> m [Unique KeyValue]
+  getKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m (Maybe Text)
+  setKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> Text -> m ()
+  deleteKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m ()

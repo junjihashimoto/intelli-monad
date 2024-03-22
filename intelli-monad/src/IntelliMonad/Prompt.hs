@@ -43,6 +43,12 @@ import qualified OpenAI.Types as API
 import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Environment (getEnv, lookupEnv)
 
+withBackend :: forall a m. (MonadIO m, MonadFail m) => (forall p. PersistentBackend p => Proxy p -> Prompt m a) -> Prompt m a
+withBackend func = do
+  (env :: PromptEnv) <- get
+  case (env) of
+    (PromptEnv _ _ _ (v :: Proxy p)) -> func v
+
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = context <$> get
 
@@ -130,7 +136,7 @@ call = loop []
     callTool next contents ret = do
       showContents contents
       env <- get
-      retTool <- tryToolExec env.tools next.contextSessionName contents
+      retTool <- tryToolExec @p env.tools next.contextSessionName contents
       showContents retTool
       pushToolReturn @p retTool
       v <- call @p
@@ -159,7 +165,9 @@ callWithValidation ::
     A.FromJSON (Output validation),
     A.ToJSON validation,
     A.ToJSON (Output validation)
-  ) => Contents -> Prompt m (Maybe validation)
+  ) =>
+  Contents ->
+  Prompt m (Maybe validation)
 callWithValidation contents = do
   let valid = ToolProxy (Proxy :: Proxy validation)
   case findToolCall valid contents of
@@ -203,7 +211,8 @@ initializePrompt tools customs sessionName req = do
           PromptEnv
             { context = v,
               tools = tools,
-              customInstructions = customs
+              customInstructions = customs,
+              promptEnvBackend = (Proxy @p)
             }
       Nothing -> do
         time <- liftIO getCurrentTime
@@ -221,7 +230,8 @@ initializePrompt tools customs sessionName req = do
                         contextCreated = time
                       },
                   tools = tools,
-                  customInstructions = customs
+                  customInstructions = customs,
+                  promptEnvBackend = (Proxy @p)
                 }
         initialize @p conn (init'.context)
         return init'

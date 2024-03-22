@@ -20,6 +20,7 @@
 
 module IntelliMonad.Tools.Bash where
 
+import Control.Monad.IO.Class
 import qualified Data.Aeson as A
 import GHC.Generics
 import GHC.IO.Exception
@@ -45,7 +46,7 @@ instance Tool Bash where
     }
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
-  toolExec args = do
+  toolExec args = liftIO $ do
     (code, stdout, stderr) <- readCreateProcessWithExitCode (shell args.script) ""
     let code' = case code of
           ExitSuccess -> 0

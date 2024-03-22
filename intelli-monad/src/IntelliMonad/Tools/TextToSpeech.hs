@@ -20,6 +20,7 @@
 
 module IntelliMonad.Tools.TextToSpeech where
 
+import Control.Monad.IO.Class
 import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
@@ -51,15 +52,15 @@ instance Tool TextToSpeech where
       stderr :: String
     }
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
-  toolExec args = do
-    api_key <- (API.clientAuth . T.pack) <$> getEnv "OPENAI_API_KEY"
+  toolExec args = liftIO $ do
+    api_key <- (API.clientAuth . T.pack) <$> (getEnv "OPENAI_API_KEY")
     url <- parseBaseUrl "https://api.openai.com/v1/"
     manager <- newManager tlsManagerSettings
     let API.OpenAIBackend {..} = API.createOpenAIClient
     let request =
           API.CreateSpeechRequest
             { API.createSpeechRequestModel = API.CreateSpeechRequestModel "tts-1",
-              API.createSpeechRequestInput = args.script,
+              API.createSpeechRequestInput = (script args :: T.Text),
               API.createSpeechRequestVoice = "alloy",
               API.createSpeechRequestResponseUnderscoreformat = Just "mp3",
               API.createSpeechRequestSpeed = Nothing

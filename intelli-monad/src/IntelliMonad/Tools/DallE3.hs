@@ -78,7 +78,7 @@ instance Tool DallE3 where
       url :: Text
     }
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
-  toolExec args = do
+  toolExec args = liftIO $ do
     api_key <- (API.clientAuth . T.pack) <$> getEnv "OPENAI_API_KEY"
     url <- parseBaseUrl "https://api.openai.com/v1/"
     manager <- newManager tlsManagerSettings

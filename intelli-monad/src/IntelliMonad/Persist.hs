@@ -35,22 +35,6 @@ import IntelliMonad.Types
 
 data StatelessConf = StatelessConf
 
-class PersistentBackend p where
-  type Conn p
-  config :: p
-  setup :: (MonadIO m, MonadFail m) => p -> m (Maybe (Conn p))
-  initialize :: (MonadIO m, MonadFail m) => Conn p -> Context -> m ()
-  load :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m (Maybe Context)
-  loadByKey :: (MonadIO m, MonadFail m) => Conn p -> (Key Context) -> m (Maybe Context)
-  save :: (MonadIO m, MonadFail m) => Conn p -> Context -> m (Maybe (Key Context))
-  saveContents :: (MonadIO m, MonadFail m) => Conn p -> [Content] -> m ()
-  listSessions :: (MonadIO m, MonadFail m) => Conn p -> m [Text]
-  deleteSession :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m ()
-  listKeys :: (MonadIO m, MonadFail m) => Conn p -> m [Unique KeyValue]
-  getKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m (Maybe Text)
-  setKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> Text -> m()
-  deleteKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m()
-
 instance PersistentBackend SqliteConf where
   type Conn SqliteConf = ConnectionPool
   config =
@@ -95,7 +79,7 @@ instance PersistentBackend SqliteConf where
     return $ concat $ map (\(Entity _ v) -> persistUniqueKeys v) a
   getKey conn key = do
     (a :: Maybe (Entity KeyValue)) <- liftIO $ runPool (config @SqliteConf) (getBy key) conn
-    case a  of
+    case a of
       Nothing -> return Nothing
       Just (Entity _ v) -> return $ Just $ keyValueValue v
   setKey conn (KeyName n' k') value = do
@@ -103,7 +87,6 @@ instance PersistentBackend SqliteConf where
     liftIO $ runPool (config @SqliteConf) (putMany [d]) conn
   deleteKey conn key = do
     liftIO $ runPool (config @SqliteConf) (deleteBy key) conn
-
 
 instance PersistentBackend StatelessConf where
   type Conn StatelessConf = ()

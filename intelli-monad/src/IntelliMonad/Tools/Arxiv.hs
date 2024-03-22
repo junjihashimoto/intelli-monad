@@ -1,8 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -30,43 +30,46 @@
 module IntelliMonad.Tools.Arxiv where
 
 import qualified Codec.Picture as P
+-- Import HttpClient to make the REST API call
+
+-- import Network.HTTP.Conduit
+
+import Control.Exception (SomeException, catch)
+import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
 import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, (.:))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as A
 import qualified Data.Aeson.KeyMap as A
-import qualified Data.ByteString.Char8 as BC
 import Data.ByteString (ByteString, fromStrict, toStrict)
+import qualified Data.ByteString.Char8 as BC
 import Data.Coerce
 import Data.Kind (Type)
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy as TL
 import Data.Time
 import qualified Data.Vector as V
 import Database.Persist
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
-import qualified OpenAI.Types as API
--- Import HttpClient to make the REST API call
+import IntelliMonad.Types
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import Network.HTTP.Simple (setRequestQueryString)
--- import Network.HTTP.Conduit
-import IntelliMonad.Types
+import qualified OpenAI.Types as API
 import Text.XML
-import Text.XML.Cursor (Cursor, attributeIs, content, element, fromDocument, ($//), (&/), (&//), Axis, checkName)
-import Control.Exception (SomeException, catch)
-import Data.Maybe (mapMaybe, fromMaybe)
+import Text.XML.Cursor (Axis, Cursor, attributeIs, checkName, content, element, fromDocument, ($//), (&/), (&//))
 
 data Arxiv = Arxiv
-  { searchQuery :: Text
-  , maxResults :: Maybe Int
-  , start :: Maybe Int
+  { searchQuery :: Text,
+    maxResults :: Maybe Int,
+    start :: Maybe Int
   }
   deriving (Eq, Show, Generic, JSONSchema, A.FromJSON, A.ToJSON)
 
@@ -78,19 +81,20 @@ instance HasFunctionObject Arxiv where
   getFieldDescription "start" = "The start index of the results. If not specified, the default is 0."
 
 arxivSearch :: Arxiv -> IO ByteString
-arxivSearch Arxiv{..} = do
+arxivSearch Arxiv {..} = do
   manager <- newManager tlsManagerSettings
-  let request = setRequestQueryString
-                  [ ("search_query", Just $ T.encodeUtf8 searchQuery)
-                  , ("max_results", Just $ fromMaybe "10" (BC.pack . show <$> maxResults))
-                  , ("start", Just $ fromMaybe "0" (BC.pack . show <$> start))
-                  ]
-                  "https://export.arxiv.org/api/query"
+  let request =
+        setRequestQueryString
+          [ ("search_query", Just $ T.encodeUtf8 searchQuery),
+            ("max_results", Just $ fromMaybe "10" (BC.pack . show <$> maxResults)),
+            ("start", Just $ fromMaybe "0" (BC.pack . show <$> start))
+          ]
+          "https://export.arxiv.org/api/query"
   response <- httpLbs request manager
   return $ toStrict $ responseBody response
 
 element' :: Text -> Axis
-element' name = checkName (\n ->  nameLocalName n == name)
+element' name = checkName (\n -> nameLocalName n == name)
 
 queryArxiv :: Arxiv -> IO [ArxivEntry]
 queryArxiv keyword = do
@@ -98,24 +102,25 @@ queryArxiv keyword = do
   return $ parseArxivXML jsonSource
 
 data ArxivEntry = ArxivEntry
-  { arxivId   :: Text
-  , published :: Text
-  , title     :: Text
-  , summary   :: Text
-  } deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
+  { arxivId :: Text,
+    published :: Text,
+    title :: Text,
+    summary :: Text
+  }
+  deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
 headDef :: a -> [a] -> a
 headDef d [] = d
-headDef _ (x:_) = x
+headDef _ (x : _) = x
 
 -- | Parser for an Arxiv Entry in XML
 parseEntry :: Cursor -> Maybe ArxivEntry
 parseEntry c =
-  let arxivId   = headDef "" $ c $// element' "id" &/ content
+  let arxivId = headDef "" $ c $// element' "id" &/ content
       published = headDef "" $ c $// element' "published" &/ content
-      title     = headDef "" $ c $// element' "title" &/ content
-      summary   = headDef "" $ c $// element' "summary" &/ content
-  in  Just $ ArxivEntry arxivId published title summary
+      title = headDef "" $ c $// element' "title" &/ content
+      summary = headDef "" $ c $// element' "summary" &/ content
+   in Just $ ArxivEntry arxivId published title summary
 
 -- | Parser for an Arxiv Result in XML
 parseArxivResult :: Cursor -> [ArxivEntry]
@@ -133,6 +138,6 @@ instance Tool Arxiv where
     }
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
-  toolExec args = do
+  toolExec args = liftIO $ do
     papers <- queryArxiv args
     return $ ArxivOutput papers

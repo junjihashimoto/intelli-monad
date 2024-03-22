@@ -43,6 +43,7 @@ library
                     , IntelliMonad.Tools.TextToSpeech
                     , IntelliMonad.Tools.DallE3
                     , IntelliMonad.Tools.Utils
+                    , IntelliMonad.Tools.KeyValue
                     , IntelliMonad.Persist
                     , IntelliMonad.Repl
                     , IntelliMonad.Cmd

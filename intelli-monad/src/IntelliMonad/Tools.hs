@@ -45,6 +45,6 @@ dallE3 = ToolProxy (Proxy :: Proxy DallE3)
 
 defaultTools :: [ToolProxy]
 defaultTools =
-  [ bash
-  , arxiv
+  [ bash,
+    arxiv
   ]

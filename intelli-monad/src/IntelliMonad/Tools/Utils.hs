@@ -39,8 +39,8 @@ addTools (tool : tools') v =
     (ToolProxy (_ :: Proxy a)) -> addTools tools' (toolAdd @a v)
 
 toolExec' ::
-  forall t m.
-  (MonadIO m, MonadFail m, Tool t, A.FromJSON t, A.ToJSON (Output t)) =>
+  forall t p m.
+  (PersistentBackend p, MonadIO m, MonadFail m, Tool t, A.FromJSON t, A.ToJSON (Output t)) =>
   Text ->
   Text ->
   Text ->
@@ -51,7 +51,7 @@ toolExec' sessionName id' name' args' = do
     then case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String t) of
       Left _ -> return Nothing
       Right input -> do
-        output <- liftIO $ toolExec input
+        output <- toolExec @t @p @m input
         time <- liftIO getCurrentTime
         return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) sessionName time)
     else return Nothing
@@ -72,11 +72,11 @@ toolExec' sessionName id' name' args' = do
     Just v -> return (Just v)
     Nothing -> tool1 sessionName id' name' args'
 
-mergeToolCall :: (MonadIO m, MonadFail m) => [ToolProxy] -> Text -> Text -> Text -> Text -> Prompt m (Maybe Content)
+mergeToolCall :: forall p m. (PersistentBackend p, MonadIO m, MonadFail m) => [ToolProxy] -> Text -> Text -> Text -> Text -> Prompt m (Maybe Content)
 mergeToolCall [] _ _ _ _ = return Nothing
 mergeToolCall (tool : tools') sessionName id' name' args' = do
   case tool of
-    (ToolProxy (_ :: Proxy a)) -> (toolExec' @a <||> mergeToolCall tools') sessionName id' name' args'
+    (ToolProxy (_ :: Proxy a)) -> (toolExec' @a @p <||> mergeToolCall @p tools') sessionName id' name' args'
 
 hasToolCall :: Contents -> Bool
 hasToolCall cs =
@@ -92,10 +92,10 @@ filterToolCall cs =
       loop (_ : cs') = loop cs'
    in loop cs
 
-tryToolExec :: (MonadIO m, MonadFail m) => [ToolProxy] -> Text -> Contents -> Prompt m Contents
+tryToolExec :: forall p m. (PersistentBackend p, MonadIO m, MonadFail m) => [ToolProxy] -> Text -> Contents -> Prompt m Contents
 tryToolExec tools sessionName contents = do
   cs <- forM (filterToolCall contents) $ \(Content _ (ToolCall id' name' args') _ _) -> do
-    mergeToolCall tools sessionName id' name' args'
+    mergeToolCall @p tools sessionName id' name' args'
   return $ catMaybes cs
 
 findToolCall :: ToolProxy -> Contents -> Maybe Content
