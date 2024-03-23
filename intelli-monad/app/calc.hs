@@ -34,14 +34,10 @@ instance Tool ValidateNumber where
     }
     deriving (Eq, Show, Generic, FromJSON, ToJSON)
   toolExec _ = return $ ValidateNumberOutput 0 "" ""
-
-data Math = Math
-
-instance CustomInstruction Math where
-  customHeader = [(Content System (Message "Calcurate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime)]
-  customFooter = []
+  toolHeader = [(Content System (Message "Calcurate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime)]
 
 main :: IO ()
 main = do
-  v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [CustomInstructionProxy (Proxy @Math)] "default" (fromModel "gpt-4") "2+3+3+sin(3)"
+  v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [] "default" (fromModel "gpt-4") "2+3+3+sin(3)"
+--   runPrompt (Proxy :: Proxy (Int -> Int)) "Output uesr input multiplied by 3, then call 'output_number' function." (20)
   print (v :: Maybe ValidateNumber)

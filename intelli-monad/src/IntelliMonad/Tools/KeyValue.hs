@@ -83,7 +83,7 @@ instance Tool GetKey where
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
   toolExec args = do
-    withBackend $ \(_ :: Proxy p) -> do
+    withBackend $ \(_ :: p) -> do
       namespace' <- getSessionName
       mv <- withDB @p $ \conn -> getKey @p conn (KeyName namespace' args.key)
       case mv of
@@ -98,7 +98,7 @@ instance Tool SetKey where
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
   toolExec args = do
-    withBackend $ \(_ :: Proxy p) -> do
+    withBackend $ \(_ :: p) -> do
       namespace' <- getSessionName
       withDB @p $ \conn -> setKey @p conn (KeyName namespace' args.key) args.value
       return $ SetKeyOutput 0 ""
@@ -111,7 +111,7 @@ instance Tool DeleteKey where
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
   toolExec args = do
-    withBackend $ \(_ :: Proxy p) -> do
+    withBackend $ \(_ :: p) -> do
       namespace' <- getSessionName
       withDB @p $ \conn -> deleteKey @p conn (KeyName namespace' args.key)
       return $ DeleteKeyOutput 0 ""
@@ -125,7 +125,7 @@ instance Tool ListKeys where
     deriving (Eq, Show, Generic, A.FromJSON, A.ToJSON)
 
   toolExec args = do
-    withBackend $ \(_ :: Proxy p) -> do
+    withBackend $ \(_ :: p) -> do
       namespace' <- getSessionName
       keys <- withDB @p $ \conn -> listKeys @p conn
       return $ ListKeysOutput (map (\(KeyName _ key) -> key) keys) 0 ""

@@ -29,9 +29,10 @@ import Control.Monad.IO.Class
 import Data.List (maximumBy)
 import qualified Data.Set as S
 import Data.Text (Text)
-import Database.Persist
-import Database.Persist.Sqlite
+import Database.Persist hiding (get)
+import Database.Persist.Sqlite hiding (get)
 import IntelliMonad.Types
+import Control.Monad.Trans.State (get)
 
 data StatelessConf = StatelessConf
 
@@ -109,3 +110,10 @@ withDB func =
   setup (config @p) >>= \case
     Nothing -> fail "Can not open a database."
     Just (conn :: Conn p) -> func conn
+
+withBackend :: forall a m. (MonadIO m, MonadFail m) => (forall p. PersistentBackend p => p -> Prompt m a) -> Prompt m a
+withBackend func = do
+  (env :: PromptEnv) <- get
+  case (env) of
+    (PromptEnv _ _ _ (PersistProxy v) _) -> func v
+

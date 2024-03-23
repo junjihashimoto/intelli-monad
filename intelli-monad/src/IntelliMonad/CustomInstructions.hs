@@ -52,17 +52,29 @@ instance Tool ValidateNumber where
 data Math = Math
 
 instance CustomInstruction Math where
-  customHeader = [(Content System (Message "Calcurate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime)]
-  customFooter = []
+  customHeader _ = [(Content System (Message "Calcurate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime)]
+  customFooter _ = []
 
 headers :: [CustomInstructionProxy] -> Contents
 headers [] = []
 headers (tool : tools') =
   case tool of
-    (CustomInstructionProxy (_ :: Proxy a)) -> customHeader @a <> headers tools'
+    (CustomInstructionProxy a) -> customHeader a <> headers tools'
 
 footers :: [CustomInstructionProxy] -> Contents
 footers [] = []
 footers (tool : tools') =
   case tool of
-    (CustomInstructionProxy (_ :: Proxy a)) -> customFooter @a <> footers tools'
+    (CustomInstructionProxy a) -> customFooter a <> footers tools'
+
+toolHeaders :: [ToolProxy] -> Contents
+toolHeaders [] = []
+toolHeaders (tool : tools') =
+  case tool of
+    (ToolProxy (_ :: Proxy a)) -> toolHeader @a <> toolHeaders tools'
+
+toolFooters :: [ToolProxy] -> Contents
+toolFooters [] = []
+toolFooters (tool : tools') =
+  case tool of
+    (ToolProxy (_ :: Proxy a)) -> toolFooter @a <> toolFooters tools'

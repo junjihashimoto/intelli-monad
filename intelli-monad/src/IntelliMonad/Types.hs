@@ -213,16 +213,30 @@ KeyValue
 data ToolProxy = forall t. (Tool t, A.FromJSON t, A.ToJSON t, A.FromJSON (Output t), A.ToJSON (Output t)) => ToolProxy (Proxy t)
 
 class CustomInstruction a where
-  customHeader :: Contents
-  customFooter :: Contents
+  customHeader :: a -> Contents
+  customFooter :: a -> Contents
 
-data CustomInstructionProxy = forall t. (CustomInstruction t) => CustomInstructionProxy (Proxy t)
+data CustomInstructionProxy = forall t. (CustomInstruction t) => CustomInstructionProxy t
 
-data PromptEnv = forall p. PersistentBackend p => PromptEnv
-  { tools :: [ToolProxy],
-    customInstructions :: [CustomInstructionProxy],
-    context :: Context,
-    promptEnvBackend :: Proxy p 
+class Hook a where
+  preHook :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => a -> Prompt m ()
+  postHook :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => a -> Prompt m ()
+
+data HookProxy = forall t. (Hook t) => HookProxy t
+
+data PersistProxy = forall t. (PersistentBackend t) => PersistProxy t
+
+data PromptEnv = PromptEnv
+  { tools :: [ToolProxy]
+  -- ^ The list of function calling
+  , customInstructions :: [CustomInstructionProxy]
+  -- ^ This system sends a prompt that includes headers, bodies and footers. Then the message that LLM outputs is added to bodies. customInstructions generates headers and footers.
+  , context :: Context
+  -- ^ The request settings like model and prompt logs
+  , backend :: PersistProxy
+  -- ^ The backend for prompt logging
+  , hooks :: [HookProxy]
+  -- ^ The hook functions before or after calling LLM
   }
 
 type Contents = [Content]
@@ -270,6 +284,12 @@ class Tool a where
   toolSchema = toChatCompletionTool @a
 
   toolExec :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => a -> Prompt m (Output a)
+
+  toolHeader :: Contents
+  toolHeader = []
+  toolFooter :: Contents
+  toolFooter = []
+
 
 toChatCompletionTool :: forall a. (HasFunctionObject a, JSONSchema a) => API.ChatCompletionTool
 toChatCompletionTool =

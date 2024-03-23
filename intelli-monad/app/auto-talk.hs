@@ -17,20 +17,20 @@ import IntelliMonad.Types
 data Haruhi = Haruhi
 
 instance CustomInstruction Haruhi where
-  customHeader = [(Content System (Message "あなたは涼宮ハルヒとして会話してください。話す時は'haruhi: 'をつけて話してください。") "" defaultUTCTime)]
-  customFooter = []
+  customHeader _ = [(Content System (Message "あなたは涼宮ハルヒとして会話してください。話す時は'haruhi: 'をつけて話してください。") "" defaultUTCTime)]
+  customFooter _ = []
 
 data Kyon = Kyon
 
 instance CustomInstruction Kyon where
-  customHeader = [(Content System (Message "あなたは涼宮ハルヒの同級生のキョンとして会話してください。話す時は'kyon: 'をつけて話してください。") "" defaultUTCTime)]
-  customFooter = []
+  customHeader _ = [(Content System (Message "あなたは涼宮ハルヒの同級生のキョンとして会話してください。話す時は'kyon: 'をつけて話してください。") "" defaultUTCTime)]
+  customFooter _ = []
 
 data Env = Env
 
 instance CustomInstruction Env where
-  customHeader = [(Content System (Message "あなたは涼宮ハルヒの世界の環境として状況を設定してください。話す時は'env: 'をつけて話してください。") "" defaultUTCTime)]
-  customFooter = []
+  customHeader _ = [(Content System (Message "あなたは涼宮ハルヒの世界の環境として状況を設定してください。話す時は'env: 'をつけて話してください。") "" defaultUTCTime)]
+  customFooter _ = []
 
 toUser :: Content -> Content
 toUser c =
@@ -40,9 +40,9 @@ toUser c =
 
 main :: IO ()
 main = do
-  e <- initializePrompt @StatelessConf [] [CustomInstructionProxy (Proxy @Env)] "env" (fromModel "gpt-4")
-  h <- initializePrompt @StatelessConf [] [CustomInstructionProxy (Proxy @Haruhi)] "haruhi" (fromModel "gpt-4")
-  k <- initializePrompt @StatelessConf [] [CustomInstructionProxy (Proxy @Kyon)] "kyon" (fromModel "gpt-4")
+  e <- initializePrompt @StatelessConf [] [CustomInstructionProxy Env]"env" (fromModel "gpt-4")
+  h <- initializePrompt @StatelessConf [] [CustomInstructionProxy Haruhi] "haruhi" (fromModel "gpt-4")
+  k <- initializePrompt @StatelessConf [] [CustomInstructionProxy Kyon] "kyon" (fromModel "gpt-4")
   let init' = [Content User (Message "ある駄菓子屋の前での出来ことで話を作ってください。Let's start!") "default" defaultUTCTime]
   loop init' [] [] [] e h k
   where

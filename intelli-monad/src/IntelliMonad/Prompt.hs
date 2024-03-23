@@ -43,12 +43,6 @@ import qualified OpenAI.Types as API
 import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Environment (getEnv, lookupEnv)
 
-withBackend :: forall a m. (MonadIO m, MonadFail m) => (forall p. PersistentBackend p => Proxy p -> Prompt m a) -> Prompt m a
-withBackend func = do
-  (env :: PromptEnv) <- get
-  case (env) of
-    (PromptEnv _ _ _ (v :: Proxy p)) -> func v
-
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = context <$> get
 
@@ -109,10 +103,24 @@ pushToolReturn contents = do
   withDB @p $ \conn -> saveContents @p conn contents
   return ()
 
+callPreHook :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m ()
+callPreHook = do
+  env <- get
+  forM_ env.hooks $ \(HookProxy (h :: h)) -> do
+    preHook @h @p h
+  
+
+callPostHook :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m ()
+callPostHook = do
+  env <- get
+  forM_ env.hooks $ \(HookProxy (h :: h)) -> do
+    postHook @h @p h
+
 call :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m Contents
 call = loop []
   where
     loop ret = do
+      callPreHook @p
       prev <- getContext
       ((contents, finishReason), res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
       let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
@@ -123,6 +131,7 @@ call = loop []
               }
       setContext @p next
       push @p contents
+      callPostHook @p
 
       let ret' = ret <> contents
 
@@ -212,7 +221,8 @@ initializePrompt tools customs sessionName req = do
             { context = v,
               tools = tools,
               customInstructions = customs,
-              promptEnvBackend = (Proxy @p)
+              backend = (PersistProxy (config @p)),
+              hooks = []
             }
       Nothing -> do
         time <- liftIO getCurrentTime
@@ -222,16 +232,17 @@ initializePrompt tools customs sessionName req = do
                     Context
                       { contextRequest = settings,
                         contextResponse = Nothing,
-                        contextHeader = headers customs,
+                        contextHeader = headers customs ++ toolHeaders tools,
                         contextBody = [],
-                        contextFooter = footers customs,
+                        contextFooter = toolFooters tools ++ footers customs,
                         contextTotalTokens = 0,
                         contextSessionName = sessionName,
                         contextCreated = time
                       },
                   tools = tools,
                   customInstructions = customs,
-                  promptEnvBackend = (Proxy @p)
+                  backend = (PersistProxy (config @p)),
+                  hooks = []
                 }
         initialize @p conn (init'.context)
         return init'
