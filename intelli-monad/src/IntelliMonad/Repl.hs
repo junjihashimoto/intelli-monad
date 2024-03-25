@@ -22,6 +22,8 @@ import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.State (get, put)
 import qualified Data.Aeson as A
 import Data.Aeson.Encode.Pretty (encodePretty)
+import qualified Data.Yaml as Y
+import qualified Data.Yaml.Pretty as Y
 import qualified Data.ByteString as BS
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -106,9 +108,9 @@ editWithEditor = do
 
 editRequestWithEditor :: forall m. (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> m (Maybe API.CreateChatCompletionRequest)
 editRequestWithEditor req = do
-  liftIO $ withSystemTempFile "tempfile.json" $ \filePath fileHandle -> do
+  liftIO $ withSystemTempFile "tempfile.yaml" $ \filePath fileHandle -> do
     hClose fileHandle
-    BS.writeFile filePath $ BS.toStrict $ encodePretty req
+    BS.writeFile filePath $ Y.encodePretty Y.defConfig req
     editor <- do
       lookupEnv "EDITOR" >>= \case
         Just editor' -> return editor'
@@ -116,17 +118,19 @@ editRequestWithEditor req = do
     code <- system (editor <> " " <> filePath)
     case code of
       ExitSuccess -> do
-        newReq <- A.decodeFileStrict @API.CreateChatCompletionRequest filePath
+        newReq <- Y.decodeFileEither @API.CreateChatCompletionRequest filePath
         case newReq of
-          Just newReq' -> return $ Just newReq'
-          Nothing -> return Nothing
+          Right newReq' -> return $ Just newReq'
+          Left err -> do
+            print err
+            return Nothing
       ExitFailure _ -> return Nothing
 
 editContentsWithEditor :: forall m. (MonadIO m, MonadFail m) => Contents -> m (Maybe Contents)
 editContentsWithEditor contents = do
-  liftIO $ withSystemTempFile "tempfile.json" $ \filePath fileHandle -> do
+  liftIO $ withSystemTempFile "tempfile.yaml" $ \filePath fileHandle -> do
     hClose fileHandle
-    BS.writeFile filePath $ BS.toStrict $ encodePretty contents
+    BS.writeFile filePath $ Y.encodePretty Y.defConfig contents
     editor <- do
       lookupEnv "EDITOR" >>= \case
         Just editor' -> return editor'
@@ -134,10 +138,12 @@ editContentsWithEditor contents = do
     code <- system (editor <> " " <> filePath)
     case code of
       ExitSuccess -> do
-        newContents <- A.decodeFileStrict @Contents filePath
+        newContents <- Y.decodeFileEither @Contents filePath
         case newContents of
-          Just newContents' -> return $ Just newContents'
-          Nothing -> return Nothing
+          Right newContents' -> return $ Just newContents'
+          Left err -> do
+            print err
+            return Nothing
       ExitFailure _ -> return Nothing
 
 runCmd' :: forall p. (PersistentBackend p) => Either (ParseErrorBundle Text Void) ReplCommand -> Maybe (Prompt (InputT IO) ()) -> Prompt (InputT IO) ()
@@ -244,9 +250,8 @@ runCmd' cmd ret = do
       let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
       editRequestWithEditor req >>= \case
         Just req' -> do
-          (env :: PromptEnv) <- get
           let newContext = prev {contextRequest = req'}
-          put $ env {context = newContext}
+          setContext @p newContext
           repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
@@ -255,9 +260,8 @@ runCmd' cmd ret = do
       prev <- getContext
       editContentsWithEditor prev.contextBody >>= \case
         Just contents' -> do
-          (env :: PromptEnv) <- get
           let newContext = prev {contextBody = contents'}
-          put $ env {context = newContext}
+          setContext @p newContext
           repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
@@ -266,10 +270,8 @@ runCmd' cmd ret = do
       prev <- getContext
       editContentsWithEditor prev.contextHeader >>= \case
         Just contents' -> do
-          (env :: PromptEnv) <- get
           let newContext = prev {contextHeader = contents'}
-          put $ env {context = newContext}
-          repl
+          setContext @p newContext
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
           repl
@@ -277,9 +279,8 @@ runCmd' cmd ret = do
       prev <- getContext
       editContentsWithEditor prev.contextFooter >>= \case
         Just contents' -> do
-          (env :: PromptEnv) <- get
           let newContext = prev {contextFooter = contents'}
-          put $ env {context = newContext}
+          setContext @p newContext
           repl
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
