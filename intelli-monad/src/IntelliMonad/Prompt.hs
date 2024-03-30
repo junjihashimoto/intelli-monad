@@ -210,6 +210,48 @@ runPromptWithValidation tools customs sessionName req input = do
   let valid = ToolProxy (Proxy :: Proxy validation)
   runPrompt @p (valid : tools) customs sessionName req (callWithText @p input >>= callWithValidation @validation @p)
 
+user :: Text -> Content
+user input = Content User (Message input) "default" defaultUTCTime
+
+system :: Text -> Content
+system input = Content System (Message input) "default" defaultUTCTime
+
+assistant :: Text -> Content
+assistant input = Content Assistant (Message input) "default" defaultUTCTime
+
+generate ::
+  forall input output m p.
+  ( MonadIO m,
+    MonadFail m,
+    p ~ StatelessConf,
+    A.ToJSON input,
+    A.FromJSON input,
+    JSONSchema input,
+    Tool output,
+    A.FromJSON output,
+    A.FromJSON (Output output),
+    A.ToJSON output,
+    A.ToJSON (Output output)
+  ) => Contents -> input -> m (Maybe output)
+generate userContext input = do
+  let valid = ToolProxy (Proxy :: Proxy output)
+      req = (fromModel "gpt-4")
+  runPrompt @p [valid] [] "default" req $ do
+    time <- liftIO getCurrentTime
+    context <- getContext
+    let schemaText :: Text
+        schemaText = T.decodeUtf8Lenient $ BS.toStrict $ A.encode $ toAeson (schema @input)
+        inputText :: Text
+        inputText = T.decodeUtf8Lenient $ BS.toStrict $ A.encode input
+        contents = userContext ++
+          [ user ("#User-input format is as follows:\n" <> schemaText)
+          , user ("#User-input is as follows:\n" <> inputText)
+          , user ("#Save the processing results using " <> toolFunctionName @output <> " function")
+          ]
+    
+    push @p contents
+    call @p >>= callWithValidation @output @StatelessConf
+
 initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> m PromptEnv
 initializePrompt tools customs sessionName req = do
   let settings = addTools tools (req {API.createChatCompletionRequestTools = Nothing})

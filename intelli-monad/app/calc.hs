@@ -5,10 +5,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 module Main where
 
 import Data.Aeson
+import Data.Text (Text)
 import Data.Proxy
 import GHC.Generics
 import IntelliMonad.Persist
@@ -36,8 +38,40 @@ instance Tool ValidateNumber where
   toolExec _ = return $ ValidateNumberOutput 0 "" ""
   toolHeader = [(Content System (Message "Calcurate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime)]
 
+
+data Number = Number
+  { number :: Double
+  }
+  deriving (Eq, Show, Generic, JSONSchema, FromJSON, ToJSON)
+
+instance HasFunctionObject Number where
+  getFunctionName = "number"
+  getFunctionDescription = "validate input"
+  getFieldDescription "number" = "A number"
+
+instance Tool Number where
+  data Output Number = NumberOutput
+    { code :: Int,
+      stdout :: String,
+      stderr :: String
+    }
+    deriving (Eq, Show, Generic, FromJSON, ToJSON)
+  toolExec _ = return $ NumberOutput 0 "" ""
+
+data Input = Input
+  { formula :: Text
+  }
+  deriving (Eq, Show, Generic, JSONSchema, FromJSON, ToJSON)
+
+instance HasFunctionObject Input where
+  getFunctionName = "formula"
+  getFunctionDescription = "Describe a formula"
+  getFieldDescription "formula" = "A formula"
+
 main :: IO ()
 main = do
   v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [] "default" (fromModel "gpt-4") "2+3+3+sin(3)"
---   runPrompt (Proxy :: Proxy (Int -> Int)) "Output uesr input multiplied by 3, then call 'output_number' function." (20)
   print (v :: Maybe ValidateNumber)
+
+  v <- generate [user "Calcurate a formula"] (Input "1+3")
+  print (v :: Maybe Number)

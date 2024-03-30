@@ -31,7 +31,7 @@ import qualified Data.Text.IO as T
 import Data.Void
 import GHC.IO.Exception
 import IntelliMonad.Persist
-import IntelliMonad.Prompt
+import IntelliMonad.Prompt hiding (user, system, assistant)
 import IntelliMonad.Types
 import qualified OpenAI.Types as API
 import System.Console.Haskeline
