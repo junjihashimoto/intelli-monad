@@ -57,7 +57,7 @@ common warnings
 executable chat-completion
     import:           warnings
     main-is:          chat-completion.hs
-    build-depends:    base == 4.*
+    build-depends:    base >= 4.0
                     , http-client
                     , http-client-tls
                     , servant-client
@@ -71,7 +71,7 @@ executable chat-completion
 executable chat-completion-local
     import:           warnings
     main-is:          chat-completion-local.hs
-    build-depends:    base == 4.*
+    build-depends:    base >= 4.0
                     , http-client
                     , http-client-tls
                     , servant-client
@@ -83,7 +83,7 @@ executable chat-completion-local
 executable text2speech
     import:           warnings
     main-is:          text2speech.hs
-    build-depends:    base == 4.*
+    build-depends:    base >= 4.0
                     , http-client
                     , http-client-tls
                     , servant-client
@@ -98,7 +98,7 @@ executable text2speech
 executable chat-completion-server
     import:           warnings
     main-is:          chat-completion-server.hs
-    build-depends:    base == 4.*
+    build-depends:    base >= 4.0
                     , http-client
                     , http-client-tls
                     , servant-client
