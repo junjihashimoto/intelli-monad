@@ -47,6 +47,7 @@ library
                     , IntelliMonad.Persist
                     , IntelliMonad.Repl
                     , IntelliMonad.Cmd
+                    , IntelliMonad.Config
                     , IntelliMonad.CustomInstructions
 
     -- Modules included in this library but not exported.

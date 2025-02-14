@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Main where
 
@@ -16,7 +17,7 @@ import GHC.Generics
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
-import IntelliMonad.Config (readConfig)
+import IntelliMonad.Config
 import OpenAI.Types
 
 data ValidateNumber = ValidateNumber
@@ -72,7 +73,7 @@ instance HasFunctionObject Input where
 main :: IO ()
 main = do
   config <- readConfig
-  v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [] "default" (fromModel $ T.pack $ config.model) "2+3+3+sin(3)"
+  v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [] "default" (fromModel config.model) "2+3+3+sin(3)"
   print (v :: Maybe ValidateNumber)
 
   v <- generate [user "Calcurate a formula"] (Input "1+3")

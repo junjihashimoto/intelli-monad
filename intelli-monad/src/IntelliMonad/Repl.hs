@@ -42,7 +42,7 @@ import System.Process
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
-import IntelliMonad.Config (readConfig)
+import IntelliMonad.Config
 
 type Parser = Parsec Void Text
 
@@ -332,4 +332,4 @@ runRepl tools customs sessionName defaultReq contents = do
           autoAddHistory = True
         }
     )
-    (runPrompt @p tools customs sessionName (defaultReq {API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel (T.pack $ config.model)}) (push @p contents >> runRepl' @p))
+    (runPrompt @p tools customs sessionName (defaultReq {API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel config.model}) (push @p contents >> runRepl' @p))

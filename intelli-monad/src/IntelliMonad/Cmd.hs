@@ -29,7 +29,7 @@ import qualified Data.Text.IO as T
 import Data.Void
 import Database.Persist.Sqlite (SqliteConf)
 import GHC.IO.Exception
-import IntelliMonad.Config (readConfig)
+import IntelliMonad.Config
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Repl
@@ -82,7 +82,7 @@ runCmd cmd = do
       sessionName = "default"
       defaultReq =
         defaultRequest
-          { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel (T.pack $ config.model)
+          { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel config.model
           }
   runInputT
     ( Settings

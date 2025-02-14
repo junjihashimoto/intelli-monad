@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Main where
 
@@ -13,7 +14,7 @@ import Data.Proxy
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
-import IntelliMonad.Config (readConfig)
+import IntelliMonad.Config
 
 data Haruhi = Haruhi
 
@@ -42,9 +43,9 @@ toUser c =
 main :: IO ()
 main = do
   config <- readConfig
-  e <- initializePrompt @StatelessConf [] [CustomInstructionProxy Env] "env" (fromModel $ T.pack $ config.model)
-  h <- initializePrompt @StatelessConf [] [CustomInstructionProxy Haruhi] "haruhi" (fromModel $ T.pack $ config.model)
-  k <- initializePrompt @StatelessConf [] [CustomInstructionProxy Kyon] "kyon" (fromModel $ T.pack $ config.model)
+  e <- initializePrompt @StatelessConf [] [CustomInstructionProxy Env] "env" (fromModel config.model)
+  h <- initializePrompt @StatelessConf [] [CustomInstructionProxy Haruhi] "haruhi" (fromModel config.model)
+  k <- initializePrompt @StatelessConf [] [CustomInstructionProxy Kyon] "kyon" (fromModel config.model)
   let init' = [Content User (Message "ある駄菓子屋の前での出来ことで話を作ってください。Let's start!") "default" defaultUTCTime]
   loop init' [] [] [] e h k
   where
