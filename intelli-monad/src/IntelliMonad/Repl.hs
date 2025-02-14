@@ -42,6 +42,7 @@ import System.Process
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
+import IntelliMonad.Config (readConfig)
 
 type Parser = Parsec Void Text
 
@@ -323,6 +324,7 @@ runRepl' = do
 
 runRepl :: forall p. (PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
 runRepl tools customs sessionName defaultReq contents = do
+  config <- readConfig
   runInputT
     ( Settings
         { complete = completeFilename,
@@ -330,4 +332,4 @@ runRepl tools customs sessionName defaultReq contents = do
           autoAddHistory = True
         }
     )
-    (runPrompt @p tools customs sessionName defaultReq (push @p contents >> runRepl' @p))
+    (runPrompt @p tools customs sessionName (defaultReq {API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel (T.pack $ config.model)}) (push @p contents >> runRepl' @p))
