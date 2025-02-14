@@ -29,6 +29,7 @@ import qualified Data.Text.IO as T
 import Data.Void
 import Database.Persist.Sqlite (SqliteConf)
 import GHC.IO.Exception
+import IntelliMonad.Config (readConfig)
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Repl
@@ -75,12 +76,13 @@ opts =
 
 runCmd :: forall p. (PersistentBackend p) => ReplCommand -> IO ()
 runCmd cmd = do
+  config <- readConfig
   let tools = defaultTools
       customs = []
       sessionName = "default"
       defaultReq =
         defaultRequest
-          { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel "gpt-4"
+          { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel (T.pack $ config.model)
           }
   runInputT
     ( Settings

@@ -32,6 +32,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import Data.Time
+import IntelliMonad.Config (readConfig)
 import IntelliMonad.CustomInstructions
 import IntelliMonad.Persist
 import IntelliMonad.Tools
@@ -254,6 +255,7 @@ generate userContext input = do
 
 initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> m PromptEnv
 initializePrompt tools customs sessionName req = do
+  config <- readConfig
   let settings = addTools tools (req {API.createChatCompletionRequestTools = Nothing})
   withDB @p $ \conn -> do
     load @p conn sessionName >>= \case
@@ -281,11 +283,11 @@ initializePrompt tools customs sessionName req = do
                         contextSessionName = sessionName,
                         contextCreated = time
                       },
-                  tools = tools,
-                  customInstructions = customs,
-                  backend = (PersistProxy (config @p)),
-                  hooks = []
-                }
+                    tools = tools,
+                    customInstructions = customs,
+                    backend = (PersistProxy (config @p)),
+                    hooks = []
+                  }
         initialize @p conn (init'.context)
         return init'
 
@@ -372,11 +374,9 @@ instance ChatCompletion Contents where
 
 runRequest :: (ChatCompletion a) => Text -> API.CreateChatCompletionRequest -> a -> IO ((a, FinishReason), API.CreateChatCompletionResponse)
 runRequest sessionName defaultReq request = do
-  api_key <- (API.clientAuth . T.pack) <$> getEnv "OPENAI_API_KEY"
-  url <- do
-    lookupEnv "OPENAI_ENDPOINT" >>= \case
-      Just url -> parseBaseUrl url
-      Nothing -> parseBaseUrl "https://api.openai.com/v1/"
+  config <- readConfig
+  let api_key = API.clientAuth $ T.pack $ config.apiKey
+      url = parseBaseUrl $ config.endpoint
   manager <-
     newManager
       ( tlsManagerSettings

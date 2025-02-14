@@ -114,3 +114,17 @@ main = do
   v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [CustomInstructionProxy (Proxy @Math)] "default" (fromModel "gpt-4") "2+3+3+sin(3)"
   print (v :: Maybe ValidateNumber)
 ```
+
+# Configuration
+
+To specify OpenAI endpoints and models as part of data instead of using environment variables, you can use a configuration file. Create a `intellimonad-config.yaml` file in the root directory of your project with the following content:
+
+```yaml
+apiKey: "your_openai_api_key"
+endpoint: "https://api.openai.com/v1/"
+model: "gpt-4"
+```
+
+The `apiKey` is your OpenAI API key, `endpoint` is the OpenAI endpoint, and `model` is the model you want to use.
+
+Make sure to update the `initializePrompt` and `runPrompt` functions to read from the configuration file as shown in the examples in the `intelli-monad/app/auto-talk.hs` and `intelli-monad/app/calc.hs` files.

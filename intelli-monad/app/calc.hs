@@ -16,6 +16,7 @@ import GHC.Generics
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
+import IntelliMonad.Config (readConfig)
 import OpenAI.Types
 
 data ValidateNumber = ValidateNumber
@@ -70,7 +71,8 @@ instance HasFunctionObject Input where
 
 main :: IO ()
 main = do
-  v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [] "default" (fromModel "gpt-4") "2+3+3+sin(3)"
+  config <- readConfig
+  v <- runPromptWithValidation @ValidateNumber @StatelessConf [] [] "default" (fromModel $ T.pack $ config.model) "2+3+3+sin(3)"
   print (v :: Maybe ValidateNumber)
 
   v <- generate [user "Calcurate a formula"] (Input "1+3")
