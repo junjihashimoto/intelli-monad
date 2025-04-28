@@ -49,6 +49,7 @@ library
                     , IntelliMonad.Cmd
                     , IntelliMonad.Config
                     , IntelliMonad.CustomInstructions
+                    , IntelliMonad.ExternalApis.Ollama
 
     -- Modules included in this library but not exported.
     -- other-modules:
