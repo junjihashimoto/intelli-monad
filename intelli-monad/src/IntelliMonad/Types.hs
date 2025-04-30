@@ -12,9 +12,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -43,6 +45,7 @@ import Data.Kind (Type)
 import qualified Data.Map as M
 import Data.Proxy
 import Data.Text (Text)
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Data.Time
 import qualified Data.Vector as V
@@ -50,7 +53,8 @@ import Database.Persist
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
-import qualified OpenAI.Types as API
+import qualified OpenAI.Types as OpenAI
+import qualified IntelliMonad.ExternalApis.Ollama as Ollama
 
 data User = User | System | Assistant | Tool deriving (Eq, Show, Ord, Generic)
 
@@ -129,12 +133,69 @@ instance FromJSON Message
 
 newtype Model = Model Text deriving (Eq, Show)
 
-class ChatCompletion a where
-  toRequest :: API.CreateChatCompletionRequest -> a -> API.CreateChatCompletionRequest
-  fromResponse :: Text -> API.CreateChatCompletionResponse -> (a, FinishReason)
+class HasFunctionObject r where
+  getFunctionName :: String
+  getFunctionDescription :: String
+  getFieldDescription :: String -> String
 
-class (ChatCompletion a) => Validate a b where
-  tryConvert :: a -> Either a b
+data Schema
+  = Maybe' Schema
+  | String'
+  | Number'
+  | Integer'
+  | Object' [(String, String, Schema)]
+  | Array' Schema
+  | Boolean'
+  | Null'
+
+class GSchema s f where
+  gschema :: forall a. f a -> Schema
+
+class JSONSchema r where
+  schema :: Schema
+  default schema :: (HasFunctionObject r, Generic r, GSchema r (Rep r)) => Schema
+  schema = gschema @r (from (undefined :: r))
+
+data OpenAI
+data Ollama
+
+data LLMProtocol
+  = OpenAI
+  | Ollama
+
+data LLMRequest'
+  = OpenAIRequest OpenAI.CreateChatCompletionRequest
+  | OllamaRequest Ollama.ChatRequest
+  deriving (Show, Eq, Ord, Generic)
+
+data LLMResponse'
+  = OpenAIResponse OpenAI.CreateChatCompletionResponse
+  | OllamaResponse Ollama.ChatResponse
+  deriving (Show, Eq, Ord, Generic)
+
+data LLMTool'
+  = OpenAITool OpenAI.ChatCompletionTool
+  | OllamaTool Ollama.Tool
+  deriving (Show, Eq, Ord, Generic)
+
+instance ToJSON LLMRequest'
+instance FromJSON LLMRequest'
+instance ToJSON LLMResponse'
+instance FromJSON LLMResponse'
+
+class LLMApi api where
+  type LLMRequest api
+  type LLMResponse api
+  type LLMTool api
+  defaultRequest :: LLMRequest api
+  newTool :: forall a. (HasFunctionObject a, JSONSchema a) => Proxy a -> LLMTool api
+  toTools :: LLMRequest api -> [LLMTool api]
+  fromTools :: LLMRequest api -> [LLMTool api] -> LLMRequest api
+  fromModel_ :: Text -> LLMRequest api
+
+class ChatCompletion b where
+  toRequest :: LLMRequest' -> b -> LLMRequest'
+  fromResponse :: Text -> LLMResponse' -> (b, FinishReason)
 
 toPV :: (ToJSON a) => a -> PersistValue
 toPV = toPersistValue . toStrict . encode
@@ -146,18 +207,32 @@ fromPV json = do
     Right v -> return v
     Left err -> Left $ "Decoding JSON fails : " <> T.pack err
 
-instance PersistField API.CreateChatCompletionRequest where
+instance PersistField OpenAI.CreateChatCompletionRequest where
   toPersistValue = toPV
   fromPersistValue = fromPV
 
-instance PersistFieldSql API.CreateChatCompletionRequest where
+instance PersistFieldSql OpenAI.CreateChatCompletionRequest where
   sqlType _ = sqlType (Proxy @ByteString)
 
-instance PersistField API.CreateChatCompletionResponse where
+instance PersistField OpenAI.CreateChatCompletionResponse where
   toPersistValue = toPV
   fromPersistValue = fromPV
 
-instance PersistFieldSql API.CreateChatCompletionResponse where
+instance PersistFieldSql OpenAI.CreateChatCompletionResponse where
+  sqlType _ = sqlType (Proxy @ByteString)
+
+instance PersistField Ollama.ChatRequest where
+  toPersistValue = toPV
+  fromPersistValue = fromPV
+
+instance PersistFieldSql Ollama.ChatRequest where
+  sqlType _ = sqlType (Proxy @ByteString)
+
+instance PersistField Ollama.ChatResponse where
+  toPersistValue = toPV
+  fromPersistValue = fromPV
+
+instance PersistFieldSql Ollama.ChatResponse where
   sqlType _ = sqlType (Proxy @ByteString)
 
 instance PersistField User where
@@ -174,6 +249,22 @@ instance PersistField Message where
 instance PersistFieldSql Message where
   sqlType _ = sqlType (Proxy @ByteString)
 
+instance PersistField LLMRequest' where
+  toPersistValue = toPV
+  fromPersistValue = fromPV
+
+instance PersistField LLMResponse' where
+  toPersistValue = toPV
+  fromPersistValue = fromPV
+
+instance PersistFieldSql LLMRequest' where
+  sqlType _ = sqlType (Proxy @ByteString)
+
+instance PersistFieldSql LLMResponse' where
+  sqlType _ = sqlType (Proxy @ByteString)
+
+
+
 share
   [mkPersist sqlSettings, mkMigrate "migrateAll"]
   [persistLowerCase|
@@ -189,8 +280,8 @@ Content
     deriving FromJSON
     deriving Generic
 Context
-    request API.CreateChatCompletionRequest
-    response API.CreateChatCompletionResponse Maybe
+    request LLMRequest'
+    response LLMResponse' Maybe
     header [Content]
     body [Content]
     footer [Content]
@@ -210,7 +301,7 @@ KeyValue
     deriving Ord
 |]
 
-data ToolProxy = forall t. (Tool t, A.FromJSON t, A.ToJSON t, A.FromJSON (Output t), A.ToJSON (Output t)) => ToolProxy (Proxy t)
+data ToolProxy = forall t. (Tool t, A.FromJSON t, A.ToJSON t, A.FromJSON (Output t), A.ToJSON (Output t), HasFunctionObject t, JSONSchema t) => ToolProxy (Proxy t)
 
 class CustomInstruction a where
   customHeader :: a -> Contents
@@ -247,31 +338,6 @@ type Prompt = StateT PromptEnv
 
 type SessionName = Text
 
-defaultRequest :: API.CreateChatCompletionRequest
-defaultRequest =
-  API.CreateChatCompletionRequest
-    { API.createChatCompletionRequestMessages = [],
-      API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel "gpt-4",
-      API.createChatCompletionRequestFrequencyUnderscorepenalty = Nothing,
-      API.createChatCompletionRequestLogitUnderscorebias = Nothing,
-      API.createChatCompletionRequestLogprobs = Nothing,
-      API.createChatCompletionRequestTopUnderscorelogprobs = Nothing,
-      API.createChatCompletionRequestMaxUnderscoretokens = Nothing,
-      API.createChatCompletionRequestN = Nothing,
-      API.createChatCompletionRequestPresenceUnderscorepenalty = Nothing,
-      API.createChatCompletionRequestResponseUnderscoreformat = Nothing,
-      API.createChatCompletionRequestSeed = Just 0,
-      API.createChatCompletionRequestStop = Nothing,
-      API.createChatCompletionRequestStream = Nothing,
-      API.createChatCompletionRequestTemperature = Nothing,
-      API.createChatCompletionRequestTopUnderscorep = Nothing,
-      API.createChatCompletionRequestTools = Nothing,
-      API.createChatCompletionRequestToolUnderscorechoice = Nothing,
-      API.createChatCompletionRequestUser = Nothing,
-      API.createChatCompletionRequestFunctionUnderscorecall = Nothing,
-      API.createChatCompletionRequestFunctions = Nothing
-    }
-
 class Tool a where
   data Output a :: Type
 
@@ -279,55 +345,12 @@ class Tool a where
   default toolFunctionName :: (HasFunctionObject a) => Text
   toolFunctionName = T.pack $ getFunctionName @a
 
-  toolSchema :: API.ChatCompletionTool
-  default toolSchema :: (HasFunctionObject a, JSONSchema a, Generic a, GSchema a (Rep a)) => API.ChatCompletionTool
-  toolSchema = toChatCompletionTool @a
-
   toolExec :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => a -> Prompt m (Output a)
 
   toolHeader :: Contents
   toolHeader = []
   toolFooter :: Contents
   toolFooter = []
-
-
-toChatCompletionTool :: forall a. (HasFunctionObject a, JSONSchema a) => API.ChatCompletionTool
-toChatCompletionTool =
-  API.ChatCompletionTool
-    { chatCompletionToolType = "function",
-      chatCompletionToolFunction =
-        API.FunctionObject
-          { functionObjectDescription = Just (T.pack $ getFunctionDescription @a),
-            functionObjectName = T.pack $ getFunctionName @a,
-            functionObjectParameters = Just $
-              case toAeson (schema @a) of
-                A.Object kv -> M.fromList $ map (\(k, v) -> (A.toString k, v)) $ A.toList kv
-                _ -> []
-          }
-    }
-
-class HasFunctionObject r where
-  getFunctionName :: String
-  getFunctionDescription :: String
-  getFieldDescription :: String -> String
-
-class JSONSchema r where
-  schema :: Schema
-  default schema :: (HasFunctionObject r, Generic r, GSchema r (Rep r)) => Schema
-  schema = gschema @r (from (undefined :: r))
-
-class GSchema s f where
-  gschema :: forall a. f a -> Schema
-
-data Schema
-  = Maybe' Schema
-  | String'
-  | Number'
-  | Integer'
-  | Object' [(String, String, Schema)]
-  | Array' Schema
-  | Boolean'
-  | Null'
 
 toAeson :: Schema -> A.Value
 toAeson = \case
@@ -432,13 +455,13 @@ instance (HasFunctionObject s, GSchema s f, Selector c) => GSchema s (M1 S c f) 
         desc = getFieldDescription @s name
      in Object' [(name, desc, (gschema @s @f undefined))]
 
-toolAdd :: forall a. (Tool a) => API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
+toolAdd :: forall api a. (LLMApi api, Tool a, HasFunctionObject a, JSONSchema a) => LLMRequest api -> LLMRequest api
 toolAdd req =
-  let prevTools = case API.createChatCompletionRequestTools req of
-        Nothing -> []
-        Just v -> v
-      newTools = prevTools ++ [toolSchema @a]
-   in req {API.createChatCompletionRequestTools = Just newTools}
+  let prevTools = case toTools @api req of
+        [] -> []
+        v -> v
+      newTools = prevTools ++ [newTool @api @a Proxy]
+   in fromTools @api req newTools
 
 defaultUTCTime :: UTCTime
 defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
@@ -504,3 +527,172 @@ class PersistentBackend p where
   getKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m (Maybe Text)
   setKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> Text -> m ()
   deleteKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m ()
+
+
+instance LLMApi OpenAI where
+  type LLMRequest OpenAI = OpenAI.CreateChatCompletionRequest
+  type LLMResponse OpenAI = OpenAI.CreateChatCompletionResponse
+  type LLMTool OpenAI = OpenAI.ChatCompletionTool
+  defaultRequest =
+    OpenAI.CreateChatCompletionRequest
+      { OpenAI.createChatCompletionRequestMessages = [],
+        OpenAI.createChatCompletionRequestModel = OpenAI.CreateChatCompletionRequestModel "gpt-4",
+        OpenAI.createChatCompletionRequestFrequencyUnderscorepenalty = Nothing,
+        OpenAI.createChatCompletionRequestLogitUnderscorebias = Nothing,
+        OpenAI.createChatCompletionRequestLogprobs = Nothing,
+        OpenAI.createChatCompletionRequestTopUnderscorelogprobs = Nothing,
+        OpenAI.createChatCompletionRequestMaxUnderscoretokens = Nothing,
+        OpenAI.createChatCompletionRequestN = Nothing,
+        OpenAI.createChatCompletionRequestPresenceUnderscorepenalty = Nothing,
+        OpenAI.createChatCompletionRequestResponseUnderscoreformat = Nothing,
+        OpenAI.createChatCompletionRequestSeed = Just 0,
+        OpenAI.createChatCompletionRequestStop = Nothing,
+        OpenAI.createChatCompletionRequestStream = Nothing,
+        OpenAI.createChatCompletionRequestTemperature = Nothing,
+        OpenAI.createChatCompletionRequestTopUnderscorep = Nothing,
+        OpenAI.createChatCompletionRequestTools = Nothing,
+        OpenAI.createChatCompletionRequestToolUnderscorechoice = Nothing,
+        OpenAI.createChatCompletionRequestUser = Nothing,
+        OpenAI.createChatCompletionRequestFunctionUnderscorecall = Nothing,
+        OpenAI.createChatCompletionRequestFunctions = Nothing
+      }
+  newTool (Proxy :: Proxy a) =
+    OpenAI.ChatCompletionTool
+      { chatCompletionToolType = "function",
+        chatCompletionToolFunction =
+          OpenAI.FunctionObject
+            { functionObjectDescription = Just (T.pack $ getFunctionDescription @a),
+              functionObjectName = T.pack $ getFunctionName @a,
+              functionObjectParameters = Just $
+                case toAeson (schema @a) of
+                  A.Object kv -> M.fromList $ map (\(k, v) -> (A.toString k, v)) $ A.toList kv
+                  _ -> []
+            }
+      }
+  toTools req =
+    case OpenAI.createChatCompletionRequestTools req of
+      Nothing -> []
+      Just v -> v
+  fromTools req [] = req {OpenAI.createChatCompletionRequestTools = Nothing}
+  fromTools req tools = req {OpenAI.createChatCompletionRequestTools = Just tools}
+  fromModel_ model =
+    (defaultRequest @OpenAI :: LLMRequest OpenAI) 
+      { OpenAI.createChatCompletionRequestModel = OpenAI.CreateChatCompletionRequestModel model
+      }
+
+instance ChatCompletion Contents where
+  toRequest (OpenAIRequest orgRequest) contents =
+    let messages = flip map contents $ \case
+          Content user (Message message) _ _ ->
+            OpenAI.ChatCompletionRequestMessage
+              { OpenAI.chatCompletionRequestMessageContent = Just $ OpenAI.ChatCompletionRequestMessageContentText message,
+                OpenAI.chatCompletionRequestMessageRole = userToText user,
+                OpenAI.chatCompletionRequestMessageName = Nothing,
+                OpenAI.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
+                OpenAI.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
+                OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
+              }
+          Content user (Image type' img) _ _ ->
+            OpenAI.ChatCompletionRequestMessage
+              { OpenAI.chatCompletionRequestMessageContent =
+                  Just $
+                    OpenAI.ChatCompletionRequestMessageContentParts
+                      [ OpenAI.ChatCompletionRequestMessageContentPart
+                          { OpenAI.chatCompletionRequestMessageContentPartType = "image_url",
+                            OpenAI.chatCompletionRequestMessageContentPartText = Nothing,
+                            OpenAI.chatCompletionRequestMessageContentPartImageUnderscoreurl =
+                              Just $
+                                OpenAI.ChatCompletionRequestMessageContentPartImageImageUrl
+                                  { OpenAI.chatCompletionRequestMessageContentPartImageImageUrlUrl =
+                                      "data:image/" <> type' <> ";base64," <> img,
+                                    OpenAI.chatCompletionRequestMessageContentPartImageImageUrlDetail = Nothing
+                                  }
+                          }
+                      ],
+                OpenAI.chatCompletionRequestMessageRole = userToText user,
+                OpenAI.chatCompletionRequestMessageName = Nothing,
+                OpenAI.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
+                OpenAI.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
+                OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
+              }
+          Content user (ToolCall id' name' args') _ _ ->
+            OpenAI.ChatCompletionRequestMessage
+              { OpenAI.chatCompletionRequestMessageContent = Nothing,
+                OpenAI.chatCompletionRequestMessageRole = userToText user,
+                OpenAI.chatCompletionRequestMessageName = Nothing,
+                OpenAI.chatCompletionRequestMessageToolUnderscorecalls =
+                  Just
+                    [ OpenAI.ChatCompletionMessageToolCall
+                        { OpenAI.chatCompletionMessageToolCallId = id',
+                          OpenAI.chatCompletionMessageToolCallType = "function",
+                          OpenAI.chatCompletionMessageToolCallFunction =
+                            OpenAI.ChatCompletionMessageToolCallFunction
+                              { OpenAI.chatCompletionMessageToolCallFunctionName = name',
+                                OpenAI.chatCompletionMessageToolCallFunctionArguments = args'
+                              }
+                        }
+                    ],
+                OpenAI.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
+                OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
+              }
+          Content user (ToolReturn id' name' ret') _ _ ->
+            OpenAI.ChatCompletionRequestMessage
+              { OpenAI.chatCompletionRequestMessageContent = Just $ OpenAI.ChatCompletionRequestMessageContentText ret',
+                OpenAI.chatCompletionRequestMessageRole = userToText user,
+                OpenAI.chatCompletionRequestMessageName = Just name',
+                OpenAI.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
+                OpenAI.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
+                OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
+              }
+     in OpenAIRequest $ orgRequest {OpenAI.createChatCompletionRequestMessages = messages}
+  fromResponse sessionName (OpenAIResponse response) =
+    let res = head (OpenAI.createChatCompletionResponseChoices response)
+        message = OpenAI.createChatCompletionResponseChoicesInnerMessage res
+        role = textToUser $ OpenAI.chatCompletionResponseMessageRole message
+        content = OpenAI.chatCompletionResponseMessageContent message
+        finishReason = textToFinishReason $ OpenAI.createChatCompletionResponseChoicesInnerFinishUnderscorereason res
+        v = case OpenAI.chatCompletionResponseMessageToolUnderscorecalls message of
+          Just toolcalls -> map (\(OpenAI.ChatCompletionMessageToolCall id' _ (OpenAI.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
+          Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
+     in (v, finishReason)
+
+instance LLMApi Ollama where
+  type LLMRequest Ollama = Ollama.ChatRequest
+  type LLMResponse Ollama = Ollama.ChatResponse
+  type LLMTool Ollama = Ollama.Tool
+  defaultRequest = undefined
+  newTool = undefined
+    
+data LLMProxy api =
+  LLMProxy
+  { toRequest' :: LLMRequest api -> LLMRequest'
+  , toResponse' :: LLMResponse api -> LLMResponse'
+  }
+
+withLLMRequest
+  :: forall a. LLMRequest'
+  -> (forall (api :: Type)
+      . (LLMApi api)
+      => LLMProxy api
+      -> LLMRequest api
+      -> a)
+  -> a
+withLLMRequest req func =
+  case req of
+    OpenAIRequest req' -> func (LLMProxy @OpenAI OpenAIRequest OpenAIResponse)  req'
+    OllamaRequest req' -> func (LLMProxy @Ollama OllamaRequest OllamaResponse)  req'
+
+updateRequest :: LLMRequest' -> Contents -> LLMRequest'
+updateRequest = toRequest
+
+--  withLLMRequest req' $ \(p :: LLMProxy api) req -> (toRequest' @api p) (toRequest req cs)
+
+addTools :: [ToolProxy] -> LLMRequest' -> LLMRequest'
+addTools [] req' = req'
+addTools (tool : tools') req' =
+  case tool of
+    (ToolProxy (_ :: Proxy a)) ->
+      withLLMRequest req' $ \(p :: LLMProxy api) req -> addTools tools' ((toRequest' @api p) $ toolAdd @api @a req)
+      
+fromModel :: Text -> LLMRequest'
+fromModel = OpenAIRequest . fromModel_ @OpenAI

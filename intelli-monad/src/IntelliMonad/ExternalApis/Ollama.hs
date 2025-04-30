@@ -77,7 +77,7 @@ data GenerateRequest = GenerateRequest
   , grRaw        :: Maybe Bool
   , grKeepAlive  :: Maybe Text -- e.g., "5m", "0"
   , grContext    :: Maybe [Int] -- Deprecated
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON GenerateRequest where
   toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
@@ -100,7 +100,7 @@ data GenerateResponse = GenerateResponse
   , genRespEvalCount         :: Maybe Int -- Only in final response
   , genRespEvalDuration      :: Maybe Nanoseconds -- Only in final response
   , genRespDoneReason        :: Maybe Text -- e.g., "stop", "unload", only in final response
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON GenerateResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 7 n of { "" -> ""; x -> x } }
@@ -116,7 +116,7 @@ data ChatMessage = ChatMessage
   , msgContent   :: Text
   , msgImages    :: Maybe [Text] -- List of base64 encoded images
   , msgToolCalls :: Maybe [ToolCall] -- Optional list of tool calls
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ChatMessage where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -126,7 +126,7 @@ instance FromJSON ChatMessage where
 
 data ToolCall = ToolCall
   { tcFunction :: ToolFunction
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ToolCall where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
@@ -136,7 +136,7 @@ instance FromJSON ToolCall where
 data ToolFunction = ToolFunction
   { tfName      :: Text
   , tfArguments :: Map Text Value -- Arguments for the function call
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ToolFunction where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
@@ -147,7 +147,7 @@ instance FromJSON ToolFunction where
 data Tool = Tool
     { toolType     :: Text -- Currently only "function"
     , toolFunction :: ToolFunctionDefinition
-    } deriving (Show, Generic)
+    } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON Tool where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
@@ -159,7 +159,7 @@ data ToolFunctionDefinition = ToolFunctionDefinition
     { tfdName        :: Text
     , tfdDescription :: Maybe Text
     , tfdParameters  :: Value -- JSON Schema Object for parameters
-    } deriving (Show, Generic)
+    } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ToolFunctionDefinition where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -174,7 +174,7 @@ data ChatRequest = ChatRequest
   , crOptions   :: Maybe ModelOptions
   , crStream    :: Maybe Bool
   , crKeepAlive :: Maybe Text
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ChatRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
@@ -194,7 +194,7 @@ data ChatResponse = ChatResponse
   , chatRespEvalCount         :: Maybe Int -- Only in final response
   , chatRespEvalDuration      :: Maybe Nanoseconds -- Only in final response
   , chatRespDoneReason        :: Maybe Text -- e.g., "stop", "load", "unload", only in final response
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ChatResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
@@ -207,7 +207,7 @@ instance ToJSON ChatResponse where
 -- -----------------------------------------------------------------------------
 
 -- Represents the license field which can be a string or list of strings
-newtype License = License Value deriving (Show, Generic, FromJSON, ToJSON)
+newtype License = License Value deriving (Show, Generic, FromJSON, ToJSON, Eq, Ord)
 
 data CreateModelRequest = CreateModelRequest
   { cmrModel      :: Text
@@ -221,7 +221,7 @@ data CreateModelRequest = CreateModelRequest
   , cmrMessages   :: Maybe [ChatMessage]
   , cmrStream     :: Maybe Bool
   , cmrQuantize   :: Maybe Text -- e.g., "q4_K_M"
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON CreateModelRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -237,7 +237,7 @@ data StatusResponse = StatusResponse
   , statusRespDigest    :: Maybe Text -- Only for push/pull download/upload phases
   , statusRespTotal     :: Maybe Int64 -- Only for push/pull download/upload phases
   , statusRespCompleted :: Maybe Int64 -- Only for push/pull download/upload phases
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON StatusResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 10 n of { "" -> ""; x -> x } }
@@ -250,7 +250,7 @@ instance ToJSON StatusResponse where
 
 data ListModelsResponse = ListModelsResponse
   { lmrModels :: [ModelEntry]
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ListModelsResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -264,7 +264,7 @@ data ModelEntry = ModelEntry
   , meSize         :: Int64 -- Size in bytes
   , meDigest       :: Text
   , meDetails      :: ModelDetails
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ModelEntry where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
@@ -279,7 +279,7 @@ data ModelDetails = ModelDetails
   , mdParameterSize     :: Text -- e.g., "7B", "13B"
   , mdQuantizationLevel :: Text -- e.g., "Q4_0"
   , mdParentModel       :: Maybe Text -- Added based on /api/ps example, seems relevant here too
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ModelDetails where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
@@ -294,7 +294,7 @@ instance ToJSON ModelDetails where
 data ShowModelRequest = ShowModelRequest
   { smrModel   :: Text
   , smrVerbose :: Maybe Bool
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ShowModelRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -308,7 +308,7 @@ data ShowModelResponse = ShowModelResponse
   , showRespDetails     :: ShowModelDetails
   , showRespModelInfo   :: Map Text Value -- Flexible map for various model info keys
   , showRespCapabilities :: Maybe [Text]
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ShowModelResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
@@ -324,7 +324,7 @@ data ShowModelDetails = ShowModelDetails
   , smdFamilies          :: Maybe [Text]
   , smdParameterSize     :: Text
   , smdQuantizationLevel :: Text
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ShowModelDetails where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -339,7 +339,7 @@ instance ToJSON ShowModelDetails where
 data CopyModelRequest = CopyModelRequest
   { cprSource      :: Text
   , cprDestination :: Text
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON CopyModelRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -353,7 +353,7 @@ instance FromJSON CopyModelRequest where
 
 data DeleteModelRequest = DeleteModelRequest
   { dmrModel :: Text
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON DeleteModelRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -369,7 +369,7 @@ data PullModelRequest = PullModelRequest
   { pmrModel    :: Text
   , pmrInsecure :: Maybe Bool
   , pmrStream   :: Maybe Bool
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON PullModelRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -385,7 +385,7 @@ data PushModelRequest = PushModelRequest
   { psrModel    :: Text -- Must be in <namespace>/<model>:<tag> format
   , psrInsecure :: Maybe Bool
   , psrStream   :: Maybe Bool
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON PushModelRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -399,7 +399,7 @@ instance FromJSON PushModelRequest where
 
 -- Using Either Text [Text] to represent "text or list of text"
 data EmbeddingInput = SingleInput Text | MultipleInputs [Text]
-  deriving (Show, Generic)
+  deriving (Show, Generic, Eq, Ord)
 
 -- Custom JSON instances to handle the "text or list of text" format
 instance ToJSON EmbeddingInput where
@@ -416,7 +416,7 @@ data GenerateEmbeddingsRequest = GenerateEmbeddingsRequest
   , gerTruncate  :: Maybe Bool
   , gerOptions   :: Maybe ModelOptions
   , gerKeepAlive :: Maybe Text
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON GenerateEmbeddingsRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -429,7 +429,7 @@ data GenerateEmbeddingsResponse = GenerateEmbeddingsResponse
   , genEmbRespTotalDuration :: Maybe Nanoseconds -- Added field based on example response
   , genEmbRespLoadDuration :: Maybe Nanoseconds -- Added field based on example response
   , genEmbRespPromptEvalCount :: Maybe Int -- Added field based on example response
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON GenerateEmbeddingsResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 10 n of { "" -> ""; x -> x } }
@@ -443,7 +443,7 @@ instance ToJSON GenerateEmbeddingsResponse where
 
 data ListRunningModelsResponse = ListRunningModelsResponse
   { lrmrModels :: [RunningModelEntry]
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ListRunningModelsResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
@@ -458,7 +458,7 @@ data RunningModelEntry = RunningModelEntry
   , rmeDetails   :: ModelDetails -- Reusing ModelDetails type
   , rmeExpiresAt :: UTCTime
   , rmeSizeVram  :: Int64
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON RunningModelEntry where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
@@ -475,7 +475,7 @@ data GenerateEmbeddingsDeprecatedRequest = GenerateEmbeddingsDeprecatedRequest
   , gedrPrompt    :: Text
   , gedrOptions   :: Maybe ModelOptions
   , gedrKeepAlive :: Maybe Text
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON GenerateEmbeddingsDeprecatedRequest where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
@@ -484,7 +484,7 @@ instance FromJSON GenerateEmbeddingsDeprecatedRequest where
 
 data GenerateEmbeddingsDeprecatedResponse = GenerateEmbeddingsDeprecatedResponse
   { gedRespEmbedding :: [Double]
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON GenerateEmbeddingsDeprecatedResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 7 n of { "" -> ""; x -> x } }
@@ -498,7 +498,7 @@ instance ToJSON GenerateEmbeddingsDeprecatedResponse where
 
 data VersionResponse = VersionResponse
   { vrVersion :: Text
-  } deriving (Show, Generic)
+  } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON VersionResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }

@@ -80,10 +80,7 @@ runCmd cmd = do
   let tools = defaultTools
       customs = []
       sessionName = "default"
-      defaultReq =
-        defaultRequest
-          { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel config.model
-          }
+      defaultReq = OpenAIRequest (defaultRequest @OpenAI)
   runInputT
     ( Settings
         { complete = completeFilename,
