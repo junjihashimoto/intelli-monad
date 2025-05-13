@@ -208,7 +208,7 @@ runPromptWithValidation ::
   [ToolProxy] ->
   [CustomInstructionProxy] ->
   Text ->
-  LLMRequest' ->
+  LLMRequest ->
   Text ->
   m (Maybe validation)
 runPromptWithValidation tools customs sessionName req input = do
@@ -259,7 +259,7 @@ generate userContext input = do
     push @p contents
     call @p >>= callWithValidation @output @StatelessConf
 
-initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest' -> m PromptEnv
+initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest -> m PromptEnv
 initializePrompt tools customs sessionName req = do
 --  config <- readConfig
   let settings = addTools tools req
@@ -297,35 +297,10 @@ initializePrompt tools customs sessionName req = do
         initialize @p conn (init'.context)
         return init'
 
-runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest' -> Prompt m a -> m a
+runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest -> Prompt m a -> m a
 runPrompt tools customs sessionName req func = do
   context <- initializePrompt @p tools customs sessionName req
   fst <$> runStateT func context
-
-runRequest :: forall a. (ChatCompletion a) => Text -> LLMRequest' -> a -> IO ((a, FinishReason), LLMResponse')
-runRequest sessionName (OpenAIRequest defaultReq) request = do
-  config <- readConfig
-  let api_key = API.clientAuth config.apiKey
-  url <- case parseBaseUrl (T.unpack config.endpoint) of
-           Just url' -> pure url'
-           Nothing -> error $ T.unpack $ "Can not parse the endpoint: " <> config.endpoint
-  manager <-
-    newManager
-      ( tlsManagerSettings
-          { managerResponseTimeout = responseTimeoutMicro (120 * 1000 * 1000)
-          }
-      )
-  let API.OpenAIBackend {..} = API.createOpenAIClient
-      (OpenAIRequest req) = (toRequest (OpenAIRequest defaultReq) request)
-
-  lookupEnv "OPENAI_DEBUG" >>= \case
-    Just "1" -> do
-      liftIO $ do
-        BS.putStr $ BS.toStrict $ encodePretty req
-        T.putStrLn ""
-    _ -> return ()
-  res <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
-  return $ (fromResponse sessionName (OpenAIResponse res), OpenAIResponse res)
 
 showContents :: (MonadIO m) => Contents -> m ()
 showContents res = do

@@ -1,23 +1,72 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveTraversable          #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DuplicateRecordFields      #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-} -- Optional, but convenient for Text literals
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE OverloadedRecordDot        #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 module IntelliMonad.ExternalApis.Ollama where
 
-import Data.Aeson hiding (Options) -- Avoid conflict with our Options type
-import Data.Aeson.Types (Value, Options) -- For flexible fields like 'format' and 'options'
-import Data.ByteString (ByteString)
-import Data.Int (Int64) -- For nanosecond durations
-import Data.Map (Map)
-import Data.Text (Text)
-import Data.Time (UTCTime)
-import GHC.Generics (Generic)
-import Servant.API
-import Servant.API.Stream -- For streaming responses
-import Control.Applicative ((<|>))
+import           Network.HTTP.Types                 (Status, statusIsSuccessful)
+import           Control.Applicative ((<|>))
+import           Control.Monad.Catch                (Exception, MonadThrow, throwM)
+import           Control.Monad.Except               (ExceptT, runExceptT)
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader         (ReaderT (..))
+import           Control.Monad.Reader               (MonadReader, ReaderT, ask, runReaderT)
+import           Control.Monad                      (unless)
+import           Control.Exception                  (evaluate, throwIO)
+import           Data.Aeson hiding (Options) -- Avoid conflict with our Options type
+import           Data.Aeson.Types (Value, Options) -- For flexible fields like 'format' and 'options'
+import           Data.ByteString                    (ByteString, fromStrict, toStrict)
+import           Data.Coerce                        (coerce)
+import           Data.Function                      ((&))
+import           Data.Int (Int64) -- For nanosecond durations
+import           Data.Map (Map)
+import           Data.Proxy                         (Proxy (..))
+import           Data.Text (Text)
+import           Data.Time (UTCTime)
+import           GHC.Exts                           (IsString (..))
+import           GHC.Generics (Generic)
+import           Network.HTTP.Client                (Manager, newManager)
+import           Network.HTTP.Client.TLS            (tlsManagerSettings)
+import           Network.Wai                        (Middleware, Request, requestHeaders)
+import           Network.Wai.Middleware.HttpAuth    (extractBearerAuth)
+import           Servant                            (ServerError, serveWithContextT, throwError)
+import           Servant.API.Verbs
+import           Servant.API                        hiding (addHeader)
+import           Servant.API.Stream -- For streaming responses
+import           Servant.Client                     (ClientEnv, Scheme (Http), ClientError, client, mkClientEnv, parseBaseUrl)
+import           Servant.Client.Core                (baseUrlPort, baseUrlHost, AuthClientData, AuthenticatedRequest, addHeader, mkAuthenticatedRequest, StreamingResponse)
+import           Servant.Client.Core.RunClient
+import qualified Servant.Client.Core.Request      as Core
+import           Servant.Client.Internal.HttpClient
+import           Servant.Client.Internal.HttpClient.Streaming
+import           Servant.Server                     (Handler (..), Application, Context ((:.), EmptyContext))
+import           Servant.Server.Experimental.Auth   (AuthHandler, AuthServerData, mkAuthHandler)
+import           Servant.Server.StaticFiles         (serveDirectoryFileServer)
+import qualified Network.Wai.Handler.Warp           as Warp
+import qualified Network.HTTP.Client                as Client
+import qualified Data.ByteString.Lazy               as BSL
+import qualified Servant.Types.SourceT              as S
+import qualified Data.ByteString                    as BS
+import           Data.Time.Clock                    (getCurrentTime)
+import           Control.Monad.STM                  (atomically)
+import           Control.Concurrent.STM.TVar
+import Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Codensity
+                 (Codensity (..))
 
 -- Common type alias for nanosecond durations
 type Nanoseconds = Int64
@@ -35,22 +84,26 @@ type FormatOption = Maybe Value -- Using Maybe Value to represent optional strin
 --  API Type Definition
 -- =============================================================================
 
+instance ReflectMethod (Verb 'POST 200) where
+    reflectMethod _ = reflectMethod @POST Proxy
+
 type OllamaAPI =
-       "api" :> "generate" :> ReqBody '[JSON] GenerateRequest :> Stream Post 200 NewlineFraming JSON (SourceIO GenerateResponse) -- Streaming endpoint
-  :<|> "api" :> "chat" :> ReqBody '[JSON] ChatRequest :> Stream Post 200 NewlineFraming JSON (SourceIO ChatResponse) -- Streaming endpoint
-  :<|> "api" :> "create" :> ReqBody '[JSON] CreateModelRequest :> Stream Post 200 NewlineFraming JSON (SourceIO StatusResponse) -- Streaming endpoint
-  :<|> "api" :> "blobs" :> Capture "digest" Text :> GetNoContent -- Check Blob Exists
-  :<|> "api" :> "blobs" :> Capture "digest" Text :> ReqBody '[OctetStream] ByteString :> Verb 'POST 201 '[PlainText] NoContent -- Push Blob
-  :<|> "api" :> "tags" :> Get '[JSON] ListModelsResponse -- List Local Models
-  :<|> "api" :> "show" :> ReqBody '[JSON] ShowModelRequest :> Post '[JSON] ShowModelResponse -- Show Model Info
-  :<|> "api" :> "copy" :> ReqBody '[JSON] CopyModelRequest :> PostNoContent -- Copy Model
-  :<|> "api" :> "delete" :> ReqBody '[JSON] DeleteModelRequest :> DeleteNoContent -- Delete Model
-  :<|> "api" :> "pull" :> ReqBody '[JSON] PullModelRequest :> Stream Post 200 NewlineFraming JSON (SourceIO StatusResponse) -- Streaming endpoint
-  :<|> "api" :> "push" :> ReqBody '[JSON] PushModelRequest :> Stream Post 200 NewlineFraming JSON (SourceIO StatusResponse) -- Streaming endpoint
-  :<|> "api" :> "embed" :> ReqBody '[JSON] GenerateEmbeddingsRequest :> Post '[JSON] GenerateEmbeddingsResponse -- Generate Embeddings (New)
-  :<|> "api" :> "ps" :> Get '[JSON] ListRunningModelsResponse -- List Running Models
-  :<|> "api" :> "embeddings" :> ReqBody '[JSON] GenerateEmbeddingsDeprecatedRequest :> Post '[JSON] GenerateEmbeddingsDeprecatedResponse -- Generate Embeddings (Deprecated)
-  :<|> "api" :> "version" :> Get '[JSON] VersionResponse -- Version
+       Protected :> "api" :> "generate" :> ReqBody '[JSON] GenerateRequest :> Stream Post 200 NewlineFraming JSON (SourceIO GenerateResponse) -- Streaming endpoint
+  :<|> Protected :> "api" :> "chat" :> ReqBody '[JSON] ChatRequest :> Stream Post 200 NewlineFraming JSON (SourceIO ChatResponse) -- Streaming endpoint
+  :<|> Protected :> "api" :> "create" :> ReqBody '[JSON] CreateModelRequest :> Stream Post 200 NewlineFraming JSON (SourceIO StatusResponse) -- Streaming endpoint
+  :<|> Protected :> "api" :> "blobs" :> Capture "digest" Text :> GetNoContent -- Check Blob Exists
+  :<|> Protected :> "api" :> "blobs" :> Capture "digest" Text :> ReqBody '[OctetStream] ByteString :> Verb 'POST 201 '[PlainText] NoContent -- Push Blob
+  :<|> Protected :> "api" :> "tags" :> Get '[JSON] ListModelsResponse -- List Local Models
+  :<|> Protected :> "api" :> "show" :> ReqBody '[JSON] ShowModelRequest :> Post '[JSON] ShowModelResponse -- Show Model Info
+  :<|> Protected :> "api" :> "copy" :> ReqBody '[JSON] CopyModelRequest :> PostNoContent -- Copy Model
+  :<|> Protected :> "api" :> "delete" :> ReqBody '[JSON] DeleteModelRequest :> DeleteNoContent -- Delete Model
+  :<|> Protected :> "api" :> "pull" :> ReqBody '[JSON] PullModelRequest :> Stream Post 200 NewlineFraming JSON (SourceIO StatusResponse) -- Streaming endpoint
+  :<|> Protected :> "api" :> "push" :> ReqBody '[JSON] PushModelRequest :> Stream Post 200 NewlineFraming JSON (SourceIO StatusResponse) -- Streaming endpoint
+  :<|> Protected :> "api" :> "embed" :> ReqBody '[JSON] GenerateEmbeddingsRequest :> Post '[JSON] GenerateEmbeddingsResponse -- Generate Embeddings (New)
+  :<|> Protected :> "api" :> "ps" :> Get '[JSON] ListRunningModelsResponse -- List Running Models
+  :<|> Protected :> "api" :> "embeddings" :> ReqBody '[JSON] GenerateEmbeddingsDeprecatedRequest :> Post '[JSON] GenerateEmbeddingsDeprecatedResponse -- Generate Embeddings (Deprecated)
+  :<|> Protected :> "api" :> "version" :> Get '[JSON] VersionResponse -- Version
+  :<|> Raw
 
 -- =============================================================================
 --  Data Types
@@ -115,6 +168,7 @@ data ChatMessage = ChatMessage
   { msgRole      :: Text -- "system", "user", "assistant", or "tool"
   , msgContent   :: Text
   , msgImages    :: Maybe [Text] -- List of base64 encoded images
+  , msgName :: Maybe Text -- The function name
   , msgToolCalls :: Maybe [ToolCall] -- Optional list of tool calls
   } deriving (Show, Generic, Eq, Ord)
 
@@ -197,10 +251,11 @@ data ChatResponse = ChatResponse
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ChatResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
 instance ToJSON ChatResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
 
+type ChatResponses = [ChatResponse]
 
 -- -----------------------------------------------------------------------------
 -- Create Model (/api/create)
@@ -504,3 +559,215 @@ instance FromJSON VersionResponse where
  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
 instance ToJSON VersionResponse where
  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+
+-- Define a proxy for your API
+ollamaAPI :: Proxy OllamaAPI
+ollamaAPI = Proxy
+
+data OllamaBackend a m = OllamaBackend
+  { generateClient :: a -> GenerateRequest -> m (SourceIO GenerateResponse)
+  , chatClient :: a -> ChatRequest -> m (SourceIO ChatResponse)
+  , createClient :: a -> CreateModelRequest -> m (SourceIO StatusResponse)
+  , checkBlobClient :: a -> Text -> m NoContent
+  , pushBlobClient :: a -> Text -> ByteString -> m NoContent
+  , listTagsClient :: a -> m ListModelsResponse
+  , showClient :: a -> ShowModelRequest -> m ShowModelResponse
+  , copyClient :: a -> CopyModelRequest -> m NoContent
+  , deleteClient :: a -> DeleteModelRequest -> m NoContent
+  , pullClient :: a -> PullModelRequest -> m (SourceIO StatusResponse)
+  , pushClient :: a -> PushModelRequest -> m (SourceIO StatusResponse)
+  , embedClient :: a -> GenerateEmbeddingsRequest -> m GenerateEmbeddingsResponse
+  , psClient :: a -> m ListRunningModelsResponse
+  , embeddingsDeprecatedClient :: a -> GenerateEmbeddingsDeprecatedRequest -> m GenerateEmbeddingsDeprecatedResponse
+  , versionClient :: a -> m VersionResponse
+  }
+
+-- | TODO: support UVerb ('acceptStatus' argument, like in 'performRequest' above).
+performWithStreamingRequest :: Core.Request -> (StreamingResponse -> IO a) -> Servant.Client.Internal.HttpClient.ClientM a
+performWithStreamingRequest req k = do
+  ClientEnv m burl cookieJar' createClientRequest _ <- ask
+  clientRequest <- liftIO $ createClientRequest burl req
+  request <- case cookieJar' of
+    Nothing -> pure clientRequest
+    Just cj -> liftIO $ do
+      now <- getCurrentTime
+      atomically $ do
+        oldCookieJar <- readTVar cj
+        let (newRequest, newCookieJar) =
+              Client.insertCookiesIntoRequest
+                clientRequest
+                oldCookieJar
+                now
+        writeTVar cj newCookieJar
+        pure newRequest
+  Servant.Client.Internal.HttpClient.ClientM $ lift $ lift $
+      Client.withResponse request m $ \res -> do
+          let status = Client.responseStatus res
+
+          -- we throw FailureResponse in IO :(
+          unless (statusIsSuccessful status) $ do
+              b <- BSL.fromChunks <$> Client.brConsume (Client.responseBody res)
+              throwIO $ mkFailureResponse burl req (clientResponseToResponse (const b) res)
+
+          k (clientResponseToResponse (S.fromAction BS.null) res)
+
+instance RunStreamingClient Servant.Client.Internal.HttpClient.ClientM where
+  withStreamingRequest = IntelliMonad.ExternalApis.Ollama.performWithStreamingRequest
+ 
+data OllamaAuth = OllamaAuth
+  { lookupUser :: ByteString -> Handler AuthServer
+  , authError :: Request -> ServerError
+  }
+
+newtype OllamaClient a = OllamaClient
+  { runClient :: ClientEnv -> ExceptT ClientError IO a
+  } deriving Functor
+
+instance Applicative OllamaClient where
+  pure x = OllamaClient (\_ -> pure x)
+  (OllamaClient f) <*> (OllamaClient x) =
+    OllamaClient (\env -> f env <*> x env)
+
+instance Monad OllamaClient where
+  (OllamaClient a) >>= f =
+    OllamaClient (\env -> do
+      value <- a env
+      runClient (f value) env)
+
+instance MonadIO OllamaClient where
+  liftIO io = OllamaClient (\_ -> liftIO io)
+
+createOllamaClient :: OllamaBackend AuthClient OllamaClient
+createOllamaClient = OllamaBackend{..}
+  where
+    ((coerce -> generateClient) :<|>
+     (coerce -> chatClient) :<|>
+     (coerce -> createClient) :<|>
+     (coerce -> checkBlobClient) :<|>
+     (coerce -> pushBlobClient) :<|>
+     (coerce -> listTagsClient) :<|>
+     (coerce -> showClient) :<|>
+     (coerce -> copyClient) :<|>
+     (coerce -> deleteClient) :<|>
+     (coerce -> pullClient) :<|>
+     (coerce -> pushClient) :<|>
+     (coerce -> embedClient) :<|>
+     (coerce -> psClient) :<|>
+     (coerce -> embeddingsDeprecatedClient) :<|>
+     (coerce -> versionClient) :<|>
+     _) = Servant.Client.client (Proxy :: Proxy OllamaAPI)
+
+-- | Server or client configuration, specifying the host and port to query or serve on.
+data OllamaConfig = OllamaConfig
+  { configUrl :: String  -- ^ scheme://hostname:port/path, e.g. "http://localhost:8080/"
+  } deriving (Eq, Ord, Show, Read)
+
+-- | Custom exception type for our errors.
+newtype OllamaClientError = OllamaClientError ClientError
+  deriving (Show, Exception)
+-- | Configuration, specifying the full url of the service.
+
+
+-- | Run requests in the OllamaClient monad.
+runOllamaClient :: OllamaConfig -> OllamaClient a -> ExceptT ClientError IO a
+runOllamaClient clientConfig cl = do
+  manager <- liftIO $ newManager tlsManagerSettings
+  runOllamaClientWithManager manager clientConfig cl
+
+-- | Run requests in the OllamaClient monad using a custom manager.
+runOllamaClientWithManager :: Manager -> OllamaConfig -> OllamaClient a -> ExceptT ClientError IO a
+runOllamaClientWithManager manager OllamaConfig{..} cl = do
+  url <- parseBaseUrl configUrl
+  runClient cl $ mkClientEnv manager url
+
+-- | Like @runClient@, but returns the response or throws
+--   a OllamaClientError
+callOllama
+  :: (MonadIO m, MonadThrow m)
+  => ClientEnv -> OllamaClient a -> m a
+callOllama env f = do
+  res <- liftIO $ runExceptT $ runClient f env
+  case res of
+    Left err       -> throwM (OllamaClientError err)
+    Right response -> pure response
+
+
+requestMiddlewareId :: Application -> Application
+requestMiddlewareId a = a
+
+-- | Run the Ollama server at the provided host and port.
+runOllamaServer
+  :: (MonadIO m, MonadThrow m)
+  => OllamaConfig -> OllamaAuth -> OllamaBackend AuthServer (ExceptT ServerError IO) -> m ()
+runOllamaServer config auth backend = runOllamaMiddlewareServer config requestMiddlewareId auth backend
+
+-- | Run the Ollama server at the provided host and port.
+runOllamaMiddlewareServer
+  :: (MonadIO m, MonadThrow m)
+  => OllamaConfig -> Middleware -> OllamaAuth -> OllamaBackend AuthServer (ExceptT ServerError IO) -> m ()
+runOllamaMiddlewareServer OllamaConfig{..} middleware auth backend = do
+  url <- parseBaseUrl configUrl
+  let warpSettings = Warp.defaultSettings
+        & Warp.setPort (baseUrlPort url)
+        & Warp.setHost (fromString $ baseUrlHost url)
+  liftIO $ Warp.runSettings warpSettings $ middleware $ serverWaiApplicationOllama auth backend
+
+serverWaiApplicationOllama :: OllamaAuth -> OllamaBackend AuthServer (ExceptT ServerError IO) -> Application
+serverWaiApplicationOllama auth backend = serveWithContextT (Proxy :: Proxy OllamaAPI) context id (serverFromBackend backend)
+  where
+    context = serverContext auth
+    serverFromBackend OllamaBackend{..} =
+      (coerce generateClient :<|>
+        coerce chatClient :<|>
+        coerce createClient :<|>
+        coerce checkBlobClient :<|>
+        coerce pushBlobClient :<|>
+        coerce listTagsClient :<|>
+        coerce showClient :<|>
+        coerce copyClient :<|>
+        coerce deleteClient :<|>
+        coerce pullClient :<|>
+        coerce pushClient :<|>
+        coerce embedClient :<|>
+        coerce psClient :<|>
+        coerce embeddingsDeprecatedClient :<|>
+        coerce versionClient :<|>
+        serveDirectoryFileServer "static")
+
+-- Authentication is implemented with servants generalized authentication:
+-- https://docs.servant.dev/en/stable/tutorial/Authentication.html#generalized-authentication
+
+authHandler :: OllamaAuth -> AuthHandler Request AuthServer
+authHandler OllamaAuth{..} = mkAuthHandler handler
+  where
+    handler req = case lookup "Authorization" (requestHeaders req) of
+      Just header -> case extractBearerAuth header of
+        Just key -> lookupUser key
+        Nothing -> throwError (authError req)
+      Nothing -> throwError (authError req)
+
+type Protected = AuthProtect "bearer"
+type AuthServer = AuthServerData Protected
+type AuthClient = AuthenticatedRequest Protected
+type instance AuthClientData Protected = Text
+
+clientAuth :: Text -> AuthClient
+clientAuth key = mkAuthenticatedRequest ("Bearer " <> key) (addHeader "Authorization")
+
+serverContext :: OllamaAuth -> Context (AuthHandler Request AuthServer ': '[])
+serverContext auth = authHandler auth :. EmptyContext
+
+-- concatChatResponse :: [ChatResponse] -> ChatResponse
+-- concatChatResponse = foldl1 (\a b -> ChatResponse {
+--                                chatRespModel = a.chatRespModel <> b.chatRespModel,
+--                                chatRespCreatedAt = b.chatRespCreatedAt,
+--                                chatRespMessage = a.chatRespMessage <> b.chatRespMessage,
+--                                chatRespDone = b.chatRespDone,
+--                                chatRespTotalDuration = a.chatRespTotalDuration <> b.chatRespTotalDuration,
+--                                chatRespLoadDuration = a.chatRespLoadDuration <> b.chatRespLoadDuration,
+--                                chatRespPromptEvalCount = a.chatRespPromptEvalCount <> b.chatRespPromptEvalCount,
+--                                chatRespPromptEvalDuration = a.chatRespPromptEvalDuration <> b.chatRespPromptEvalDuration,
+--                                chatRespEvalCount = a.chatRespEvalCount <> b.chatRespEvalCount,
+--                                chatRespEvalDuration = a.chatRespEvalDuration <> b.chatRespEvalDuration,
+--                                chatRespDoneReason = b.chatRespDoneReason
+--                                                 })

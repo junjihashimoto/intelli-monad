@@ -80,7 +80,8 @@ runCmd cmd = do
   let tools = defaultTools
       customs = []
       sessionName = "default"
-      defaultReq = OpenAIRequest (defaultRequest @OpenAI)
+--      defaultReq = OpenAIRequest (defaultRequest @OpenAI)
+      defaultReq = OllamaRequest (defaultRequest @Ollama)
   runInputT
     ( Settings
         { complete = completeFilename,
@@ -88,7 +89,7 @@ runCmd cmd = do
           autoAddHistory = True
         }
     )
-    (runPrompt @p tools customs sessionName defaultReq (runCmd' @p (Right cmd) Nothing))
+    (runPrompt @p [] customs sessionName defaultReq (runCmd' @p (Right cmd) Nothing))
 
 main :: IO ()
 main = do

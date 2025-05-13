@@ -85,6 +85,16 @@ library
                     , temporary >= 1.3 && < 1.4
                     , xml-conduit >= 1.9 && < 2.0
                     , yaml >= 0.11 && < 0.12
+                    , wai
+                    , warp
+                    , servant-server
+                    , servant-client-core
+                    , mtl
+                    , exceptions
+                    , wai-extra
+                    , stm
+                    , kan-extensions
+                    , http-types
     -- Directories containing source files.
     hs-source-dirs:   src
 

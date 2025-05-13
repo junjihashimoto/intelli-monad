@@ -35,10 +35,13 @@ module IntelliMonad.Types where
 import qualified Codec.Picture as P
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
-import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode)
+import Control.Monad.Except (runExceptT, ExceptT)
+import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, Value)
+import Data.Map (Map)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as A
 import qualified Data.Aeson.KeyMap as A
+import qualified Data.Aeson.Text as A
 import Data.ByteString (ByteString, fromStrict, toStrict)
 import Data.Coerce
 import Data.Kind (Type)
@@ -47,14 +50,27 @@ import Data.Proxy
 import Data.Text (Text)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import Data.Time
 import qualified Data.Vector as V
 import Database.Persist
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
+import qualified OpenAI.API as OpenAI
 import qualified OpenAI.Types as OpenAI
 import qualified IntelliMonad.ExternalApis.Ollama as Ollama
+import IntelliMonad.Config
+import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro, defaultManagerSettings)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
+import qualified Data.ByteString as BS
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO as T
+import Servant.Client (mkClientEnv, parseBaseUrl)
+import System.Environment (getEnv, lookupEnv)
+import Data.Aeson.Encode.Pretty (encodePretty)
+import qualified Servant.Types.SourceT as Servant
 
 data User = User | System | Assistant | Tool deriving (Eq, Show, Ord, Generic)
 
@@ -114,7 +130,7 @@ finishReasonToText = \case
   Length -> "length"
   ToolCalls -> "tool_calls"
   FunctionCall -> "function_call"
-  ContentFilter -> "content_fileter"
+  ContentFilter -> "content_filter"
   Null -> "null"
 
 textToFinishReason :: Text -> FinishReason
@@ -163,39 +179,39 @@ data LLMProtocol
   = OpenAI
   | Ollama
 
-data LLMRequest'
+data LLMRequest
   = OpenAIRequest OpenAI.CreateChatCompletionRequest
   | OllamaRequest Ollama.ChatRequest
   deriving (Show, Eq, Ord, Generic)
 
-data LLMResponse'
+data LLMResponse
   = OpenAIResponse OpenAI.CreateChatCompletionResponse
-  | OllamaResponse Ollama.ChatResponse
+  | OllamaResponse Ollama.ChatResponses
   deriving (Show, Eq, Ord, Generic)
 
-data LLMTool'
+data LLMTool
   = OpenAITool OpenAI.ChatCompletionTool
   | OllamaTool Ollama.Tool
   deriving (Show, Eq, Ord, Generic)
 
-instance ToJSON LLMRequest'
-instance FromJSON LLMRequest'
-instance ToJSON LLMResponse'
-instance FromJSON LLMResponse'
+instance ToJSON LLMRequest
+instance FromJSON LLMRequest
+instance ToJSON LLMResponse
+instance FromJSON LLMResponse
 
 class LLMApi api where
-  type LLMRequest api
-  type LLMResponse api
-  type LLMTool api
-  defaultRequest :: LLMRequest api
-  newTool :: forall a. (HasFunctionObject a, JSONSchema a) => Proxy a -> LLMTool api
-  toTools :: LLMRequest api -> [LLMTool api]
-  fromTools :: LLMRequest api -> [LLMTool api] -> LLMRequest api
-  fromModel_ :: Text -> LLMRequest api
+  type LLMRequest' api
+  type LLMResponse' api
+  type LLMTool' api
+  defaultRequest :: LLMRequest' api
+  newTool :: forall a. (HasFunctionObject a, JSONSchema a) => Proxy a -> LLMTool' api
+  toTools :: LLMRequest' api -> [LLMTool' api]
+  fromTools :: LLMRequest' api -> [LLMTool' api] -> LLMRequest' api
+  fromModel_ :: Text -> LLMRequest' api
 
 class ChatCompletion b where
-  toRequest :: LLMRequest' -> b -> LLMRequest'
-  fromResponse :: Text -> LLMResponse' -> (b, FinishReason)
+  toRequest :: LLMRequest -> b -> LLMRequest
+  fromResponse :: Text -> LLMResponse -> (b, FinishReason)
 
 toPV :: (ToJSON a) => a -> PersistValue
 toPV = toPersistValue . toStrict . encode
@@ -249,18 +265,18 @@ instance PersistField Message where
 instance PersistFieldSql Message where
   sqlType _ = sqlType (Proxy @ByteString)
 
-instance PersistField LLMRequest' where
+instance PersistField LLMRequest where
   toPersistValue = toPV
   fromPersistValue = fromPV
 
-instance PersistField LLMResponse' where
+instance PersistField LLMResponse where
   toPersistValue = toPV
   fromPersistValue = fromPV
 
-instance PersistFieldSql LLMRequest' where
+instance PersistFieldSql LLMRequest where
   sqlType _ = sqlType (Proxy @ByteString)
 
-instance PersistFieldSql LLMResponse' where
+instance PersistFieldSql LLMResponse where
   sqlType _ = sqlType (Proxy @ByteString)
 
 
@@ -280,8 +296,8 @@ Content
     deriving FromJSON
     deriving Generic
 Context
-    request LLMRequest'
-    response LLMResponse' Maybe
+    request LLMRequest
+    response LLMResponse Maybe
     header [Content]
     body [Content]
     footer [Content]
@@ -455,7 +471,7 @@ instance (HasFunctionObject s, GSchema s f, Selector c) => GSchema s (M1 S c f) 
         desc = getFieldDescription @s name
      in Object' [(name, desc, (gschema @s @f undefined))]
 
-toolAdd :: forall api a. (LLMApi api, Tool a, HasFunctionObject a, JSONSchema a) => LLMRequest api -> LLMRequest api
+toolAdd :: forall api a. (LLMApi api, Tool a, HasFunctionObject a, JSONSchema a) => LLMRequest' api -> LLMRequest' api
 toolAdd req =
   let prevTools = case toTools @api req of
         [] -> []
@@ -530,9 +546,9 @@ class PersistentBackend p where
 
 
 instance LLMApi OpenAI where
-  type LLMRequest OpenAI = OpenAI.CreateChatCompletionRequest
-  type LLMResponse OpenAI = OpenAI.CreateChatCompletionResponse
-  type LLMTool OpenAI = OpenAI.ChatCompletionTool
+  type LLMRequest' OpenAI = OpenAI.CreateChatCompletionRequest
+  type LLMResponse' OpenAI = OpenAI.CreateChatCompletionResponse
+  type LLMTool' OpenAI = OpenAI.ChatCompletionTool
   defaultRequest =
     OpenAI.CreateChatCompletionRequest
       { OpenAI.createChatCompletionRequestMessages = [],
@@ -576,9 +592,20 @@ instance LLMApi OpenAI where
   fromTools req [] = req {OpenAI.createChatCompletionRequestTools = Nothing}
   fromTools req tools = req {OpenAI.createChatCompletionRequestTools = Just tools}
   fromModel_ model =
-    (defaultRequest @OpenAI :: LLMRequest OpenAI) 
+    (defaultRequest @OpenAI :: LLMRequest' OpenAI) 
       { OpenAI.createChatCompletionRequestModel = OpenAI.CreateChatCompletionRequestModel model
       }
+
+-- | Read the JSON object and convert it to a Map
+toMap :: Text -> Map Text Value
+toMap json =
+  case A.decodeStrictText json of
+    Just v -> v
+    Nothing -> error $ T.unpack $ "Decoding JSON fails"
+  
+
+fromMap :: Map Text Value -> Text
+fromMap txt = TL.toStrict $ A.encodeToLazyText txt
 
 instance ChatCompletion Contents where
   toRequest (OpenAIRequest orgRequest) contents =
@@ -645,6 +672,45 @@ instance ChatCompletion Contents where
                 OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
               }
      in OpenAIRequest $ orgRequest {OpenAI.createChatCompletionRequestMessages = messages}
+  toRequest (OllamaRequest orgRequest) contents =
+    let messages = flip map contents $ \case
+          Content user (Message message) _ _ ->
+            Ollama.ChatMessage
+              { Ollama.msgContent = message,
+                Ollama.msgRole = userToText user,
+                Ollama.msgImages = Nothing,
+                Ollama.msgName = Nothing,
+                Ollama.msgToolCalls = Nothing
+              }
+          Content user (Image type' img) _ _ ->
+            Ollama.ChatMessage
+              { Ollama.msgContent = "",
+                Ollama.msgRole = userToText user,
+                Ollama.msgImages = Just [img],
+                Ollama.msgName = Nothing,
+                Ollama.msgToolCalls = Nothing
+              }
+          Content user (ToolCall id' name' args') _ _ -> 
+            Ollama.ChatMessage
+              { Ollama.msgContent = "",
+                Ollama.msgRole = userToText Assistant,
+                Ollama.msgImages = Nothing,
+                Ollama.msgName = Nothing,
+                Ollama.msgToolCalls = Just [Ollama.ToolCall (Ollama.ToolFunction
+                                            { Ollama.tfName = name'
+                                            , Ollama.tfArguments = toMap args'
+                                            })]
+              }
+          Content user (ToolReturn id' name' ret') _ _ ->
+            Ollama.ChatMessage
+              { Ollama.msgContent = ret',
+                Ollama.msgRole = userToText Tool,
+                Ollama.msgName = Just name',
+                Ollama.msgImages = Nothing,
+                Ollama.msgToolCalls = Nothing
+              }
+     in OllamaRequest $ orgRequest {Ollama.crMessages = messages}
+
   fromResponse sessionName (OpenAIResponse response) =
     let res = head (OpenAI.createChatCompletionResponseChoices response)
         message = OpenAI.createChatCompletionResponseChoicesInnerMessage res
@@ -655,26 +721,61 @@ instance ChatCompletion Contents where
           Just toolcalls -> map (\(OpenAI.ChatCompletionMessageToolCall id' _ (OpenAI.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
           Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
      in (v, finishReason)
+  fromResponse sessionName (OllamaResponse (response:_)) =
+    let message = Ollama.chatRespMessage response
+        role = textToUser $ Ollama.msgRole message
+        content = Ollama.msgContent message
+        finishReason = Ollama.msgContent message
+    in case Ollama.msgToolCalls message of
+         Just toolcalls -> (map (\func -> Content role (ToolCall "" func.tcFunction.tfName (fromMap func.tcFunction.tfArguments)) sessionName defaultUTCTime) toolcalls, ToolCalls)
+         Nothing -> ([Content role (Message (fromMaybe "" (Just content))) sessionName defaultUTCTime], Stop)
 
 instance LLMApi Ollama where
-  type LLMRequest Ollama = Ollama.ChatRequest
-  type LLMResponse Ollama = Ollama.ChatResponse
-  type LLMTool Ollama = Ollama.Tool
-  defaultRequest = undefined
-  newTool = undefined
+  type LLMRequest' Ollama = Ollama.ChatRequest
+  type LLMResponse' Ollama = Ollama.ChatResponses
+  type LLMTool' Ollama = Ollama.Tool
+  defaultRequest = Ollama.ChatRequest
+    { Ollama.crModel = "gemma3"
+    , Ollama.crMessages = []
+    , Ollama.crTools = Nothing
+    , Ollama.crFormat = Nothing
+    , Ollama.crOptions = Nothing
+    , Ollama.crStream = Just True
+    , Ollama.crKeepAlive = Nothing
+    }
+  newTool (Proxy :: Proxy a) =
+    Ollama.Tool
+      { Ollama.toolType = "function",
+        Ollama.toolFunction =
+          Ollama.ToolFunctionDefinition
+            { Ollama.tfdDescription = Just (T.pack $ getFunctionDescription @a),
+              Ollama.tfdName = T.pack $ getFunctionName @a,
+              Ollama.tfdParameters = toAeson (schema @a)
+            }
+      }
+  toTools req =
+    case Ollama.crTools req of
+      Nothing -> []
+      Just v -> v
+  fromTools req [] = req {Ollama.crTools = Nothing}
+  fromTools req tools = req {Ollama.crTools = Just tools}
+  fromModel_ model =
+    (defaultRequest @Ollama :: LLMRequest' Ollama) 
+      { Ollama.crModel = model
+      }
     
 data LLMProxy api =
   LLMProxy
-  { toRequest' :: LLMRequest api -> LLMRequest'
-  , toResponse' :: LLMResponse api -> LLMResponse'
+  { toRequest' :: LLMRequest' api -> LLMRequest
+  , toResponse' :: LLMResponse' api -> LLMResponse
   }
 
 withLLMRequest
-  :: forall a. LLMRequest'
+  :: forall a. LLMRequest
   -> (forall (api :: Type)
       . (LLMApi api)
       => LLMProxy api
-      -> LLMRequest api
+      -> LLMRequest' api
       -> a)
   -> a
 withLLMRequest req func =
@@ -682,17 +783,76 @@ withLLMRequest req func =
     OpenAIRequest req' -> func (LLMProxy @OpenAI OpenAIRequest OpenAIResponse)  req'
     OllamaRequest req' -> func (LLMProxy @Ollama OllamaRequest OllamaResponse)  req'
 
-updateRequest :: LLMRequest' -> Contents -> LLMRequest'
+updateRequest :: LLMRequest -> Contents -> LLMRequest
 updateRequest = toRequest
 
 --  withLLMRequest req' $ \(p :: LLMProxy api) req -> (toRequest' @api p) (toRequest req cs)
 
-addTools :: [ToolProxy] -> LLMRequest' -> LLMRequest'
+addTools :: [ToolProxy] -> LLMRequest -> LLMRequest
 addTools [] req' = req'
 addTools (tool : tools') req' =
   case tool of
     (ToolProxy (_ :: Proxy a)) ->
       withLLMRequest req' $ \(p :: LLMProxy api) req -> addTools tools' ((toRequest' @api p) $ toolAdd @api @a req)
       
-fromModel :: Text -> LLMRequest'
+fromModel :: Text -> LLMRequest
 fromModel = OpenAIRequest . fromModel_ @OpenAI
+
+runRequest :: forall a. (ChatCompletion a) => Text -> LLMRequest -> a -> IO ((a, FinishReason), LLMResponse)
+runRequest sessionName (OpenAIRequest defaultReq) request = do
+  config <- readConfig
+  let api_key = OpenAI.clientAuth config.apiKey
+  url <- case parseBaseUrl (T.unpack config.endpoint) of
+           Just url' -> pure url'
+           Nothing -> error $ T.unpack $ "Can not parse the endpoint: " <> config.endpoint
+  manager <-
+    newManager
+      ( tlsManagerSettings
+          { managerResponseTimeout = responseTimeoutMicro (120 * 1000 * 1000)
+          }
+      )
+  let OpenAI.OpenAIBackend {..} = OpenAI.createOpenAIClient
+      (OpenAIRequest req) = (toRequest (OpenAIRequest defaultReq) request)
+
+  lookupEnv "OPENAI_DEBUG" >>= \case
+    Just "1" -> do
+      liftIO $ do
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
+    _ -> return ()
+  res <- OpenAI.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
+  return $ (fromResponse sessionName (OpenAIResponse res), OpenAIResponse res)
+
+runRequest sessionName (OllamaRequest defaultReq) request = do
+  config <- readConfig
+  url <- case parseBaseUrl (T.unpack config.endpoint) of
+           Just url' -> pure url'
+           Nothing -> error $ T.unpack $ "Can not parse the endpoint: " <> config.endpoint
+  liftIO $ print "hello"
+  manager <-
+    newManager
+      ( defaultManagerSettings
+          { managerResponseTimeout = responseTimeoutMicro (120 * 1000 * 1000)
+          }
+      )
+  let Ollama.OllamaBackend {..} = Ollama.createOllamaClient
+      (OllamaRequest req) = (toRequest (OllamaRequest defaultReq) request)
+
+  lookupEnv "OPENAI_DEBUG" >>= \case
+    Just "1" -> do
+      liftIO $ do
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
+    _ -> return ()
+  (res :: [Ollama.ChatResponse]) <- Ollama.callOllama (mkClientEnv manager url) $ do
+    (r0 :: Servant.SourceT IO Ollama.ChatResponse) <- chatClient (Ollama.clientAuth "") (req {Ollama.crStream = Just False})
+    liftIO $ do
+      runExceptT (Servant.runSourceT r0) >>= \case
+        Left err -> do
+          print "-------"
+          print err
+          return []
+--          fail err
+        Right v -> return v
+    
+  return $ (fromResponse sessionName (OllamaResponse res), OllamaResponse res)
