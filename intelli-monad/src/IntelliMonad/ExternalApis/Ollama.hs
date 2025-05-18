@@ -15,6 +15,7 @@
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE BangPatterns               #-}
 
 module IntelliMonad.ExternalApis.Ollama where
 
@@ -600,16 +601,17 @@ performWithStreamingRequest req k = do
                 now
         writeTVar cj newCookieJar
         pure newRequest
-  Servant.Client.Internal.HttpClient.ClientM $ lift $ lift $
-      Client.withResponse request m $ \res -> do
-          let status = Client.responseStatus res
-
-          -- we throw FailureResponse in IO :(
-          unless (statusIsSuccessful status) $ do
-              b <- BSL.fromChunks <$> Client.brConsume (Client.responseBody res)
-              throwIO $ mkFailureResponse burl req (clientResponseToResponse (const b) res)
-
-          k (clientResponseToResponse (S.fromAction BS.null) res)
+  Servant.Client.Internal.HttpClient.ClientM $ lift $ lift $ do
+      !a <- Client.withResponse request m $ \res -> do
+             let status = Client.responseStatus res
+             -- we throw FailureResponse in IO :(
+             unless (statusIsSuccessful status) $ do
+                 b <- BSL.fromChunks <$> Client.brConsume (Client.responseBody res)
+                 throwIO $ mkFailureResponse burl req (clientResponseToResponse (const b) res)
+             let !stream_res = clientResponseToResponse (S.fromAction BS.null) res
+             k stream_res
+      liftIO $ print "after withResponse"
+      return a
 
 instance RunStreamingClient Servant.Client.Internal.HttpClient.ClientM where
   withStreamingRequest = IntelliMonad.ExternalApis.Ollama.performWithStreamingRequest

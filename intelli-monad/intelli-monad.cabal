@@ -104,6 +104,7 @@ library
 executable intelli-monad
     import:           warnings
     main-is:          repl.hs
+    ghc-options:      -rtsopts -prof -fprof-auto -threaded -g
     build-depends:
         base == 4.*,
         intelli-monad,

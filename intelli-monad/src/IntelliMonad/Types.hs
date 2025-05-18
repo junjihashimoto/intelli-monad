@@ -740,8 +740,8 @@ instance LLMApi Ollama where
     , Ollama.crTools = Nothing
     , Ollama.crFormat = Nothing
     , Ollama.crOptions = Nothing
-    , Ollama.crStream = Just True
-    , Ollama.crKeepAlive = Nothing
+    , Ollama.crStream = Just False
+    , Ollama.crKeepAlive = Just "5m"
     }
   newTool (Proxy :: Proxy a) =
     Ollama.Tool
