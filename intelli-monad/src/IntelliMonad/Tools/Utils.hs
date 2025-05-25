@@ -32,12 +32,6 @@ import Data.Time
 import IntelliMonad.Types
 import qualified OpenAI.Types as API
 
-addTools :: [ToolProxy] -> API.CreateChatCompletionRequest -> API.CreateChatCompletionRequest
-addTools [] v = v
-addTools (tool : tools') v =
-  case tool of
-    (ToolProxy (_ :: Proxy a)) -> addTools tools' (toolAdd @a v)
-
 toolExec' ::
   forall t p m.
   (PersistentBackend p, MonadIO m, MonadFail m, Tool t, A.FromJSON t, A.ToJSON (Output t)) =>

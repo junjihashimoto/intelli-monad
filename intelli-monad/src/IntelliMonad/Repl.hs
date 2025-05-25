@@ -107,7 +107,7 @@ editWithEditor = do
       ExitSuccess -> Just <$> T.readFile filePath
       ExitFailure _ -> return Nothing
 
-editRequestWithEditor :: forall m. (MonadIO m, MonadFail m) => API.CreateChatCompletionRequest -> m (Maybe API.CreateChatCompletionRequest)
+editRequestWithEditor :: forall m. (MonadIO m, MonadFail m) => LLMRequest -> m (Maybe LLMRequest)
 editRequestWithEditor req = do
   liftIO $ withSystemTempFile "tempfile.yaml" $ \filePath fileHandle -> do
     hClose fileHandle
@@ -119,7 +119,7 @@ editRequestWithEditor req = do
     code <- system (editor <> " " <> filePath)
     case code of
       ExitSuccess -> do
-        newReq <- Y.decodeFileEither @API.CreateChatCompletionRequest filePath
+        newReq <- Y.decodeFileEither @LLMRequest filePath
         case newReq of
           Right newReq' -> return $ Just newReq'
           Left err -> do
@@ -322,7 +322,7 @@ runRepl' = do
   cmd <- getUserCommand @p
   runCmd' @p cmd (Just (runRepl' @p))
 
-runRepl :: forall p. (PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Contents -> IO ()
+runRepl :: forall p. (PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest -> Contents -> IO ()
 runRepl tools customs sessionName defaultReq contents = do
   config <- readConfig
   runInputT
@@ -332,4 +332,4 @@ runRepl tools customs sessionName defaultReq contents = do
           autoAddHistory = True
         }
     )
-    (runPrompt @p tools customs sessionName (defaultReq {API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel config.model}) (push @p contents >> runRepl' @p))
+    (runPrompt @p tools customs sessionName defaultReq (push @p contents >> runRepl' @p))

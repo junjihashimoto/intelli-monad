@@ -70,7 +70,7 @@ push contents = do
       next =
         prev
           { contextBody = nextContents,
-            contextRequest = toRequest prev.contextRequest (prev.contextHeader <> nextContents <> prev.contextFooter)
+            contextRequest = updateRequest prev.contextRequest (prev.contextHeader <> nextContents <> prev.contextFooter)
           }
   setContext @p next
 
@@ -97,7 +97,7 @@ pushToolReturn contents = do
       next =
         prev
           { contextBody = nextContents,
-            contextRequest = toRequest prev.contextRequest (prev.contextHeader <> nextContents <> prev.contextFooter)
+            contextRequest = updateRequest prev.contextRequest (prev.contextHeader <> nextContents <> prev.contextFooter)
           }
   setContext @p next
 
@@ -124,7 +124,7 @@ call = loop []
       callPreHook @p
       prev <- getContext
       ((contents, finishReason), res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
-      let current_total_tokens = fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
+      let current_total_tokens = 0 -- fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
           next =
             prev
               { contextResponse = Just res,
@@ -174,7 +174,9 @@ callWithValidation ::
     A.FromJSON validation,
     A.FromJSON (Output validation),
     A.ToJSON validation,
-    A.ToJSON (Output validation)
+    A.ToJSON (Output validation),
+    HasFunctionObject validation,
+    JSONSchema validation
   ) =>
   Contents ->
   Prompt m (Maybe validation)
@@ -199,12 +201,14 @@ runPromptWithValidation ::
     A.FromJSON validation,
     A.FromJSON (Output validation),
     A.ToJSON validation,
-    A.ToJSON (Output validation)
+    A.ToJSON (Output validation),
+    HasFunctionObject validation,
+    JSONSchema validation
   ) =>
   [ToolProxy] ->
   [CustomInstructionProxy] ->
   Text ->
-  API.CreateChatCompletionRequest ->
+  LLMRequest ->
   Text ->
   m (Maybe validation)
 runPromptWithValidation tools customs sessionName req input = do
@@ -232,7 +236,9 @@ generate ::
     A.FromJSON output,
     A.FromJSON (Output output),
     A.ToJSON output,
-    A.ToJSON (Output output)
+    A.ToJSON (Output output),
+    HasFunctionObject output,
+    JSONSchema output
   ) => Contents -> input -> m (Maybe output)
 generate userContext input = do
   let valid = ToolProxy (Proxy :: Proxy output)
@@ -253,10 +259,10 @@ generate userContext input = do
     push @p contents
     call @p >>= callWithValidation @output @StatelessConf
 
-initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> m PromptEnv
+initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest -> m PromptEnv
 initializePrompt tools customs sessionName req = do
 --  config <- readConfig
-  let settings = addTools tools (req {API.createChatCompletionRequestTools = Nothing})
+  let settings = addTools tools req
   withDB @p $ \conn -> do
     load @p conn sessionName >>= \case
       Just v ->
@@ -291,111 +297,10 @@ initializePrompt tools customs sessionName req = do
         initialize @p conn (init'.context)
         return init'
 
-runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> API.CreateChatCompletionRequest -> Prompt m a -> m a
+runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest -> Prompt m a -> m a
 runPrompt tools customs sessionName req func = do
   context <- initializePrompt @p tools customs sessionName req
   fst <$> runStateT func context
-
-instance ChatCompletion Contents where
-  toRequest orgRequest contents =
-    let messages = flip map contents $ \case
-          Content user (Message message) _ _ ->
-            API.ChatCompletionRequestMessage
-              { API.chatCompletionRequestMessageContent = Just $ API.ChatCompletionRequestMessageContentText message,
-                API.chatCompletionRequestMessageRole = userToText user,
-                API.chatCompletionRequestMessageName = Nothing,
-                API.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
-                API.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
-                API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
-              }
-          Content user (Image type' img) _ _ ->
-            API.ChatCompletionRequestMessage
-              { API.chatCompletionRequestMessageContent =
-                  Just $
-                    API.ChatCompletionRequestMessageContentParts
-                      [ API.ChatCompletionRequestMessageContentPart
-                          { API.chatCompletionRequestMessageContentPartType = "image_url",
-                            API.chatCompletionRequestMessageContentPartText = Nothing,
-                            API.chatCompletionRequestMessageContentPartImageUnderscoreurl =
-                              Just $
-                                API.ChatCompletionRequestMessageContentPartImageImageUrl
-                                  { API.chatCompletionRequestMessageContentPartImageImageUrlUrl =
-                                      "data:image/" <> type' <> ";base64," <> img,
-                                    API.chatCompletionRequestMessageContentPartImageImageUrlDetail = Nothing
-                                  }
-                          }
-                      ],
-                API.chatCompletionRequestMessageRole = userToText user,
-                API.chatCompletionRequestMessageName = Nothing,
-                API.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
-                API.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
-                API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
-              }
-          Content user (ToolCall id' name' args') _ _ ->
-            API.ChatCompletionRequestMessage
-              { API.chatCompletionRequestMessageContent = Nothing,
-                API.chatCompletionRequestMessageRole = userToText user,
-                API.chatCompletionRequestMessageName = Nothing,
-                API.chatCompletionRequestMessageToolUnderscorecalls =
-                  Just
-                    [ API.ChatCompletionMessageToolCall
-                        { API.chatCompletionMessageToolCallId = id',
-                          API.chatCompletionMessageToolCallType = "function",
-                          API.chatCompletionMessageToolCallFunction =
-                            API.ChatCompletionMessageToolCallFunction
-                              { API.chatCompletionMessageToolCallFunctionName = name',
-                                API.chatCompletionMessageToolCallFunctionArguments = args'
-                              }
-                        }
-                    ],
-                API.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
-                API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
-              }
-          Content user (ToolReturn id' name' ret') _ _ ->
-            API.ChatCompletionRequestMessage
-              { API.chatCompletionRequestMessageContent = Just $ API.ChatCompletionRequestMessageContentText ret',
-                API.chatCompletionRequestMessageRole = userToText user,
-                API.chatCompletionRequestMessageName = Just name',
-                API.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
-                API.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
-                API.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
-              }
-     in orgRequest {API.createChatCompletionRequestMessages = messages}
-  fromResponse sessionName response =
-    let res = head (API.createChatCompletionResponseChoices response)
-        message = API.createChatCompletionResponseChoicesInnerMessage res
-        role = textToUser $ API.chatCompletionResponseMessageRole message
-        content = API.chatCompletionResponseMessageContent message
-        finishReason = textToFinishReason $ API.createChatCompletionResponseChoicesInnerFinishUnderscorereason res
-        v = case API.chatCompletionResponseMessageToolUnderscorecalls message of
-          Just toolcalls -> map (\(API.ChatCompletionMessageToolCall id' _ (API.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
-          Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
-     in (v, finishReason)
-
-runRequest :: (ChatCompletion a) => Text -> API.CreateChatCompletionRequest -> a -> IO ((a, FinishReason), API.CreateChatCompletionResponse)
-runRequest sessionName defaultReq request = do
-  config <- readConfig
-  let api_key = API.clientAuth config.apiKey
-  url <- case parseBaseUrl (T.unpack config.endpoint) of
-           Just url' -> pure url'
-           Nothing -> error $ T.unpack $ "Can not parse the endpoint: " <> config.endpoint
-  manager <-
-    newManager
-      ( tlsManagerSettings
-          { managerResponseTimeout = responseTimeoutMicro (120 * 1000 * 1000)
-          }
-      )
-  let API.OpenAIBackend {..} = API.createOpenAIClient
-      req = (toRequest defaultReq request)
-
-  lookupEnv "OPENAI_DEBUG" >>= \case
-    Just "1" -> do
-      liftIO $ do
-        BS.putStr $ BS.toStrict $ encodePretty req
-        T.putStrLn ""
-    _ -> return ()
-  res <- API.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
-  return (fromResponse sessionName res, res)
 
 showContents :: (MonadIO m) => Contents -> m ()
 showContents res = do
@@ -409,12 +314,6 @@ showContents res = do
             Image _ _ -> "Image: ..."
             c@(ToolCall _ _ _) -> T.pack $ show c
             c@(ToolReturn _ _ _) -> T.pack $ show c
-
-fromModel :: Text -> API.CreateChatCompletionRequest
-fromModel model =
-  defaultRequest
-    { API.createChatCompletionRequestModel = API.CreateChatCompletionRequestModel model
-    }
 
 clear :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m ()
 clear = do

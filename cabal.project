@@ -2,3 +2,11 @@ packages:
         openai-servant-gen/*.cabal
         openai-servant-gen-examples/*.cabal
         intelli-monad/*.cabal
+
+source-repository-package
+    type: git
+    location: https://github.com/junjihashimoto/http-client
+    tag: 2331670133904eeda284fbfcfc6035a040c67632
+    subdir: http-client
+        
+profiling: True
