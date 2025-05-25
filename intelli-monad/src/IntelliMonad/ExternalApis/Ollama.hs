@@ -30,6 +30,7 @@ import           Control.Monad                      (unless)
 import           Control.Exception                  (evaluate, throwIO)
 import           Data.Aeson hiding (Options) -- Avoid conflict with our Options type
 import           Data.Aeson.Types (Value, Options) -- For flexible fields like 'format' and 'options'
+import           Data.Aeson.Casing (snakeCase, aesonPrefix)
 import           Data.ByteString                    (ByteString, fromStrict, toStrict)
 import           Data.Coerce                        (coerce)
 import           Data.Function                      ((&))
@@ -134,32 +135,32 @@ data GenerateRequest = GenerateRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON GenerateRequest where
-  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON GenerateRequest where
-  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 
 -- Response type covers both streaming chunks and the final summary message.
 -- The 'done' field distinguishes them.
 data GenerateResponse = GenerateResponse
-  { genRespModel             :: Text
-  , genRespCreatedAt         :: UTCTime
-  , genRespResponse          :: Text -- Partial response in stream, empty or full in final/non-stream
-  , genRespDone              :: Bool
-  , genRespContext           :: Maybe [Int] -- Only in final response if not raw
-  , genRespTotalDuration     :: Maybe Nanoseconds -- Only in final response
-  , genRespLoadDuration      :: Maybe Nanoseconds -- Only in final response
-  , genRespPromptEvalCount   :: Maybe Int -- Only in final response
-  , genRespPromptEvalDuration :: Maybe Nanoseconds -- Only in final response
-  , genRespEvalCount         :: Maybe Int -- Only in final response
-  , genRespEvalDuration      :: Maybe Nanoseconds -- Only in final response
-  , genRespDoneReason        :: Maybe Text -- e.g., "stop", "unload", only in final response
+  { grsModel             :: Text
+  , grsCreatedAt         :: UTCTime
+  , grsResponse          :: Text -- Partial response in stream, empty or full in final/non-stream
+  , grsDone              :: Bool
+  , grsContext           :: Maybe [Int] -- Only in final response if not raw
+  , grsTotalDuration     :: Maybe Nanoseconds -- Only in final response
+  , grsLoadDuration      :: Maybe Nanoseconds -- Only in final response
+  , grsPromptEvalCount   :: Maybe Int -- Only in final response
+  , grsPromptEvalDuration :: Maybe Nanoseconds -- Only in final response
+  , grsEvalCount         :: Maybe Int -- Only in final response
+  , grsEvalDuration      :: Maybe Nanoseconds -- Only in final response
+  , grsDoneReason        :: Maybe Text -- e.g., "stop", "unload", only in final response
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON GenerateResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 7 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON GenerateResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 7 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 -- -----------------------------------------------------------------------------
 -- Generate Chat Completion (/api/chat)
@@ -174,9 +175,9 @@ data ChatMessage = ChatMessage
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ChatMessage where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON ChatMessage where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 
 data ToolCall = ToolCall
@@ -184,9 +185,9 @@ data ToolCall = ToolCall
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ToolCall where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON ToolCall where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 data ToolFunction = ToolFunction
   { tfName      :: Text
@@ -194,9 +195,9 @@ data ToolFunction = ToolFunction
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ToolFunction where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON ToolFunction where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 -- Represents the 'tools' parameter in the chat request
 data Tool = Tool
@@ -205,9 +206,9 @@ data Tool = Tool
     } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON Tool where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON Tool where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 
 data ToolFunctionDefinition = ToolFunctionDefinition
@@ -217,9 +218,9 @@ data ToolFunctionDefinition = ToolFunctionDefinition
     } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ToolFunctionDefinition where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON ToolFunctionDefinition where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 data ChatRequest = ChatRequest
   { crModel     :: Text
@@ -232,29 +233,29 @@ data ChatRequest = ChatRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ChatRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON ChatRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 -- Covers streaming chunks and the final summary message.
 data ChatResponse = ChatResponse
-  { chatRespModel             :: Text
-  , chatRespCreatedAt         :: UTCTime
-  , chatRespMessage           :: ChatMessage -- Partial message in stream, potentially empty in final
-  , chatRespDone              :: Bool
-  , chatRespTotalDuration     :: Maybe Nanoseconds -- Only in final response
-  , chatRespLoadDuration      :: Maybe Nanoseconds -- Only in final response
-  , chatRespPromptEvalCount   :: Maybe Int -- Only in final response
-  , chatRespPromptEvalDuration :: Maybe Nanoseconds -- Only in final response
-  , chatRespEvalCount         :: Maybe Int -- Only in final response
-  , chatRespEvalDuration      :: Maybe Nanoseconds -- Only in final response
-  , chatRespDoneReason        :: Maybe Text -- e.g., "stop", "load", "unload", only in final response
+  { crsModel             :: Text
+  , crsCreatedAt         :: UTCTime
+  , crsMessage           :: ChatMessage -- Partial message in stream, potentially empty in final
+  , crsDone              :: Bool
+  , crsTotalDuration     :: Maybe Nanoseconds -- Only in final response
+  , crsLoadDuration      :: Maybe Nanoseconds -- Only in final response
+  , crsPromptEvalCount   :: Maybe Int -- Only in final response
+  , crsPromptEvalDuration :: Maybe Nanoseconds -- Only in final response
+  , crsEvalCount         :: Maybe Int -- Only in final response
+  , crsEvalDuration      :: Maybe Nanoseconds -- Only in final response
+  , crsDoneReason        :: Maybe Text -- e.g., "stop", "load", "unload", only in final response
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ChatResponse where
-  parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON ChatResponse where
-  toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 type ChatResponses = [ChatResponse]
 
@@ -280,25 +281,25 @@ data CreateModelRequest = CreateModelRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON CreateModelRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON CreateModelRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 -- -----------------------------------------------------------------------------
 -- Status Response (for /api/create, /api/pull, /api/push)
 -- -----------------------------------------------------------------------------
 
 data StatusResponse = StatusResponse
-  { statusRespStatus    :: Text
-  , statusRespDigest    :: Maybe Text -- Only for push/pull download/upload phases
-  , statusRespTotal     :: Maybe Int64 -- Only for push/pull download/upload phases
-  , statusRespCompleted :: Maybe Int64 -- Only for push/pull download/upload phases
+  { srsStatus    :: Text
+  , srsDigest    :: Maybe Text -- Only for push/pull download/upload phases
+  , srsTotal     :: Maybe Int64 -- Only for push/pull download/upload phases
+  , srsCompleted :: Maybe Int64 -- Only for push/pull download/upload phases
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON StatusResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 10 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON StatusResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 10 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 -- -----------------------------------------------------------------------------
 -- List Local Models (/api/tags)
@@ -309,9 +310,9 @@ data ListModelsResponse = ListModelsResponse
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ListModelsResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON ListModelsResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 
 data ModelEntry = ModelEntry
@@ -323,9 +324,9 @@ data ModelEntry = ModelEntry
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ModelEntry where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON ModelEntry where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 
 data ModelDetails = ModelDetails
@@ -338,10 +339,9 @@ data ModelDetails = ModelDetails
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ModelDetails where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON ModelDetails where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
-
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 -- -----------------------------------------------------------------------------
 -- Show Model Information (/api/show)
@@ -353,9 +353,9 @@ data ShowModelRequest = ShowModelRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ShowModelRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON ShowModelRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 data ShowModelResponse = ShowModelResponse
   { showRespModelfile   :: Text
@@ -367,9 +367,9 @@ data ShowModelResponse = ShowModelResponse
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ShowModelResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON ShowModelResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 8 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 -- Reusing ModelDetails but adding parent_model explicitly if needed
 -- Using a specific type here for clarity, though it overlaps with ModelDetails
@@ -383,9 +383,9 @@ data ShowModelDetails = ShowModelDetails
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ShowModelDetails where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON ShowModelDetails where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 
 -- -----------------------------------------------------------------------------
@@ -397,10 +397,10 @@ data CopyModelRequest = CopyModelRequest
   , cprDestination :: Text
   } deriving (Show, Generic, Eq, Ord)
 
-instance ToJSON CopyModelRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
 instance FromJSON CopyModelRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
+instance ToJSON CopyModelRequest where
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 
 -- -----------------------------------------------------------------------------
@@ -412,9 +412,9 @@ data DeleteModelRequest = DeleteModelRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON DeleteModelRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON DeleteModelRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 
 -- -----------------------------------------------------------------------------
@@ -428,10 +428,9 @@ data PullModelRequest = PullModelRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON PullModelRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON PullModelRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
-
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 -- -----------------------------------------------------------------------------
 -- Push Model (/api/push)
@@ -444,9 +443,9 @@ data PushModelRequest = PushModelRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON PushModelRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON PushModelRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 
 -- -----------------------------------------------------------------------------
@@ -475,22 +474,22 @@ data GenerateEmbeddingsRequest = GenerateEmbeddingsRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON GenerateEmbeddingsRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON GenerateEmbeddingsRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 data GenerateEmbeddingsResponse = GenerateEmbeddingsResponse
-  { genEmbRespModel :: Text -- Added field based on example response
-  , genEmbRespEmbeddings :: [[Double]]
-  , genEmbRespTotalDuration :: Maybe Nanoseconds -- Added field based on example response
-  , genEmbRespLoadDuration :: Maybe Nanoseconds -- Added field based on example response
-  , genEmbRespPromptEvalCount :: Maybe Int -- Added field based on example response
+  { gersModel :: Text -- Added field based on example response
+  , gersEmbeddings :: [[Double]]
+  , gersTotalDuration :: Maybe Nanoseconds -- Added field based on example response
+  , gersLoadDuration :: Maybe Nanoseconds -- Added field based on example response
+  , gersPromptEvalCount :: Maybe Int -- Added field based on example response
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON GenerateEmbeddingsResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 10 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON GenerateEmbeddingsResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 10 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 
 -- -----------------------------------------------------------------------------
@@ -502,9 +501,9 @@ data ListRunningModelsResponse = ListRunningModelsResponse
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON ListRunningModelsResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON ListRunningModelsResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 data RunningModelEntry = RunningModelEntry
   { rmeName      :: Text
@@ -517,9 +516,9 @@ data RunningModelEntry = RunningModelEntry
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON RunningModelEntry where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON RunningModelEntry where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 3 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 
 -- -----------------------------------------------------------------------------
@@ -534,18 +533,18 @@ data GenerateEmbeddingsDeprecatedRequest = GenerateEmbeddingsDeprecatedRequest
   } deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON GenerateEmbeddingsDeprecatedRequest where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 instance FromJSON GenerateEmbeddingsDeprecatedRequest where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 4 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 
 data GenerateEmbeddingsDeprecatedResponse = GenerateEmbeddingsDeprecatedResponse
   { gedRespEmbedding :: [Double]
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON GenerateEmbeddingsDeprecatedResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 7 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON GenerateEmbeddingsDeprecatedResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 7 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 
 -- -----------------------------------------------------------------------------
@@ -557,9 +556,9 @@ data VersionResponse = VersionResponse
   } deriving (Show, Generic, Eq, Ord)
 
 instance FromJSON VersionResponse where
- parseJSON = genericParseJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  parseJSON = genericParseJSON $ aesonPrefix snakeCase
 instance ToJSON VersionResponse where
- toJSON = genericToJSON aesonOptions { fieldLabelModifier = \n -> case drop 2 n of { "" -> ""; x -> x } }
+  toJSON = genericToJSON $ aesonPrefix snakeCase
 
 -- Define a proxy for your API
 ollamaAPI :: Proxy OllamaAPI
@@ -602,16 +601,14 @@ performWithStreamingRequest req k = do
         writeTVar cj newCookieJar
         pure newRequest
   Servant.Client.Internal.HttpClient.ClientM $ lift $ lift $ do
-      !a <- Client.withResponse request m $ \res -> do
-             let status = Client.responseStatus res
-             -- we throw FailureResponse in IO :(
-             unless (statusIsSuccessful status) $ do
-                 b <- BSL.fromChunks <$> Client.brConsume (Client.responseBody res)
-                 throwIO $ mkFailureResponse burl req (clientResponseToResponse (const b) res)
-             let !stream_res = clientResponseToResponse (S.fromAction BS.null) res
-             k stream_res
-      liftIO $ print "after withResponse"
-      return a
+      Client.withResponse request m $ \res -> do
+        let status = Client.responseStatus res
+        -- we throw FailureResponse in IO :(
+        unless (statusIsSuccessful status) $ do
+            b <- BSL.fromChunks <$> Client.brConsume (Client.responseBody res)
+            throwIO $ mkFailureResponse burl req (clientResponseToResponse (const b) res)
+        let !stream_res = clientResponseToResponse (S.fromAction BS.null) res
+        k stream_res
 
 instance RunStreamingClient Servant.Client.Internal.HttpClient.ClientM where
   withStreamingRequest = IntelliMonad.ExternalApis.Ollama.performWithStreamingRequest

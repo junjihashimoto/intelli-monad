@@ -722,7 +722,7 @@ instance ChatCompletion Contents where
           Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
      in (v, finishReason)
   fromResponse sessionName (OllamaResponse (response:_)) =
-    let message = Ollama.chatRespMessage response
+    let message = Ollama.crsMessage response
         role = textToUser $ Ollama.msgRole message
         content = Ollama.msgContent message
         finishReason = Ollama.msgContent message
@@ -828,7 +828,6 @@ runRequest sessionName (OllamaRequest defaultReq) request = do
   url <- case parseBaseUrl (T.unpack config.endpoint) of
            Just url' -> pure url'
            Nothing -> error $ T.unpack $ "Can not parse the endpoint: " <> config.endpoint
-  liftIO $ print "hello"
   manager <-
     newManager
       ( defaultManagerSettings
@@ -849,10 +848,7 @@ runRequest sessionName (OllamaRequest defaultReq) request = do
     liftIO $ do
       runExceptT (Servant.runSourceT r0) >>= \case
         Left err -> do
-          print "-------"
-          print err
-          return []
---          fail err
+          fail err
         Right v -> return v
     
   return $ (fromResponse sessionName (OllamaResponse res), OllamaResponse res)
