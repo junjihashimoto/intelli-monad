@@ -35,7 +35,6 @@ module IntelliMonad.Types where
 import qualified Codec.Picture as P
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
-import Control.Monad.Except (runExceptT, ExceptT)
 import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, Value)
 import Data.Map (Map)
 import qualified Data.Aeson as A
@@ -57,20 +56,14 @@ import Database.Persist
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
-import qualified OpenAI.API as OpenAI
-import qualified OpenAI.Types as OpenAI
-import qualified IntelliMonad.ExternalApis.Ollama as Ollama
+import qualified Louter.Client as Louter
+import qualified Louter.Types.Request as Louter
+import qualified Louter.Types.Response as Louter
 import IntelliMonad.Config
-import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro, defaultManagerSettings)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Data.ByteString as BS
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
-import Servant.Client (mkClientEnv, parseBaseUrl)
-import System.Environment (getEnv, lookupEnv)
+import System.Environment (lookupEnv)
 import Data.Aeson.Encode.Pretty (encodePretty)
-import qualified Servant.Types.SourceT as Servant
 
 data User = User | System | Assistant | Tool deriving (Eq, Show, Ord, Generic)
 
@@ -173,31 +166,36 @@ class JSONSchema r where
   schema = gschema @r (from (undefined :: r))
 
 data OpenAI
-data Ollama
 
 data LLMProtocol
   = OpenAI
-  | Ollama
 
 data LLMRequest
-  = OpenAIRequest OpenAI.CreateChatCompletionRequest
-  | OllamaRequest Ollama.ChatRequest
-  deriving (Show, Eq, Ord, Generic)
+  = LouterRequest Louter.ChatRequest
+  deriving (Show, Eq, Generic)
 
 data LLMResponse
-  = OpenAIResponse OpenAI.CreateChatCompletionResponse
-  | OllamaResponse Ollama.ChatResponses
-  deriving (Show, Eq, Ord, Generic)
+  = LouterResponse Louter.ChatResponse
+  deriving (Show, Eq, Generic)
 
 data LLMTool
-  = OpenAITool OpenAI.ChatCompletionTool
-  | OllamaTool Ollama.Tool
-  deriving (Show, Eq, Ord, Generic)
+  = LouterTool Louter.Tool
+  deriving (Show, Eq, Generic)
 
 instance ToJSON LLMRequest
 instance FromJSON LLMRequest
 instance ToJSON LLMResponse
 instance FromJSON LLMResponse
+
+-- Manual Ord instances (Louter types don't have Ord)
+instance Ord LLMRequest where
+  compare _ _ = EQ  -- Simplified: treat all requests as equal for ordering
+
+instance Ord LLMResponse where
+  compare _ _ = EQ  -- Simplified: treat all responses as equal for ordering
+
+instance Ord LLMTool where
+  compare _ _ = EQ  -- Simplified: treat all tools as equal for ordering
 
 class LLMApi api where
   type LLMRequest' api
@@ -223,32 +221,18 @@ fromPV json = do
     Right v -> return v
     Left err -> Left $ "Decoding JSON fails : " <> T.pack err
 
-instance PersistField OpenAI.CreateChatCompletionRequest where
+instance PersistField Louter.ChatRequest where
   toPersistValue = toPV
   fromPersistValue = fromPV
 
-instance PersistFieldSql OpenAI.CreateChatCompletionRequest where
+instance PersistFieldSql Louter.ChatRequest where
   sqlType _ = sqlType (Proxy @ByteString)
 
-instance PersistField OpenAI.CreateChatCompletionResponse where
+instance PersistField Louter.ChatResponse where
   toPersistValue = toPV
   fromPersistValue = fromPV
 
-instance PersistFieldSql OpenAI.CreateChatCompletionResponse where
-  sqlType _ = sqlType (Proxy @ByteString)
-
-instance PersistField Ollama.ChatRequest where
-  toPersistValue = toPV
-  fromPersistValue = fromPV
-
-instance PersistFieldSql Ollama.ChatRequest where
-  sqlType _ = sqlType (Proxy @ByteString)
-
-instance PersistField Ollama.ChatResponse where
-  toPersistValue = toPV
-  fromPersistValue = fromPV
-
-instance PersistFieldSql Ollama.ChatResponse where
+instance PersistFieldSql Louter.ChatResponse where
   sqlType _ = sqlType (Proxy @ByteString)
 
 instance PersistField User where
@@ -546,54 +530,30 @@ class PersistentBackend p where
 
 
 instance LLMApi OpenAI where
-  type LLMRequest' OpenAI = OpenAI.CreateChatCompletionRequest
-  type LLMResponse' OpenAI = OpenAI.CreateChatCompletionResponse
-  type LLMTool' OpenAI = OpenAI.ChatCompletionTool
+  type LLMRequest' OpenAI = Louter.ChatRequest
+  type LLMResponse' OpenAI = Louter.ChatResponse
+  type LLMTool' OpenAI = Louter.Tool
   defaultRequest =
-    OpenAI.CreateChatCompletionRequest
-      { OpenAI.createChatCompletionRequestMessages = [],
-        OpenAI.createChatCompletionRequestModel = OpenAI.CreateChatCompletionRequestModel "gpt-4",
-        OpenAI.createChatCompletionRequestFrequencyUnderscorepenalty = Nothing,
-        OpenAI.createChatCompletionRequestLogitUnderscorebias = Nothing,
-        OpenAI.createChatCompletionRequestLogprobs = Nothing,
-        OpenAI.createChatCompletionRequestTopUnderscorelogprobs = Nothing,
-        OpenAI.createChatCompletionRequestMaxUnderscoretokens = Nothing,
-        OpenAI.createChatCompletionRequestN = Nothing,
-        OpenAI.createChatCompletionRequestPresenceUnderscorepenalty = Nothing,
-        OpenAI.createChatCompletionRequestResponseUnderscoreformat = Nothing,
-        OpenAI.createChatCompletionRequestSeed = Just 0,
-        OpenAI.createChatCompletionRequestStop = Nothing,
-        OpenAI.createChatCompletionRequestStream = Nothing,
-        OpenAI.createChatCompletionRequestTemperature = Nothing,
-        OpenAI.createChatCompletionRequestTopUnderscorep = Nothing,
-        OpenAI.createChatCompletionRequestTools = Nothing,
-        OpenAI.createChatCompletionRequestToolUnderscorechoice = Nothing,
-        OpenAI.createChatCompletionRequestUser = Nothing,
-        OpenAI.createChatCompletionRequestFunctionUnderscorecall = Nothing,
-        OpenAI.createChatCompletionRequestFunctions = Nothing
+    Louter.ChatRequest
+      { Louter.reqModel = "gpt-4"
+      , Louter.reqMessages = []
+      , Louter.reqTools = []
+      , Louter.reqToolChoice = Louter.ToolChoiceAuto
+      , Louter.reqTemperature = Nothing
+      , Louter.reqMaxTokens = Nothing
+      , Louter.reqStream = False
       }
   newTool (Proxy :: Proxy a) =
-    OpenAI.ChatCompletionTool
-      { chatCompletionToolType = "function",
-        chatCompletionToolFunction =
-          OpenAI.FunctionObject
-            { functionObjectDescription = Just (T.pack $ getFunctionDescription @a),
-              functionObjectName = T.pack $ getFunctionName @a,
-              functionObjectParameters = Just $
-                case toAeson (schema @a) of
-                  A.Object kv -> M.fromList $ map (\(k, v) -> (A.toString k, v)) $ A.toList kv
-                  _ -> []
-            }
+    Louter.Tool
+      { Louter.toolName = T.pack $ getFunctionName @a
+      , Louter.toolDescription = Just (T.pack $ getFunctionDescription @a)
+      , Louter.toolParameters = toAeson (schema @a)
       }
-  toTools req =
-    case OpenAI.createChatCompletionRequestTools req of
-      Nothing -> []
-      Just v -> v
-  fromTools req [] = req {OpenAI.createChatCompletionRequestTools = Nothing}
-  fromTools req tools = req {OpenAI.createChatCompletionRequestTools = Just tools}
+  toTools req = Louter.reqTools req
+  fromTools req tools = req { Louter.reqTools = tools }
   fromModel_ model =
-    (defaultRequest @OpenAI :: LLMRequest' OpenAI) 
-      { OpenAI.createChatCompletionRequestModel = OpenAI.CreateChatCompletionRequestModel model
+    (defaultRequest @OpenAI :: LLMRequest' OpenAI)
+      { Louter.reqModel = model
       }
 
 -- | Read the JSON object and convert it to a Map
@@ -608,161 +568,51 @@ fromMap :: Map Text Value -> Text
 fromMap txt = TL.toStrict $ A.encodeToLazyText txt
 
 instance ChatCompletion Contents where
-  toRequest (OpenAIRequest orgRequest) contents =
+  toRequest (LouterRequest orgRequest) contents =
     let messages = flip map contents $ \case
           Content user (Message message) _ _ ->
-            OpenAI.ChatCompletionRequestMessage
-              { OpenAI.chatCompletionRequestMessageContent = Just $ OpenAI.ChatCompletionRequestMessageContentText message,
-                OpenAI.chatCompletionRequestMessageRole = userToText user,
-                OpenAI.chatCompletionRequestMessageName = Nothing,
-                OpenAI.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
-                OpenAI.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
-                OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
+            Louter.Message
+              { Louter.msgRole = case user of
+                  User -> Louter.RoleUser
+                  System -> Louter.RoleSystem
+                  Assistant -> Louter.RoleAssistant
+                  Tool -> Louter.RoleTool
+              , Louter.msgContent = [Louter.TextPart message]
               }
           Content user (Image type' img) _ _ ->
-            OpenAI.ChatCompletionRequestMessage
-              { OpenAI.chatCompletionRequestMessageContent =
-                  Just $
-                    OpenAI.ChatCompletionRequestMessageContentParts
-                      [ OpenAI.ChatCompletionRequestMessageContentPart
-                          { OpenAI.chatCompletionRequestMessageContentPartType = "image_url",
-                            OpenAI.chatCompletionRequestMessageContentPartText = Nothing,
-                            OpenAI.chatCompletionRequestMessageContentPartImageUnderscoreurl =
-                              Just $
-                                OpenAI.ChatCompletionRequestMessageContentPartImageImageUrl
-                                  { OpenAI.chatCompletionRequestMessageContentPartImageImageUrlUrl =
-                                      "data:image/" <> type' <> ";base64," <> img,
-                                    OpenAI.chatCompletionRequestMessageContentPartImageImageUrlDetail = Nothing
-                                  }
-                          }
-                      ],
-                OpenAI.chatCompletionRequestMessageRole = userToText user,
-                OpenAI.chatCompletionRequestMessageName = Nothing,
-                OpenAI.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
-                OpenAI.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
-                OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Nothing
+            Louter.Message
+              { Louter.msgRole = case user of
+                  User -> Louter.RoleUser
+                  System -> Louter.RoleSystem
+                  Assistant -> Louter.RoleAssistant
+                  Tool -> Louter.RoleTool
+              , Louter.msgContent = [Louter.ImagePart type' img]
               }
           Content user (ToolCall id' name' args') _ _ ->
-            OpenAI.ChatCompletionRequestMessage
-              { OpenAI.chatCompletionRequestMessageContent = Nothing,
-                OpenAI.chatCompletionRequestMessageRole = userToText user,
-                OpenAI.chatCompletionRequestMessageName = Nothing,
-                OpenAI.chatCompletionRequestMessageToolUnderscorecalls =
-                  Just
-                    [ OpenAI.ChatCompletionMessageToolCall
-                        { OpenAI.chatCompletionMessageToolCallId = id',
-                          OpenAI.chatCompletionMessageToolCallType = "function",
-                          OpenAI.chatCompletionMessageToolCallFunction =
-                            OpenAI.ChatCompletionMessageToolCallFunction
-                              { OpenAI.chatCompletionMessageToolCallFunctionName = name',
-                                OpenAI.chatCompletionMessageToolCallFunctionArguments = args'
-                              }
-                        }
-                    ],
-                OpenAI.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
-                OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
+            -- Tool calls need to be handled differently - for now, convert to text
+            Louter.Message
+              { Louter.msgRole = Louter.RoleAssistant
+              , Louter.msgContent = [Louter.TextPart $ "Tool call: " <> name' <> " with args: " <> args']
               }
           Content user (ToolReturn id' name' ret') _ _ ->
-            OpenAI.ChatCompletionRequestMessage
-              { OpenAI.chatCompletionRequestMessageContent = Just $ OpenAI.ChatCompletionRequestMessageContentText ret',
-                OpenAI.chatCompletionRequestMessageRole = userToText user,
-                OpenAI.chatCompletionRequestMessageName = Just name',
-                OpenAI.chatCompletionRequestMessageToolUnderscorecalls = Nothing,
-                OpenAI.chatCompletionRequestMessageFunctionUnderscorecall = Nothing,
-                OpenAI.chatCompletionRequestMessageToolUnderscorecallUnderscoreid = Just id'
+            Louter.Message
+              { Louter.msgRole = Louter.RoleTool
+              , Louter.msgContent = [Louter.TextPart ret']
               }
-     in OpenAIRequest $ orgRequest {OpenAI.createChatCompletionRequestMessages = messages}
-  toRequest (OllamaRequest orgRequest) contents =
-    let messages = flip map contents $ \case
-          Content user (Message message) _ _ ->
-            Ollama.ChatMessage
-              { Ollama.msgContent = message,
-                Ollama.msgRole = userToText user,
-                Ollama.msgImages = Nothing,
-                Ollama.msgName = Nothing,
-                Ollama.msgToolCalls = Nothing
-              }
-          Content user (Image type' img) _ _ ->
-            Ollama.ChatMessage
-              { Ollama.msgContent = "",
-                Ollama.msgRole = userToText user,
-                Ollama.msgImages = Just [img],
-                Ollama.msgName = Nothing,
-                Ollama.msgToolCalls = Nothing
-              }
-          Content user (ToolCall id' name' args') _ _ -> 
-            Ollama.ChatMessage
-              { Ollama.msgContent = "",
-                Ollama.msgRole = userToText Assistant,
-                Ollama.msgImages = Nothing,
-                Ollama.msgName = Nothing,
-                Ollama.msgToolCalls = Just [Ollama.ToolCall (Ollama.ToolFunction
-                                            { Ollama.tfName = name'
-                                            , Ollama.tfArguments = toMap args'
-                                            })]
-              }
-          Content user (ToolReturn id' name' ret') _ _ ->
-            Ollama.ChatMessage
-              { Ollama.msgContent = ret',
-                Ollama.msgRole = userToText Tool,
-                Ollama.msgName = Just name',
-                Ollama.msgImages = Nothing,
-                Ollama.msgToolCalls = Nothing
-              }
-     in OllamaRequest $ orgRequest {Ollama.crMessages = messages}
+     in LouterRequest $ orgRequest { Louter.reqMessages = messages }
 
-  fromResponse sessionName (OpenAIResponse response) =
-    let res = head (OpenAI.createChatCompletionResponseChoices response)
-        message = OpenAI.createChatCompletionResponseChoicesInnerMessage res
-        role = textToUser $ OpenAI.chatCompletionResponseMessageRole message
-        content = OpenAI.chatCompletionResponseMessageContent message
-        finishReason = textToFinishReason $ OpenAI.createChatCompletionResponseChoicesInnerFinishUnderscorereason res
-        v = case OpenAI.chatCompletionResponseMessageToolUnderscorecalls message of
-          Just toolcalls -> map (\(OpenAI.ChatCompletionMessageToolCall id' _ (OpenAI.ChatCompletionMessageToolCallFunction name' args')) -> Content role (ToolCall id' name' args') sessionName defaultUTCTime) toolcalls
-          Nothing -> [Content role (Message (fromMaybe "" content)) sessionName defaultUTCTime]
-     in (v, finishReason)
-  fromResponse sessionName (OllamaResponse (response:_)) =
-    let message = Ollama.crsMessage response
-        role = textToUser $ Ollama.msgRole message
-        content = Ollama.msgContent message
-        finishReason = Ollama.msgContent message
-    in case Ollama.msgToolCalls message of
-         Just toolcalls -> (map (\func -> Content role (ToolCall "" func.tcFunction.tfName (fromMap func.tcFunction.tfArguments)) sessionName defaultUTCTime) toolcalls, ToolCalls)
-         Nothing -> ([Content role (Message (fromMaybe "" (Just content))) sessionName defaultUTCTime], Stop)
+  fromResponse sessionName (LouterResponse response) =
+    let choice = head (Louter.respChoices response)
+        message = Louter.choiceMessage choice
+        finishReason = case Louter.choiceFinishReason choice of
+          Just Louter.FinishStop -> Stop
+          Just Louter.FinishLength -> Length
+          Just Louter.FinishToolCalls -> ToolCalls
+          Just Louter.FinishContentFilter -> ContentFilter
+          Nothing -> Null
+        content = Content Assistant (Message message) sessionName defaultUTCTime
+     in ([content], finishReason)
 
-instance LLMApi Ollama where
-  type LLMRequest' Ollama = Ollama.ChatRequest
-  type LLMResponse' Ollama = Ollama.ChatResponses
-  type LLMTool' Ollama = Ollama.Tool
-  defaultRequest = Ollama.ChatRequest
-    { Ollama.crModel = "gemma3"
-    , Ollama.crMessages = []
-    , Ollama.crTools = Nothing
-    , Ollama.crFormat = Nothing
-    , Ollama.crOptions = Nothing
-    , Ollama.crStream = Just False
-    , Ollama.crKeepAlive = Just "5m"
-    }
-  newTool (Proxy :: Proxy a) =
-    Ollama.Tool
-      { Ollama.toolType = "function",
-        Ollama.toolFunction =
-          Ollama.ToolFunctionDefinition
-            { Ollama.tfdDescription = Just (T.pack $ getFunctionDescription @a),
-              Ollama.tfdName = T.pack $ getFunctionName @a,
-              Ollama.tfdParameters = toAeson (schema @a)
-            }
-      }
-  toTools req =
-    case Ollama.crTools req of
-      Nothing -> []
-      Just v -> v
-  fromTools req [] = req {Ollama.crTools = Nothing}
-  fromTools req tools = req {Ollama.crTools = Just tools}
-  fromModel_ model =
-    (defaultRequest @Ollama :: LLMRequest' Ollama) 
-      { Ollama.crModel = model
-      }
     
 data LLMProxy api =
   LLMProxy
@@ -780,8 +630,7 @@ withLLMRequest
   -> a
 withLLMRequest req func =
   case req of
-    OpenAIRequest req' -> func (LLMProxy @OpenAI OpenAIRequest OpenAIResponse)  req'
-    OllamaRequest req' -> func (LLMProxy @Ollama OllamaRequest OllamaResponse)  req'
+    LouterRequest req' -> func (LLMProxy @OpenAI LouterRequest LouterResponse) req'
 
 updateRequest :: LLMRequest -> Contents -> LLMRequest
 updateRequest = toRequest
@@ -796,23 +645,18 @@ addTools (tool : tools') req' =
       withLLMRequest req' $ \(p :: LLMProxy api) req -> addTools tools' ((toRequest' @api p) $ toolAdd @api @a req)
       
 fromModel :: Text -> LLMRequest
-fromModel = OpenAIRequest . fromModel_ @OpenAI
+fromModel = LouterRequest . fromModel_ @OpenAI
 
 runRequest :: forall a. (ChatCompletion a) => Text -> LLMRequest -> a -> IO ((a, FinishReason), LLMResponse)
-runRequest sessionName (OpenAIRequest defaultReq) request = do
+runRequest sessionName (LouterRequest defaultReq) request = do
   config <- readConfig
-  let api_key = OpenAI.clientAuth config.apiKey
-  url <- case parseBaseUrl (T.unpack config.endpoint) of
-           Just url' -> pure url'
-           Nothing -> error $ T.unpack $ "Can not parse the endpoint: " <> config.endpoint
-  manager <-
-    newManager
-      ( tlsManagerSettings
-          { managerResponseTimeout = responseTimeoutMicro (120 * 1000 * 1000)
-          }
-      )
-  let OpenAI.OpenAIBackend {..} = OpenAI.createOpenAIClient
-      (OpenAIRequest req) = (toRequest (OpenAIRequest defaultReq) request)
+  let backend = Louter.BackendOpenAI
+        { Louter.backendApiKey = config.apiKey
+        , Louter.backendBaseUrl = Just config.endpoint
+        , Louter.backendRequiresAuth = True
+        }
+  client <- Louter.newClient backend
+  let (LouterRequest req) = (toRequest (LouterRequest defaultReq) request)
 
   lookupEnv "OPENAI_DEBUG" >>= \case
     Just "1" -> do
@@ -820,35 +664,8 @@ runRequest sessionName (OpenAIRequest defaultReq) request = do
         BS.putStr $ BS.toStrict $ encodePretty req
         T.putStrLn ""
     _ -> return ()
-  res <- OpenAI.callOpenAI (mkClientEnv manager url) $ createChatCompletion api_key req
-  return $ (fromResponse sessionName (OpenAIResponse res), OpenAIResponse res)
 
-runRequest sessionName (OllamaRequest defaultReq) request = do
-  config <- readConfig
-  url <- case parseBaseUrl (T.unpack config.endpoint) of
-           Just url' -> pure url'
-           Nothing -> error $ T.unpack $ "Can not parse the endpoint: " <> config.endpoint
-  manager <-
-    newManager
-      ( defaultManagerSettings
-          { managerResponseTimeout = responseTimeoutMicro (120 * 1000 * 1000)
-          }
-      )
-  let Ollama.OllamaBackend {..} = Ollama.createOllamaClient
-      (OllamaRequest req) = (toRequest (OllamaRequest defaultReq) request)
-
-  lookupEnv "OPENAI_DEBUG" >>= \case
-    Just "1" -> do
-      liftIO $ do
-        BS.putStr $ BS.toStrict $ encodePretty req
-        T.putStrLn ""
-    _ -> return ()
-  (res :: [Ollama.ChatResponse]) <- Ollama.callOllama (mkClientEnv manager url) $ do
-    (r0 :: Servant.SourceT IO Ollama.ChatResponse) <- chatClient (Ollama.clientAuth "") (req {Ollama.crStream = Just False})
-    liftIO $ do
-      runExceptT (Servant.runSourceT r0) >>= \case
-        Left err -> do
-          fail err
-        Right v -> return v
-    
-  return $ (fromResponse sessionName (OllamaResponse res), OllamaResponse res)
+  result <- Louter.chatCompletion client req
+  case result of
+    Left err -> error $ T.unpack $ "Louter error: " <> err
+    Right res -> return $ (fromResponse sessionName (LouterResponse res), LouterResponse res)

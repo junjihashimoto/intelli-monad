@@ -18,7 +18,6 @@ import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
 import IntelliMonad.Config
-import OpenAI.Types
 
 data ValidateNumber = ValidateNumber
   { number :: Double

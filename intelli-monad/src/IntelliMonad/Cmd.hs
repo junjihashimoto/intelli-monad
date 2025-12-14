@@ -80,8 +80,7 @@ runCmd cmd = do
   let tools = defaultTools
       customs = []
       sessionName = "default"
---      defaultReq = OpenAIRequest (defaultRequest @OpenAI)
-      defaultReq = OllamaRequest (defaultRequest @Ollama)
+      defaultReq = LouterRequest (defaultRequest @OpenAI)
   runInputT
     ( Settings
         { complete = completeFilename,
