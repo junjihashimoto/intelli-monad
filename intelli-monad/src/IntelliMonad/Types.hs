@@ -59,7 +59,8 @@ import GHC.Generics
 import qualified Louter.Client as Louter
 import qualified Louter.Types.Request as Louter
 import qualified Louter.Types.Response as Louter
-import IntelliMonad.Config
+import IntelliMonad.Config (readConfig)
+import qualified IntelliMonad.Config as Config
 import qualified Data.ByteString as BS
 import qualified Data.Text.IO as T
 import System.Environment (lookupEnv)
@@ -604,14 +605,23 @@ instance ChatCompletion Contents where
   fromResponse sessionName (LouterResponse response) =
     let choice = head (Louter.respChoices response)
         message = Louter.choiceMessage choice
+        toolCalls = Louter.choiceToolCalls choice
         finishReason = case Louter.choiceFinishReason choice of
           Just Louter.FinishStop -> Stop
           Just Louter.FinishLength -> Length
           Just Louter.FinishToolCalls -> ToolCalls
           Just Louter.FinishContentFilter -> ContentFilter
           Nothing -> Null
-        content = Content Assistant (Message message) sessionName defaultUTCTime
-     in ([content], finishReason)
+        -- If there are tool calls, convert them to Content
+        contents = if null toolCalls
+                   then [Content Assistant (Message message) sessionName defaultUTCTime]
+                   else map (\tc -> Content Assistant
+                                      (ToolCall (Louter.rtcId tc)
+                                                (Louter.functionName $ Louter.rtcFunction tc)
+                                                (Louter.functionArguments $ Louter.rtcFunction tc))
+                                      sessionName
+                                      defaultUTCTime) toolCalls
+     in (contents, finishReason)
 
     
 data LLMProxy api =
@@ -650,12 +660,30 @@ fromModel = LouterRequest . fromModel_ @OpenAI
 runRequest :: forall a. (ChatCompletion a) => Text -> LLMRequest -> a -> IO ((a, FinishReason), LLMResponse)
 runRequest sessionName (LouterRequest defaultReq) request = do
   config <- readConfig
-  let backend = Louter.BackendOpenAI
-        { Louter.backendApiKey = config.apiKey
-        , Louter.backendBaseUrl = Just config.endpoint
-        , Louter.backendRequiresAuth = True
-        }
-  client <- Louter.newClient backend
+
+  -- Determine backend type (default to OpenAI if not specified)
+  let backendType = case Config.backend config of
+        Just bt -> bt
+        Nothing -> Config.OpenAI
+
+  let louterBackend = case backendType of
+        Config.OpenAI -> Louter.BackendOpenAI
+          { Louter.backendApiKey = Config.apiKey config
+          , Louter.backendBaseUrl = Just (Config.endpoint config)
+          , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
+          }
+        Config.Anthropic -> Louter.BackendAnthropic
+          { Louter.backendApiKey = Config.apiKey config
+          , Louter.backendBaseUrl = Just (Config.endpoint config)
+          , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
+          }
+        Config.Gemini -> Louter.BackendGemini
+          { Louter.backendApiKey = Config.apiKey config
+          , Louter.backendBaseUrl = Just (Config.endpoint config)
+          , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
+          }
+
+  client <- Louter.newClient louterBackend
   let (LouterRequest req) = (toRequest (LouterRequest defaultReq) request)
 
   lookupEnv "OPENAI_DEBUG" >>= \case

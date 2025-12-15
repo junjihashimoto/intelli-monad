@@ -75,7 +75,7 @@ library
                     , http-client-tls >= 0.3.6 && < 0.4
                     , http-conduit >= 2.2 && < 2.4
                     , megaparsec >= 9.5 && < 9.7
-                    , louter
+                    , louter >= 0.1.1 && < 0.1.2
                     , openai-servant-gen >= 0.1.0 && < 0.2
                     , servant >= 0.20.1 && < 0.22
                     , servant-client >= 0.20 && < 0.21
