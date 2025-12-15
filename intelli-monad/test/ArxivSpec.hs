@@ -35,7 +35,7 @@ spec = do
               }
 
         -- Run toolExec in the Prompt monad using runPrompt like calc.hs does
-        result <- runPrompt @StatelessConf [] [] "test-session" (LouterRequest $ defaultRequest @OpenAI) $ do
+        result <- runPrompt @StatelessConf [] [] "test-session" (defaultRequest) $ do
           toolExec @Arxiv @StatelessConf arxivQuery
 
         -- Verify results
@@ -59,7 +59,7 @@ spec = do
               }
 
         -- Run toolExec using runPrompt
-        result <- runPrompt @StatelessConf [] [] "test-session" (LouterRequest $ defaultRequest @OpenAI) $ do
+        result <- runPrompt @StatelessConf [] [] "test-session" (defaultRequest) $ do
           toolExec @Arxiv @StatelessConf arxivQuery
 
         length (papers result) `shouldSatisfy` (> 0)

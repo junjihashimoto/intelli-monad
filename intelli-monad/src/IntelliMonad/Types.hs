@@ -180,51 +180,9 @@ class JSONSchema r where
   default schema :: (HasFunctionObject r, Generic r, GSchema r (Rep r)) => Schema
   schema = gschema @r (from (undefined :: r))
 
-data OpenAI
-
-data LLMProtocol
-  = OpenAI
-
-data LLMRequest
-  = LouterRequest Louter.ChatRequest
-  deriving (Show, Eq, Generic)
-
-data LLMResponse
-  = LouterResponse Louter.ChatResponse
-  deriving (Show, Eq, Generic)
-
-data LLMTool
-  = LouterTool Louter.Tool
-  deriving (Show, Eq, Generic)
-
-instance ToJSON LLMRequest
-instance FromJSON LLMRequest
-instance ToJSON LLMResponse
-instance FromJSON LLMResponse
-
--- Manual Ord instances (Louter types don't have Ord)
-instance Ord LLMRequest where
-  compare _ _ = EQ  -- Simplified: treat all requests as equal for ordering
-
-instance Ord LLMResponse where
-  compare _ _ = EQ  -- Simplified: treat all responses as equal for ordering
-
-instance Ord LLMTool where
-  compare _ _ = EQ  -- Simplified: treat all tools as equal for ordering
-
-class LLMApi api where
-  type LLMRequest' api
-  type LLMResponse' api
-  type LLMTool' api
-  defaultRequest :: LLMRequest' api
-  newTool :: forall a. (HasFunctionObject a, JSONSchema a) => Proxy a -> LLMTool' api
-  toTools :: LLMRequest' api -> [LLMTool' api]
-  fromTools :: LLMRequest' api -> [LLMTool' api] -> LLMRequest' api
-  fromModel_ :: Text -> LLMRequest' api
-
 class ChatCompletion b where
-  toRequest :: LLMRequest -> b -> LLMRequest
-  fromResponse :: Text -> LLMResponse -> (b, FinishReason)
+  toRequest :: Louter.ChatRequest -> b -> Louter.ChatRequest
+  fromResponse :: Text -> Louter.ChatResponse -> (b, FinishReason)
 
 toPV :: (ToJSON a) => a -> PersistValue
 toPV = toPersistValue . toStrict . encode
@@ -264,20 +222,6 @@ instance PersistField Message where
 instance PersistFieldSql Message where
   sqlType _ = sqlType (Proxy @ByteString)
 
-instance PersistField LLMRequest where
-  toPersistValue = toPV
-  fromPersistValue = fromPV
-
-instance PersistField LLMResponse where
-  toPersistValue = toPV
-  fromPersistValue = fromPV
-
-instance PersistFieldSql LLMRequest where
-  sqlType _ = sqlType (Proxy @ByteString)
-
-instance PersistFieldSql LLMResponse where
-  sqlType _ = sqlType (Proxy @ByteString)
-
 
 
 share
@@ -295,8 +239,8 @@ Content
     deriving FromJSON
     deriving Generic
 Context
-    request LLMRequest
-    response LLMResponse Maybe
+    request Louter.ChatRequest
+    response Louter.ChatResponse Maybe
     header [Content]
     body [Content]
     footer [Content]
@@ -305,7 +249,6 @@ Context
     created UTCTime default=CURRENT_TIME
     deriving Show
     deriving Eq
-    deriving Ord
 KeyValue
     namespace Text
     key Text
@@ -315,6 +258,15 @@ KeyValue
     deriving Eq
     deriving Ord
 |]
+
+-- Manual Ord instance for Context
+-- We compare only the fields that have Ord, ignoring request and response
+instance Ord Context where
+  compare c1 c2 =
+    compare (contextHeader c1, contextBody c1, contextFooter c1,
+             contextTotalTokens c1, contextSessionName c1, contextCreated c1)
+            (contextHeader c2, contextBody c2, contextFooter c2,
+             contextTotalTokens c2, contextSessionName c2, contextCreated c2)
 
 data ToolProxy = forall t. (Tool t, A.FromJSON t, A.ToJSON t, A.FromJSON (Output t), A.ToJSON (Output t), HasFunctionObject t, JSONSchema t) => ToolProxy (Proxy t)
 
@@ -622,13 +574,13 @@ instance (HasFunctionObject s, GSchema s f, Selector c) => GSchema s (M1 S c f) 
         desc = getFieldDescription @s name
      in Object' [(name, desc, (gschema @s @f undefined))]
 
-toolAdd :: forall api a. (LLMApi api, Tool a, HasFunctionObject a, JSONSchema a) => LLMRequest' api -> LLMRequest' api
+toolAdd :: forall a. (Tool a, HasFunctionObject a, JSONSchema a) => Louter.ChatRequest -> Louter.ChatRequest
 toolAdd req =
-  let prevTools = case toTools @api req of
+  let prevTools = case toTools req of
         [] -> []
         v -> v
-      newTools = prevTools ++ [newTool @api @a Proxy]
-   in fromTools @api req newTools
+      newTools = prevTools ++ [newTool @a Proxy]
+   in fromTools req newTools
 
 defaultUTCTime :: UTCTime
 defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
@@ -696,32 +648,37 @@ class PersistentBackend p where
   deleteKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m ()
 
 
-instance LLMApi OpenAI where
-  type LLMRequest' OpenAI = Louter.ChatRequest
-  type LLMResponse' OpenAI = Louter.ChatResponse
-  type LLMTool' OpenAI = Louter.Tool
-  defaultRequest =
-    Louter.ChatRequest
-      { Louter.reqModel = "gpt-4"
-      , Louter.reqMessages = []
-      , Louter.reqTools = []
-      , Louter.reqToolChoice = Louter.ToolChoiceAuto
-      , Louter.reqTemperature = Nothing
-      , Louter.reqMaxTokens = Nothing
-      , Louter.reqStream = False
-      }
-  newTool (Proxy :: Proxy a) =
-    Louter.Tool
-      { Louter.toolName = T.pack $ getFunctionName @a
-      , Louter.toolDescription = Just (T.pack $ getFunctionDescription @a)
-      , Louter.toolParameters = toAeson (schema @a)
-      }
-  toTools req = Louter.reqTools req
-  fromTools req tools = req { Louter.reqTools = tools }
-  fromModel_ model =
-    (defaultRequest @OpenAI :: LLMRequest' OpenAI)
-      { Louter.reqModel = model
-      }
+defaultRequest :: Louter.ChatRequest
+defaultRequest =
+  Louter.ChatRequest
+    { Louter.reqModel = "gpt-4"
+    , Louter.reqMessages = []
+    , Louter.reqTools = []
+    , Louter.reqToolChoice = Louter.ToolChoiceAuto
+    , Louter.reqTemperature = Nothing
+    , Louter.reqMaxTokens = Nothing
+    , Louter.reqStream = False
+    }
+
+newTool :: forall a. (HasFunctionObject a, JSONSchema a) => Proxy a -> Louter.Tool
+newTool (Proxy :: Proxy a) =
+  Louter.Tool
+    { Louter.toolName = T.pack $ getFunctionName @a
+    , Louter.toolDescription = Just (T.pack $ getFunctionDescription @a)
+    , Louter.toolParameters = toAeson (schema @a)
+    }
+
+toTools :: Louter.ChatRequest -> [Louter.Tool]
+toTools req = Louter.reqTools req
+
+fromTools :: Louter.ChatRequest -> [Louter.Tool] -> Louter.ChatRequest
+fromTools req tools = req { Louter.reqTools = tools }
+
+fromModel_ :: Text -> Louter.ChatRequest
+fromModel_ model =
+  (defaultRequest :: Louter.ChatRequest)
+    { Louter.reqModel = model
+    }
 
 -- | Read the JSON object and convert it to a Map
 toMap :: Text -> Map Text Value
@@ -735,7 +692,7 @@ fromMap :: Map Text Value -> Text
 fromMap txt = TL.toStrict $ A.encodeToLazyText txt
 
 instance ChatCompletion Contents where
-  toRequest (LouterRequest orgRequest) contents =
+  toRequest orgRequest contents =
     let messages = flip map contents $ \case
           Content user (Message message) _ _ ->
             Louter.Message
@@ -766,9 +723,9 @@ instance ChatCompletion Contents where
               { Louter.msgRole = Louter.RoleTool
               , Louter.msgContent = [Louter.TextPart ret']
               }
-     in LouterRequest $ orgRequest { Louter.reqMessages = messages }
+     in orgRequest { Louter.reqMessages = messages }
 
-  fromResponse sessionName (LouterResponse response) =
+  fromResponse sessionName response =
     let choice = head (Louter.respChoices response)
         message = Louter.choiceMessage choice
         toolCalls = Louter.choiceToolCalls choice
@@ -790,41 +747,21 @@ instance ChatCompletion Contents where
      in (contents, finishReason)
 
     
-data LLMProxy api =
-  LLMProxy
-  { toRequest' :: LLMRequest' api -> LLMRequest
-  , toResponse' :: LLMResponse' api -> LLMResponse
-  }
-
-withLLMRequest
-  :: forall a. LLMRequest
-  -> (forall (api :: Type)
-      . (LLMApi api)
-      => LLMProxy api
-      -> LLMRequest' api
-      -> a)
-  -> a
-withLLMRequest req func =
-  case req of
-    LouterRequest req' -> func (LLMProxy @OpenAI LouterRequest LouterResponse) req'
-
-updateRequest :: LLMRequest -> Contents -> LLMRequest
+updateRequest :: Louter.ChatRequest -> Contents -> Louter.ChatRequest
 updateRequest = toRequest
 
---  withLLMRequest req' $ \(p :: LLMProxy api) req -> (toRequest' @api p) (toRequest req cs)
-
-addTools :: [ToolProxy] -> LLMRequest -> LLMRequest
+addTools :: [ToolProxy] -> Louter.ChatRequest -> Louter.ChatRequest
 addTools [] req' = req'
 addTools (tool : tools') req' =
   case tool of
     (ToolProxy (_ :: Proxy a)) ->
-      withLLMRequest req' $ \(p :: LLMProxy api) req -> addTools tools' ((toRequest' @api p) $ toolAdd @api @a req)
-      
-fromModel :: Text -> LLMRequest
-fromModel = LouterRequest . fromModel_ @OpenAI
+      addTools tools' (toolAdd @a req')
 
-runRequest :: forall a. (ChatCompletion a) => Text -> LLMRequest -> a -> IO ((a, FinishReason), LLMResponse)
-runRequest sessionName (LouterRequest defaultReq) request = do
+fromModel :: Text -> Louter.ChatRequest
+fromModel = fromModel_
+
+runRequest :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> a -> IO ((a, FinishReason), Louter.ChatResponse)
+runRequest sessionName defaultReq request = do
   config <- readConfig
 
   -- Determine backend type (default to OpenAI if not specified)
@@ -850,7 +787,7 @@ runRequest sessionName (LouterRequest defaultReq) request = do
           }
 
   client <- Louter.newClient louterBackend
-  let (LouterRequest req) = (toRequest (LouterRequest defaultReq) request)
+  let req = toRequest defaultReq request
 
   lookupEnv "OPENAI_DEBUG" >>= \case
     Just "1" -> do
@@ -862,4 +799,4 @@ runRequest sessionName (LouterRequest defaultReq) request = do
   result <- Louter.chatCompletion client req
   case result of
     Left err -> error $ T.unpack $ "Louter error: " <> err
-    Right res -> return $ (fromResponse sessionName (LouterResponse res), LouterResponse res)
+    Right res -> return $ (fromResponse sessionName res, res)

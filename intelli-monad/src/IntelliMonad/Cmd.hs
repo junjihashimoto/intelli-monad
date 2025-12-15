@@ -79,7 +79,7 @@ runCmd cmd = do
   let tools = defaultTools
       customs = []
       sessionName = "default"
-      defaultReq = LouterRequest (defaultRequest @OpenAI)
+      defaultReq = defaultRequest
   runInputT
     ( Settings
         { complete = completeFilename,

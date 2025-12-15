@@ -37,6 +37,8 @@ import IntelliMonad.CustomInstructions
 import IntelliMonad.Persist
 import IntelliMonad.Tools
 import IntelliMonad.Types
+import qualified Louter.Types.Request as Louter
+import qualified Louter.Types.Response as Louter
 import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import System.Environment (getEnv, lookupEnv)
@@ -205,7 +207,7 @@ runPromptWithValidation ::
   [ToolProxy] ->
   [CustomInstructionProxy] ->
   Text ->
-  LLMRequest ->
+  Louter.ChatRequest ->
   Text ->
   m (Maybe validation)
 runPromptWithValidation tools customs sessionName req input = do
@@ -256,7 +258,7 @@ generate userContext input = do
     push @p contents
     call @p >>= callWithValidation @output @StatelessConf
 
-initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest -> m PromptEnv
+initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> Louter.ChatRequest -> m PromptEnv
 initializePrompt tools customs sessionName req = do
 --  config <- readConfig
   let settings = addTools tools req
@@ -294,7 +296,7 @@ initializePrompt tools customs sessionName req = do
         initialize @p conn (init'.context)
         return init'
 
-runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> LLMRequest -> Prompt m a -> m a
+runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> Louter.ChatRequest -> Prompt m a -> m a
 runPrompt tools customs sessionName req func = do
   context <- initializePrompt @p tools customs sessionName req
   fst <$> runStateT func context
