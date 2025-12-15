@@ -18,6 +18,7 @@ import GHC.Generics
 import IntelliMonad.Types
 import Test.Hspec
 import qualified Data.ByteString.Lazy as BL
+import qualified ArxivSpec
 
 -- Test types for enum (all nullary constructors)
 data Color = Red | Green | Blue
@@ -81,6 +82,9 @@ prettyJSON = T.unpack . TE.decodeUtf8 . BL.toStrict . encode
 
 main :: IO ()
 main = hspec $ do
+  -- Run Arxiv tool tests
+  ArxivSpec.spec
+
   describe "JSON Schema Generation for Sum Types" $ do
 
     describe "Enum type (all nullary constructors)" $ do
