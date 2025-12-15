@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               intelli-monad
-version:            0.1.0.2
+version:            0.1.1.0
 synopsis:           Type level prompt with LLMs via louter.
 description:        Type level prompt with LLMs via louter. This allows us to define function calls and value validation using types.
 homepage:           https://github.com/junjihashimoto/intelli-monad
