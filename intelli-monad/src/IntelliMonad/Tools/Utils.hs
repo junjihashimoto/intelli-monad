@@ -30,7 +30,6 @@ import Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import Data.Time
 import IntelliMonad.Types
-import qualified OpenAI.Types as API
 
 toolExec' ::
   forall t p m.

@@ -39,9 +39,6 @@ import IntelliMonad.Tools
 import IntelliMonad.Types
 import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
-import qualified OpenAI.API as API
-import qualified OpenAI.Types as API
-import Servant.Client (mkClientEnv, parseBaseUrl)
 import System.Environment (getEnv, lookupEnv)
 
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context

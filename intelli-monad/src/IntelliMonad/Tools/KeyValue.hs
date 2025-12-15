@@ -31,7 +31,6 @@ import GHC.IO.Exception
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
 import IntelliMonad.Types
-import qualified OpenAI.Types as API
 import System.Process
 import Data.Proxy
 

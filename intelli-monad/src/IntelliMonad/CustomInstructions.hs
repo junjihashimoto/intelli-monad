@@ -24,7 +24,6 @@ import qualified Data.Aeson as A
 import Data.Proxy
 import GHC.Generics
 import IntelliMonad.Types
-import qualified OpenAI.Types as API
 
 defaultCustomInstructions :: [CustomInstructionProxy]
 defaultCustomInstructions = []

@@ -33,7 +33,6 @@ import GHC.IO.Exception
 import IntelliMonad.Persist
 import IntelliMonad.Prompt hiding (user, system, assistant)
 import IntelliMonad.Types
-import qualified OpenAI.Types as API
 import System.Console.Haskeline
 import System.Environment (lookupEnv)
 import System.IO (hClose)

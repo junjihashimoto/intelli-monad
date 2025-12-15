@@ -40,8 +40,6 @@ library
                     , IntelliMonad.Tools
                     , IntelliMonad.Tools.Arxiv
                     , IntelliMonad.Tools.Bash
-                    , IntelliMonad.Tools.TextToSpeech
-                    , IntelliMonad.Tools.DallE3
                     , IntelliMonad.Tools.Utils
                     , IntelliMonad.Tools.KeyValue
                     , IntelliMonad.Persist
@@ -76,9 +74,6 @@ library
                     , http-conduit >= 2.2 && < 2.4
                     , megaparsec >= 9.5 && < 9.7
                     , louter >= 0.1.1 && < 0.1.2
-                    , openai-servant-gen >= 0.1.0 && < 0.2
-                    , servant >= 0.20.1 && < 0.22
-                    , servant-client >= 0.20 && < 0.21
                     , persistent >= 2.14.6 && < 2.15
                     , persistent-sqlite >= 2.13.3 && < 2.14
                     , sixel >= 0.1.2 && < 0.2
@@ -88,8 +83,6 @@ library
                     , yaml >= 0.11 && < 0.12
                     , wai >=3.2 && <4.0
                     , warp >=3.3 && <4.0
-                    , servant-server >= 0.20 && < 0.21
-                    , servant-client-core >= 0.20 && < 0.21
                     , mtl >=2.2 && <3.0
                     , exceptions >=0.10 && <1.0
                     , wai-extra >=3.1 && <3.2

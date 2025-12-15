@@ -35,7 +35,6 @@ import IntelliMonad.Prompt
 import IntelliMonad.Repl
 import IntelliMonad.Tools
 import IntelliMonad.Types
-import qualified OpenAI.Types as API
 import Options.Applicative
 import System.Console.Haskeline
 import System.Environment (lookupEnv)

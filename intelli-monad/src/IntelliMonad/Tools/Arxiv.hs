@@ -62,7 +62,6 @@ import IntelliMonad.Types
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import Network.HTTP.Simple (setRequestQueryString)
-import qualified OpenAI.Types as API
 import Text.XML
 import Text.XML.Cursor (Axis, Cursor, attributeIs, checkName, content, element, fromDocument, ($//), (&/), (&//))
 
