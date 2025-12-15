@@ -40,7 +40,9 @@ import Data.Map (Map)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as A
 import qualified Data.Aeson.KeyMap as A
+import qualified Data.Aeson.KeyMap as HM
 import qualified Data.Aeson.Text as A
+import Data.List (nub)
 import Data.ByteString (ByteString, fromStrict, toStrict)
 import Data.Coerce
 import Data.Kind (Type)
@@ -148,6 +150,13 @@ class HasFunctionObject r where
   getFunctionDescription :: String
   getFieldDescription :: String -> String
 
+-- | Constructor schema for sum types
+data ConstructorSchema = ConstructorSchema
+  { csName :: Text           -- ^ Constructor name
+  , csPayload :: Schema      -- ^ Payload schema
+  , csIsNullary :: Bool      -- ^ True for zero-field constructors
+  } deriving (Show, Eq)
+
 data Schema
   = Maybe' Schema
   | String'
@@ -157,6 +166,11 @@ data Schema
   | Array' Schema
   | Boolean'
   | Null'
+  -- Sum type schemas
+  | Enum' [Text]                       -- ^ String enum for nullary constructors
+  | OneOfUntagged [ConstructorSchema]  -- ^ Untagged union (distinguishable shapes)
+  | OneOfTagged [ConstructorSchema]    -- ^ Tagged union with @tag/@value
+  deriving (Show, Eq)
 
 class GSchema s f where
   gschema :: forall a. f a -> Schema
@@ -390,6 +404,77 @@ toAeson = \case
       ]
   Boolean' -> A.Object [("type", "boolean")]
   Null' -> A.Object [("type", "null")]
+  -- Sum type schemas
+  Enum' constructors ->
+    A.Object
+      [ ("type", "string"),
+        ("enum", A.Array $ V.fromList $ map A.String constructors)
+      ]
+  OneOfUntagged constructors ->
+    A.Object
+      [ ("oneOf", A.Array $ V.fromList $ map constructorToUntaggedSchema constructors)
+      ]
+  OneOfTagged constructors ->
+    A.Object
+      [ ("oneOf", A.Array $ V.fromList $ map constructorToTaggedSchema constructors)
+      ]
+
+-- | Convert a constructor schema to an untagged JSON schema
+constructorToUntaggedSchema :: ConstructorSchema -> A.Value
+constructorToUntaggedSchema (ConstructorSchema name payload _) =
+  -- For untagged, just emit the payload schema
+  -- The constructor name is used for documentation but not in the schema itself
+  toAeson payload
+
+-- | Convert a constructor schema to a tagged JSON schema with @tag/@value
+constructorToTaggedSchema :: ConstructorSchema -> A.Value
+constructorToTaggedSchema (ConstructorSchema name payload isNullary) =
+  if isNullary
+    then
+      -- Nullary constructor: {"@tag": "ConstructorName"}
+      A.Object
+        [ ("type", "object"),
+          ("properties", A.Object
+            [ ("@tag", A.Object [("type", "string"), ("const", A.String name)])
+            ]),
+          ("required", A.Array $ V.fromList [A.String "@tag"]),
+          ("additionalProperties", A.Bool False)
+        ]
+    else
+      case payload of
+        Object' _ ->
+          -- Object payload: flat tagged format {"@tag": "Ctor", "field1": ..., "field2": ...}
+          case toAeson payload of
+            A.Object payloadObj ->
+              let tagProp = ("@tag", A.Object [("type", "string"), ("const", A.String name)])
+                  -- Extract properties from payload
+                  props = case HM.lookup "properties" payloadObj of
+                    Just (A.Object p) -> p
+                    _ -> HM.empty
+                  -- Extract required fields
+                  req = case HM.lookup "required" payloadObj of
+                    Just (A.Array r) -> V.toList r
+                    _ -> []
+                  -- Merge @tag with payload properties
+                  allProps = HM.insert "@tag" (A.Object [("type", "string"), ("const", A.String name)]) props
+                  allRequired = A.String "@tag" : req
+              in A.Object
+                  [ ("type", "object"),
+                    ("properties", A.Object allProps),
+                    ("required", A.Array $ V.fromList allRequired)
+                  ]
+            _ -> A.Null  -- Shouldn't happen
+        _ ->
+          -- Non-object payload: nested format {"@tag": "Ctor", "@value": ...}
+          A.Object
+            [ ("type", "object"),
+              ("properties", A.Object
+                [ ("@tag", A.Object [("type", "string"), ("const", A.String name)]),
+                  ("@value", toAeson payload)
+                ]),
+              ("required", A.Array $ V.fromList [A.String "@tag", A.String "@value"]),
+              ("additionalProperties", A.Bool False)
+            ]
 
 instance Semigroup Schema where
   (<>) (Object' a) (Object' b) = Object' (a <> b)
@@ -428,7 +513,66 @@ instance (JSONSchema a) => JSONSchema [a] where
 instance JSONSchema () where
   schema = Null'
 
-instance (HasFunctionObject s, JSONSchema c) => GSchema s U1 where
+-- | Helper functions for sum type schema generation
+
+-- | Internal wrapper to track constructor schemas during generic traversal
+-- This allows us to distinguish between a single constructor and a sum type
+data SchemaOrConstructors
+  = SingleSchema Schema  -- ^ Not a sum type, just a regular schema
+  | Constructors [ConstructorSchema]  -- ^ Sum type with multiple constructors
+  deriving (Show, Eq)
+
+-- | Extract constructors from a schema, wrapping non-sum schemas as single-constructor lists
+extractConstructors :: Schema -> [ConstructorSchema]
+extractConstructors (Enum' names) = map (\n -> ConstructorSchema n Null' True) names
+extractConstructors (OneOfUntagged cs) = cs
+extractConstructors (OneOfTagged cs) = cs
+extractConstructors other = [ConstructorSchema "" other (isNullarySchema other)]
+
+-- | Normalize constructor name (e.g., "Red" -> "red")
+normalizeConstructorName :: Text -> Text
+normalizeConstructorName = T.toLower
+
+-- | Check if a schema represents a nullary constructor
+isNullarySchema :: Schema -> Bool
+isNullarySchema Null' = True
+isNullarySchema _ = False
+
+-- | Check if all constructors are nullary (enum pattern)
+isEnum :: [ConstructorSchema] -> Bool
+isEnum = all csIsNullary
+
+-- | Extract schema shape for distinguishability check
+-- Two schemas are distinguishable if they have different shapes
+schemaShape :: Schema -> Text
+schemaShape String' = "string"
+schemaShape Number' = "number"
+schemaShape Integer' = "integer"
+schemaShape Boolean' = "boolean"
+schemaShape Null' = "null"
+schemaShape (Array' _) = "array"
+schemaShape (Object' fields) = "object:" <> T.intercalate "," (map (\(n,_,_) -> T.pack n) fields)
+schemaShape (Maybe' s) = "maybe:" <> schemaShape s
+schemaShape (Enum' _) = "enum"
+schemaShape (OneOfUntagged _) = "oneof-untagged"
+schemaShape (OneOfTagged _) = "oneof-tagged"
+
+-- | Check if constructor shapes are mutually exclusive (distinguishable)
+areShapesDistinguishable :: [ConstructorSchema] -> Bool
+areShapesDistinguishable constructors =
+  let shapes = map (schemaShape . csPayload) constructors
+      uniqueShapes = nub shapes
+  in length shapes == length uniqueShapes
+
+-- | Choose appropriate sum type encoding based on constructor analysis
+chooseSumEncoding :: [ConstructorSchema] -> Schema
+chooseSumEncoding constructors
+  | null constructors = Null'  -- Shouldn't happen, but handle gracefully
+  | isEnum constructors = Enum' (map csName constructors)
+  | areShapesDistinguishable constructors = OneOfUntagged constructors
+  | otherwise = OneOfTagged constructors
+
+instance (HasFunctionObject s) => GSchema s U1 where
   gschema _ = Null'
 
 instance (HasFunctionObject s, JSONSchema c) => GSchema s (K1 i c) where
@@ -437,17 +581,39 @@ instance (HasFunctionObject s, JSONSchema c) => GSchema s (K1 i c) where
 instance (HasFunctionObject s, GSchema s a, GSchema s b) => GSchema s (a :*: b) where
   gschema _ = gschema @s @a undefined <> gschema @s @b undefined
 
+-- | Sum type instance - collects all constructors from both branches
 instance (HasFunctionObject s, GSchema s a, GSchema s b) => GSchema s (a :+: b) where
-  gschema _ = gschema @s @a undefined
-  gschema _ = gschema @s @b undefined
+  gschema _ =
+    let leftSchema = gschema @s @a undefined
+        rightSchema = gschema @s @b undefined
+        leftConstructors = extractConstructors leftSchema
+        rightConstructors = extractConstructors rightSchema
+        allConstructors = leftConstructors ++ rightConstructors
+    in chooseSumEncoding allConstructors
 
--- | Datatype
+-- | Datatype - unwraps single-constructor types to their payload
 instance (HasFunctionObject s, GSchema s f) => GSchema s (M1 D c f) where
-  gschema _ = gschema @s @f undefined
+  gschema _ =
+    let innerSchema = gschema @s @f undefined
+    in case innerSchema of
+         -- Single constructor case: unwrap to just the payload
+         Enum' [_] -> Null'  -- Single nullary constructor is just Null
+         OneOfUntagged [ConstructorSchema _ payload _] -> payload
+         -- Multiple constructors: keep as-is
+         _ -> innerSchema
 
--- | Constructor Metadata
+-- | Constructor Metadata - captures constructor name and wraps payload
 instance (HasFunctionObject s, GSchema s f, Constructor c) => GSchema s (M1 C c f) where
-  gschema _ = gschema @s @f undefined
+  gschema proxy =
+    let name = T.pack $ conName (undefined :: M1 C c f p)
+        normalizedName = normalizeConstructorName name
+        payload = gschema @s @f undefined
+        isNullary = isNullarySchema payload
+    -- Return a single-constructor "sum type" that will be collected by :+:
+    -- or used directly if there's only one constructor
+    in case payload of
+         Null' -> Enum' [normalizedName]  -- Nullary constructor
+         _ -> OneOfUntagged [ConstructorSchema normalizedName payload isNullary]
 
 -- | Selector Metadata
 instance (HasFunctionObject s, GSchema s f, Selector c) => GSchema s (M1 S c f) where
