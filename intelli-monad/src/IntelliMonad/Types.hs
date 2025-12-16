@@ -36,6 +36,7 @@ import qualified Codec.Picture as P
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
 import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, Value)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef')
 import Data.Map (Map)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Key as A
@@ -61,6 +62,7 @@ import GHC.Generics
 import qualified Louter.Client as Louter
 import qualified Louter.Types.Request as Louter
 import qualified Louter.Types.Response as Louter
+import qualified Louter.Types.Streaming as Louter
 import IntelliMonad.Config (readConfig)
 import qualified IntelliMonad.Config as Config
 import qualified Data.ByteString as BS
@@ -800,3 +802,83 @@ runRequest sessionName defaultReq request = do
   case result of
     Left err -> error $ T.unpack $ "Louter error: " <> err
     Right res -> return $ (fromResponse sessionName res, res)
+
+runRequestStreaming :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> a -> (Text -> IO ()) -> IO ((a, FinishReason), Louter.ChatResponse)
+runRequestStreaming sessionName defaultReq request contentCallback = do
+  config <- readConfig
+
+  -- Determine backend type (default to OpenAI if not specified)
+  let backendType = case Config.backend config of
+        Just bt -> bt
+        Nothing -> Config.OpenAI
+
+  let louterBackend = case backendType of
+        Config.OpenAI -> Louter.BackendOpenAI
+          { Louter.backendApiKey = Config.apiKey config
+          , Louter.backendBaseUrl = Just (Config.endpoint config)
+          , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
+          }
+        Config.Anthropic -> Louter.BackendAnthropic
+          { Louter.backendApiKey = Config.apiKey config
+          , Louter.backendBaseUrl = Just (Config.endpoint config)
+          , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
+          }
+        Config.Gemini -> Louter.BackendGemini
+          { Louter.backendApiKey = Config.apiKey config
+          , Louter.backendBaseUrl = Just (Config.endpoint config)
+          , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
+          }
+
+  client <- Louter.newClient louterBackend
+  let req = toRequest defaultReq request
+
+  lookupEnv "OPENAI_DEBUG" >>= \case
+    Just "1" -> do
+      liftIO $ do
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
+    _ -> return ()
+
+  -- Accumulate response while streaming
+  contentRef <- newIORef []
+  finishReasonRef <- newIORef "stop"
+
+  -- Stream with callback
+  Louter.streamChatWithCallback client req $ \event -> case event of
+    Louter.StreamContent txt -> do
+      contentCallback txt  -- Call user callback for incremental output
+      modifyIORef' contentRef (++ [txt])
+    Louter.StreamFinish reason -> do
+      writeIORef finishReasonRef reason
+    Louter.StreamError err -> do
+      error $ T.unpack $ "Louter streaming error: " <> err
+    _ -> pure ()  -- Ignore reasoning and tool calls for now
+
+  -- Build response from accumulated content
+  fullContent <- T.concat <$> readIORef contentRef
+  finishReasonText <- readIORef finishReasonRef
+
+  -- Convert text finish reason to FinishReason type
+  let finishReason = case finishReasonText of
+        "stop" -> Louter.FinishStop
+        "length" -> Louter.FinishLength
+        "tool_calls" -> Louter.FinishToolCalls
+        "content_filter" -> Louter.FinishContentFilter
+        _ -> Louter.FinishStop
+
+  -- Create a minimal ChatResponse for compatibility
+  let response = Louter.ChatResponse
+        { Louter.respId = "stream-1"
+        , Louter.respModel = Louter.reqModel req
+        , Louter.respChoices =
+            [ Louter.Choice
+                { Louter.choiceIndex = 0
+                , Louter.choiceMessage = fullContent
+                , Louter.choiceToolCalls = []
+                , Louter.choiceFinishReason = Just finishReason
+                }
+            ]
+        , Louter.respUsage = Nothing
+        }
+
+  return $ (fromResponse sessionName response, response)

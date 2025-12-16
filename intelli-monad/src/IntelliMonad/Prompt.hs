@@ -32,7 +32,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import Data.Time
-import IntelliMonad.Config
+import IntelliMonad.Config (readConfig)
+import qualified IntelliMonad.Config as Config
 import IntelliMonad.CustomInstructions
 import IntelliMonad.Persist
 import IntelliMonad.Tools
@@ -42,6 +43,7 @@ import qualified Louter.Types.Response as Louter
 import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import System.Environment (getEnv, lookupEnv)
+import qualified System.IO as IO
 
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = context <$> get
@@ -122,7 +124,22 @@ call = loop []
     loop ret = do
       callPreHook @p
       prev <- getContext
-      ((contents, finishReason), res) <- liftIO $ runRequest prev.contextSessionName prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
+      config <- liftIO readConfig
+
+      -- Check if streaming is enabled
+      let streaming = Config.getUseStreaming config
+
+      ((contents, finishReason), res) <- if streaming
+        then do
+          -- Use streaming with incremental output
+          liftIO $ runRequestStreaming prev.contextSessionName prev.contextRequest
+            (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
+            (\chunk -> T.putStr chunk >> IO.hFlush IO.stdout)  -- Stream to stdout
+        else do
+          -- Use non-streaming
+          liftIO $ runRequest prev.contextSessionName prev.contextRequest
+            (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
+
       let current_total_tokens = 0 -- fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
           next =
             prev

@@ -30,9 +30,16 @@ data Config = Config
   , endpoint :: Text
   , model :: Text
   , backend :: Maybe BackendType  -- Optional, defaults to openai
+  , useStreaming :: Maybe Bool     -- Optional, defaults to True
   } deriving (Show, Generic)
 
 instance FromJSON Config
+
+-- | Get whether to use streaming (defaults to True if not specified)
+getUseStreaming :: Config -> Bool
+getUseStreaming cfg = case useStreaming cfg of
+  Just val -> val
+  Nothing -> True  -- Default to streaming enabled
 
 readConfig :: IO Config
 readConfig = do
