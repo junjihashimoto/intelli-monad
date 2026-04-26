@@ -151,19 +151,20 @@ instance Tool Calculator where
 
 ```bash
 # Start REPL
+cd intelli-monad
 cabal run intelli-monad -- repl [session-name]
 
 # Commands:
-/help              Show help
-/clear             Clear conversation
-/show-contents     Show all messages
-/show-usage        Show token usage
-/show-request      Show current request config
-/edit              Edit conversation
-/list-sessions     List all sessions
-/switch-session    Switch to different session
-/delete-session    Delete a session
-/read-image        Read and analyze an image
+:help              Show help
+:clear             Clear conversation
+:show-contents     Show all messages
+:show-usage        Show token usage
+:show-request      Show current request config
+:edit              Edit conversation
+:list-sessions     List all sessions
+:switch-session    Switch to different session
+:delete-session    Delete a session
+:read-image        Read and analyze an image
 ```
 
 ## Project Structure
