@@ -793,17 +793,31 @@ runRequest sessionName defaultReq request = do
   client <- Louter.newClient louterBackend
   let req = toRequest defaultReq request
 
-  lookupEnv "OPENAI_DEBUG" >>= \case
-    Just "1" -> do
+  openai_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_DEBUG"
+  when openai_debug $ do
       liftIO $ do
+        T.putStrLn "========== Request ==========="
         BS.putStr $ BS.toStrict $ encodePretty req
         T.putStrLn ""
-    _ -> return ()
+
+  openai_http_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_HTTP_DEBUG"
+  when openai_http_debug $ do
+      liftIO $ do
+        T.putStrLn "========== Backend ==========="
+        print louterBackend
+        T.putStrLn "========== Request ==========="
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
 
   result <- Louter.chatCompletion client req
   case result of
     Left err -> error $ T.unpack $ "Louter error: " <> err
-    Right res -> return $ (fromResponse sessionName res, res)
+    Right res -> do
+      when openai_http_debug $ do
+        T.putStrLn "========== Response =========="
+        BS.putStr $ BS.toStrict $ encodePretty res
+        T.putStrLn ""
+      return $ (fromResponse sessionName res, res)
 
 runRequestStreaming :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> a -> (Text -> IO ()) -> IO ((a, FinishReason), Louter.ChatResponse)
 runRequestStreaming sessionName defaultReq request contentCallback = do
@@ -834,12 +848,21 @@ runRequestStreaming sessionName defaultReq request contentCallback = do
   client <- Louter.newClient louterBackend
   let req = toRequest defaultReq request
 
-  lookupEnv "OPENAI_DEBUG" >>= \case
-    Just "1" -> do
+  openai_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_DEBUG"
+  when openai_debug $ do
       liftIO $ do
+        T.putStrLn "========== Request ==========="
         BS.putStr $ BS.toStrict $ encodePretty req
         T.putStrLn ""
-    _ -> return ()
+
+  openai_http_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_HTTP_DEBUG"
+  when openai_http_debug $ do
+      liftIO $ do
+        T.putStrLn "========== Backend ==========="
+        print louterBackend
+        T.putStrLn "========== Request ==========="
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
 
   -- Accumulate response while streaming
   contentRef <- newIORef []
@@ -882,5 +905,10 @@ runRequestStreaming sessionName defaultReq request contentCallback = do
             ]
         , Louter.respUsage = Nothing
         }
+
+  when openai_http_debug $ do
+    T.putStrLn "==== Response (Accumulated) ===="
+    BS.putStr $ BS.toStrict $ encodePretty response
+    T.putStrLn ""
 
   return $ (fromResponse sessionName response, response)
