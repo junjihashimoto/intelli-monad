@@ -45,6 +45,9 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer as L
 
+-- Our request contains the target server, and model type.
+import Louter.Types.Request (ChatRequest)
+
 opts :: Options.Applicative.Parser ReplCommand
 opts =
   subparser
@@ -73,13 +76,12 @@ opts =
         <> command "help" (info (pure Help) (progDesc "Show the help"))
     )
 
-runCmd :: forall p. (PersistentBackend p) => ReplCommand -> IO ()
-runCmd cmd = do
+runCmd :: forall p. (PersistentBackend p) => ChatRequest -> ReplCommand -> IO ()
+runCmd request cmd = do
   config <- readConfig
   let tools = defaultTools
       customs = []
       sessionName = "default"
-      defaultReq = defaultRequest
   runInputT
     ( Settings
         { complete = completeFilename,
@@ -87,7 +89,7 @@ runCmd cmd = do
           autoAddHistory = True
         }
     )
-    (runPrompt @p [] customs sessionName defaultReq (runCmd' @p (Right cmd) Nothing))
+    (runPrompt @p [] customs sessionName request (runCmd' @p (Right cmd) Nothing))
 
 main :: IO ()
 main = do
@@ -101,4 +103,5 @@ main = do
       Nothing -> return config.model
 
   cmd <- customExecParser (prefs showHelpOnEmpty) (info (helper <*> opts) (fullDesc <> progDesc "intelli-monad"))
-  runCmd @SqliteConf cmd
+
+  runCmd @SqliteConf (fromModel model) cmd
