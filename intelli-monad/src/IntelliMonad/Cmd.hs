@@ -94,7 +94,6 @@ main = do
   model <- do
     lookupEnv "OPENAI_MODEL" >>= \case
       Just model -> return $ T.pack model
-      --      Nothing -> return "gpt-4-vision-preview"
-      Nothing -> return "gpt-4"
+      Nothing -> return "gpt-oss:20b"
   cmd <- customExecParser (prefs showHelpOnEmpty) (info (helper <*> opts) (fullDesc <> progDesc "intelli-monad"))
   runCmd @SqliteConf cmd
