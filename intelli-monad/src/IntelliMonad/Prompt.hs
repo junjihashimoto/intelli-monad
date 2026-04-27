@@ -15,7 +15,19 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module IntelliMonad.Prompt where
+module IntelliMonad.Prompt
+  (
+    callWithImage,
+    callWithText,
+    clear,
+    getContext,
+    getSessionName,
+    push,
+    setContext,
+    runPrompt,
+    showContents
+  )
+where
 
 import Control.Monad (forM_)
 import Control.Monad.IO.Class
@@ -57,12 +69,6 @@ setContext context = do
 
 getSessionName :: (MonadIO m, MonadFail m) => Prompt m Text
 getSessionName = contextSessionName <$> getContext
-
-switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
-switchContext context = do
-  env <- get
-  put $ env {context = context}
-  return ()
 
 push :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Contents -> Prompt m ()
 push contents = do
@@ -181,6 +187,93 @@ callWithContents input = do
   push @p input
   call @p
 
+initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> Louter.ChatRequest -> m PromptEnv
+initializePrompt tools customs sessionName req = do
+--  config <- readConfig
+  let settings = addTools tools req
+  withDB @p $ \conn -> do
+    load @p conn sessionName >>= \case
+      Just v ->
+        return $
+          PromptEnv
+            { context = v,
+              tools = tools,
+              customInstructions = customs,
+              backend = (PersistProxy (config @p)),
+              hooks = []
+            }
+      Nothing -> do
+        time <- liftIO getCurrentTime
+        let init' =
+              PromptEnv
+                { context =
+                    Context
+                      { contextRequest = settings,
+                        contextResponse = Nothing,
+                        contextHeader = headers customs ++ toolHeaders tools,
+                        contextBody = [],
+                        contextFooter = toolFooters tools ++ footers customs,
+                        contextTotalTokens = 0,
+                        contextSessionName = sessionName,
+                        contextCreated = time
+                      },
+                  tools = tools,
+                  customInstructions = customs,
+                  backend = (PersistProxy (config @p)),
+                  hooks = []
+                }
+        initialize @p conn (init'.context)
+        return init'
+
+runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> Louter.ChatRequest -> Prompt m a -> m a
+runPrompt tools customs sessionName req func = do
+  context <- initializePrompt @p tools customs sessionName req
+  fst <$> runStateT func context
+
+showContents :: (MonadIO m) => Contents -> m ()
+showContents res = do
+  forM_ res $ \(Content user message _ _) ->
+    liftIO $
+      T.putStrLn $
+        userToText user
+          <> ": "
+          <> case message of
+            Message t -> t
+            Image _ _ -> "Image: ..."
+            c@(ToolCall _ _ _) -> T.pack $ show c
+            c@(ToolReturn _ _ _) -> T.pack $ show c
+
+clear :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m ()
+clear = do
+  prev <- getContext
+  setContext @p $ prev {contextBody = []}
+
+callWithImage :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Text -> Prompt m Contents
+callWithImage imagePath = do
+  let tryReadFile = T.decodeUtf8Lenient . Base64.encode <$> BS.readFile (T.unpack imagePath)
+      imageType =
+        if T.isSuffixOf ".png" imagePath
+          then "png"
+          else
+            if T.isSuffixOf ".jpg" imagePath || T.isSuffixOf ".jpeg" imagePath
+              then "jpeg"
+              else "jpeg"
+  file <- liftIO $ tryReadFile
+  time <- liftIO getCurrentTime
+  context <- getContext
+  let contents' = [Content User (Image imageType file) context.contextSessionName time]
+  callWithContents @p contents'
+
+-- Everything below this line is not called.
+
+{-
+
+switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
+switchContext context = do
+  env <- get
+  put $ env {context = context}
+  return ()
+
 callWithValidation ::
   forall validation p m.
   ( MonadIO m,
@@ -275,79 +368,4 @@ generate userContext input = do
     push @p contents
     call @p >>= callWithValidation @output @StatelessConf
 
-initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> Louter.ChatRequest -> m PromptEnv
-initializePrompt tools customs sessionName req = do
---  config <- readConfig
-  let settings = addTools tools req
-  withDB @p $ \conn -> do
-    load @p conn sessionName >>= \case
-      Just v ->
-        return $
-          PromptEnv
-            { context = v,
-              tools = tools,
-              customInstructions = customs,
-              backend = (PersistProxy (config @p)),
-              hooks = []
-            }
-      Nothing -> do
-        time <- liftIO getCurrentTime
-        let init' =
-              PromptEnv
-                { context =
-                    Context
-                      { contextRequest = settings,
-                        contextResponse = Nothing,
-                        contextHeader = headers customs ++ toolHeaders tools,
-                        contextBody = [],
-                        contextFooter = toolFooters tools ++ footers customs,
-                        contextTotalTokens = 0,
-                        contextSessionName = sessionName,
-                        contextCreated = time
-                      },
-                  tools = tools,
-                  customInstructions = customs,
-                  backend = (PersistProxy (config @p)),
-                  hooks = []
-                }
-        initialize @p conn (init'.context)
-        return init'
-
-runPrompt :: forall p m a. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> Louter.ChatRequest -> Prompt m a -> m a
-runPrompt tools customs sessionName req func = do
-  context <- initializePrompt @p tools customs sessionName req
-  fst <$> runStateT func context
-
-showContents :: (MonadIO m) => Contents -> m ()
-showContents res = do
-  forM_ res $ \(Content user message _ _) ->
-    liftIO $
-      T.putStrLn $
-        userToText user
-          <> ": "
-          <> case message of
-            Message t -> t
-            Image _ _ -> "Image: ..."
-            c@(ToolCall _ _ _) -> T.pack $ show c
-            c@(ToolReturn _ _ _) -> T.pack $ show c
-
-clear :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m ()
-clear = do
-  prev <- getContext
-  setContext @p $ prev {contextBody = []}
-
-callWithImage :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Text -> Prompt m Contents
-callWithImage imagePath = do
-  let tryReadFile = T.decodeUtf8Lenient . Base64.encode <$> BS.readFile (T.unpack imagePath)
-      imageType =
-        if T.isSuffixOf ".png" imagePath
-          then "png"
-          else
-            if T.isSuffixOf ".jpg" imagePath || T.isSuffixOf ".jpeg" imagePath
-              then "jpeg"
-              else "jpeg"
-  file <- liftIO $ tryReadFile
-  time <- liftIO getCurrentTime
-  context <- getContext
-  let contents' = [Content User (Image imageType file) context.contextSessionName time]
-  callWithContents @p contents'
+-}
