@@ -17,14 +17,19 @@
 
 module IntelliMonad.Prompt
   (
+    callWithContents,
     callWithImage,
     callWithText,
     clear,
+    generate,
     getContext,
     getSessionName,
+    initializePrompt,
     push,
     setContext,
+    user,
     runPrompt,
+    runPromptWithValidation,
     showContents
   )
 where
@@ -264,74 +269,10 @@ callWithImage imagePath = do
   let contents' = [Content User (Image imageType file) context.contextSessionName time]
   callWithContents @p contents'
 
--- Everything below this line is not called.
-
-{-
-
-switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
-switchContext context = do
-  env <- get
-  put $ env {context = context}
-  return ()
-
-callWithValidation ::
-  forall validation p m.
-  ( MonadIO m,
-    MonadFail m,
-    PersistentBackend p,
-    Tool validation,
-    A.FromJSON validation,
-    A.FromJSON (Output validation),
-    A.ToJSON validation,
-    A.ToJSON (Output validation),
-    HasFunctionObject validation,
-    JSONSchema validation
-  ) =>
-  Contents ->
-  Prompt m (Maybe validation)
-callWithValidation contents = do
-  let valid = ToolProxy (Proxy :: Proxy validation)
-  case findToolCall valid contents of
-    Just (Content _ (ToolCall _ _ args') _ _) -> do
-      let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
-      case v of
-        Left err -> do
-          liftIO $ putStrLn err
-          return Nothing
-        Right v' -> return $ Just v'
-    _ -> return Nothing
-
-runPromptWithValidation ::
-  forall validation p m.
-  ( MonadIO m,
-    MonadFail m,
-    PersistentBackend p,
-    Tool validation,
-    A.FromJSON validation,
-    A.FromJSON (Output validation),
-    A.ToJSON validation,
-    A.ToJSON (Output validation),
-    HasFunctionObject validation,
-    JSONSchema validation
-  ) =>
-  [ToolProxy] ->
-  [CustomInstructionProxy] ->
-  Text ->
-  Louter.ChatRequest ->
-  Text ->
-  m (Maybe validation)
-runPromptWithValidation tools customs sessionName req input = do
-  let valid = ToolProxy (Proxy :: Proxy validation)
-  runPrompt @p (valid : tools) customs sessionName req (callWithText @p input >>= callWithValidation @validation @p)
+-- Only called by calc example.
 
 user :: Text -> Content
 user input = Content User (Message input) "default" defaultUTCTime
-
-system :: Text -> Content
-system input = Content System (Message input) "default" defaultUTCTime
-
-assistant :: Text -> Content
-assistant input = Content Assistant (Message input) "default" defaultUTCTime
 
 generate ::
   forall input output m p.
@@ -368,4 +309,70 @@ generate userContext input = do
     push @p contents
     call @p >>= callWithValidation @output @StatelessConf
 
+runPromptWithValidation ::
+  forall validation p m.
+  ( MonadIO m,
+    MonadFail m,
+    PersistentBackend p,
+    Tool validation,
+    A.FromJSON validation,
+    A.FromJSON (Output validation),
+    A.ToJSON validation,
+    A.ToJSON (Output validation),
+    HasFunctionObject validation,
+    JSONSchema validation
+  ) =>
+  [ToolProxy] ->
+  [CustomInstructionProxy] ->
+  Text ->
+  Louter.ChatRequest ->
+  Text ->
+  m (Maybe validation)
+runPromptWithValidation tools customs sessionName req input = do
+  let valid = ToolProxy (Proxy :: Proxy validation)
+  runPrompt @p (valid : tools) customs sessionName req (callWithText @p input >>= callWithValidation @validation @p)
+
+callWithValidation ::
+  forall validation p m.
+  ( MonadIO m,
+    MonadFail m,
+    PersistentBackend p,
+    Tool validation,
+    A.FromJSON validation,
+    A.FromJSON (Output validation),
+    A.ToJSON validation,
+    A.ToJSON (Output validation),
+    HasFunctionObject validation,
+    JSONSchema validation
+  ) =>
+  Contents ->
+  Prompt m (Maybe validation)
+callWithValidation contents = do
+  let valid = ToolProxy (Proxy :: Proxy validation)
+  case findToolCall valid contents of
+    Just (Content _ (ToolCall _ _ args') _ _) -> do
+      let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
+      case v of
+        Left err -> do
+          liftIO $ putStrLn err
+          return Nothing
+        Right v' -> return $ Just v'
+    _ -> return Nothing
+
+-- Everything below this line is not called.
+
+{-
+
+switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
+switchContext context = do
+  env <- get
+  put $ env {context = context}
+  return ()
+
+system :: Text -> Content
+system input = Content System (Message input) "default" defaultUTCTime
+
+assistant :: Text -> Content
+assistant input = Content Assistant (Message input) "default" defaultUTCTime
 -}
+
