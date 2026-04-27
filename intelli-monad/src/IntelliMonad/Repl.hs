@@ -50,6 +50,7 @@ parseRepl :: Parser ReplCommand
 parseRepl =
   (try (lexm (string ":quit")) >> pure Quit)
     <|> (try (lexm (string ":clear")) >> pure Clear)
+    <|> (try (lexm (string ":model") >> T.pack <$> lexm modelName) >>= pure . SetModel)
     <|> (try (lexm (string ":show") >> lexm (string "contents")) >> pure ShowContents)
     <|> (try (lexm (string ":show") >> lexm (string "usage")) >> pure ShowUsage)
     <|> (try (lexm (string ":show") >> lexm (string "request")) >> pure ShowRequest)
@@ -78,6 +79,7 @@ parseRepl =
     lexm = lexeme sc
     sessionName = many alphaNumChar
     imagePath = many (alphaNumChar <|> char '.' <|> char '/' <|> char '-')
+    modelName = many (alphaNumChar <|> char '-' <|> char '.' <|> char ':' <|> char '/')
 
 getTextInputLine :: (MonadTrans t) => t (InputT IO) (Maybe T.Text)
 getTextInputLine = fmap (fmap T.pack) (lift $ getInputLine "% ")
@@ -160,6 +162,12 @@ runCmd' cmd ret = do
     Right Clear -> do
       clear @p
       repl
+    Right (SetModel modelName) -> do
+      prev <- getContext
+      let req = prev.contextRequest { Louter.reqModel = modelName }
+          newContext = prev {contextRequest = req}
+      setContext @p newContext
+      liftIO $ T.putStrLn $ "Model set to: " <> modelName
     Right ShowContents -> do
       context <- getContext
       showContents context.contextBody

@@ -602,6 +602,7 @@ data ReplCommand
   | EditHeader
   | EditFooter
   | ListSessions
+  | SetModel Text
   | CopySession
       { sessionNameFrom :: Text,
         sessionNameTo :: Text
