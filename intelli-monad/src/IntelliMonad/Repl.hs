@@ -168,6 +168,7 @@ runCmd' cmd ret = do
           newContext = prev {contextRequest = req}
       setContext @p newContext
       liftIO $ T.putStrLn $ "Model set to: " <> modelName
+      repl
     Right ShowContents -> do
       context <- getContext
       showContents context.contextBody
