@@ -651,6 +651,7 @@ class PersistentBackend p where
   deleteKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m ()
 
 
+-- FIXME: use mempty here, instead of providing a model name.
 defaultRequest :: Louter.ChatRequest
 defaultRequest =
   Louter.ChatRequest
