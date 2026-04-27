@@ -2,4 +2,6 @@ packages:
         openai-servant-gen/*.cabal
         openai-servant-gen-examples/*.cabal
         intelli-monad/*.cabal
+
+optional-packages:
         ../*.cabal
