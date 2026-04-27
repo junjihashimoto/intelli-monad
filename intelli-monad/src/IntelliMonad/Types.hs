@@ -33,6 +33,7 @@
 module IntelliMonad.Types where
 
 import qualified Codec.Picture as P
+import Control.Monad (when)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
 import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, Value)
@@ -653,7 +654,7 @@ class PersistentBackend p where
 defaultRequest :: Louter.ChatRequest
 defaultRequest =
   Louter.ChatRequest
-    { Louter.reqModel = "gpt-4"
+    { Louter.reqModel = ""
     , Louter.reqMessages = []
     , Louter.reqTools = []
     , Louter.reqToolChoice = Louter.ToolChoiceAuto
