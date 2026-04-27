@@ -9,4 +9,4 @@ optional-packages:
 source-repository-package
         type: git
         location: https://github.com/julialongtin/louter.git
-        tag: 76fdcbc0154e7791e650c06d631cf67345d04183
+        tag: 6eb00576ed1fd9001659a8c3af52ed3679d2c590
