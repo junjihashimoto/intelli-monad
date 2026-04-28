@@ -136,7 +136,6 @@ call = loop []
       callPreHook @p
       prev <- getContext
       config <- liftIO readConfig
-      env <- get
 
       -- Check if streaming is enabled
       let streaming = Config.getUseStreaming config
@@ -144,12 +143,12 @@ call = loop []
       ((contents, finishReason), res) <- if streaming
         then do
           -- Use streaming with incremental output
-          liftIO $ runRequestStreaming prev.contextSessionName prev.contextRequest env.timeoutSeconds
+          liftIO $ runRequestStreaming prev.contextSessionName prev.contextRequest
             (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
             (\chunk -> T.putStr chunk >> IO.hFlush IO.stdout)  -- Stream to stdout
         else do
           -- Use non-streaming
-          liftIO $ runRequest prev.contextSessionName prev.contextRequest env.timeoutSeconds
+          liftIO $ runRequest prev.contextSessionName prev.contextRequest
             (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
 
       let current_total_tokens = 0 -- fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
