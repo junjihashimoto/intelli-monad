@@ -115,5 +115,5 @@ withBackend :: forall a m. (MonadIO m, MonadFail m) => (forall p. PersistentBack
 withBackend func = do
   (env :: PromptEnv) <- get
   case (env) of
-    (PromptEnv _ _ _ (PersistProxy v) _) -> func v
+    (PromptEnv _ _ _ (PersistProxy v) _ _) -> func v
 

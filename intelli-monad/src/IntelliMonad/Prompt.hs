@@ -15,7 +15,24 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module IntelliMonad.Prompt where
+module IntelliMonad.Prompt
+  (
+    callWithContents,
+    callWithImage,
+    callWithText,
+    clear,
+    generate,
+    getContext,
+    getSessionName,
+    initializePrompt,
+    push,
+    setContext,
+    user,
+    runPrompt,
+    runPromptWithValidation,
+    showContents
+  )
+where
 
 import Control.Monad (forM_)
 import Control.Monad.IO.Class
@@ -57,12 +74,6 @@ setContext context = do
 
 getSessionName :: (MonadIO m, MonadFail m) => Prompt m Text
 getSessionName = contextSessionName <$> getContext
-
-switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
-switchContext context = do
-  env <- get
-  put $ env {context = context}
-  return ()
 
 push :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Contents -> Prompt m ()
 push contents = do
@@ -125,6 +136,7 @@ call = loop []
       callPreHook @p
       prev <- getContext
       config <- liftIO readConfig
+      env <- get
 
       -- Check if streaming is enabled
       let streaming = Config.getUseStreaming config
@@ -132,12 +144,12 @@ call = loop []
       ((contents, finishReason), res) <- if streaming
         then do
           -- Use streaming with incremental output
-          liftIO $ runRequestStreaming prev.contextSessionName prev.contextRequest
+          liftIO $ runRequestStreaming prev.contextSessionName prev.contextRequest env.timeoutSeconds
             (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
             (\chunk -> T.putStr chunk >> IO.hFlush IO.stdout)  -- Stream to stdout
         else do
           -- Use non-streaming
-          liftIO $ runRequest prev.contextSessionName prev.contextRequest
+          liftIO $ runRequest prev.contextSessionName prev.contextRequest env.timeoutSeconds
             (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
 
       let current_total_tokens = 0 -- fromMaybe 0 $ API.completionUsageTotalUnderscoretokens <$> API.createChatCompletionResponseUsage res
@@ -180,100 +192,6 @@ callWithContents :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) =>
 callWithContents input = do
   push @p input
   call @p
-
-callWithValidation ::
-  forall validation p m.
-  ( MonadIO m,
-    MonadFail m,
-    PersistentBackend p,
-    Tool validation,
-    A.FromJSON validation,
-    A.FromJSON (Output validation),
-    A.ToJSON validation,
-    A.ToJSON (Output validation),
-    HasFunctionObject validation,
-    JSONSchema validation
-  ) =>
-  Contents ->
-  Prompt m (Maybe validation)
-callWithValidation contents = do
-  let valid = ToolProxy (Proxy :: Proxy validation)
-  case findToolCall valid contents of
-    Just (Content _ (ToolCall _ _ args') _ _) -> do
-      let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
-      case v of
-        Left err -> do
-          liftIO $ putStrLn err
-          return Nothing
-        Right v' -> return $ Just v'
-    _ -> return Nothing
-
-runPromptWithValidation ::
-  forall validation p m.
-  ( MonadIO m,
-    MonadFail m,
-    PersistentBackend p,
-    Tool validation,
-    A.FromJSON validation,
-    A.FromJSON (Output validation),
-    A.ToJSON validation,
-    A.ToJSON (Output validation),
-    HasFunctionObject validation,
-    JSONSchema validation
-  ) =>
-  [ToolProxy] ->
-  [CustomInstructionProxy] ->
-  Text ->
-  Louter.ChatRequest ->
-  Text ->
-  m (Maybe validation)
-runPromptWithValidation tools customs sessionName req input = do
-  let valid = ToolProxy (Proxy :: Proxy validation)
-  runPrompt @p (valid : tools) customs sessionName req (callWithText @p input >>= callWithValidation @validation @p)
-
-user :: Text -> Content
-user input = Content User (Message input) "default" defaultUTCTime
-
-system :: Text -> Content
-system input = Content System (Message input) "default" defaultUTCTime
-
-assistant :: Text -> Content
-assistant input = Content Assistant (Message input) "default" defaultUTCTime
-
-generate ::
-  forall input output m p.
-  ( MonadIO m,
-    MonadFail m,
-    p ~ StatelessConf,
-    A.ToJSON input,
-    A.FromJSON input,
-    JSONSchema input,
-    Tool output,
-    A.FromJSON output,
-    A.FromJSON (Output output),
-    A.ToJSON output,
-    A.ToJSON (Output output),
-    HasFunctionObject output,
-    JSONSchema output
-  ) => Contents -> input -> m (Maybe output)
-generate userContext input = do
-  let valid = ToolProxy (Proxy :: Proxy output)
-      req = (fromModel "gpt-4")
-  runPrompt @p [valid] [] "default" req $ do
-    time <- liftIO getCurrentTime
-    context <- getContext
-    let schemaText :: Text
-        schemaText = T.decodeUtf8Lenient $ BS.toStrict $ A.encode $ toAeson (schema @input)
-        inputText :: Text
-        inputText = T.decodeUtf8Lenient $ BS.toStrict $ A.encode input
-        contents = userContext ++
-          [ user ("#User-input format is as follows:\n" <> schemaText)
-          , user ("#User-input is as follows:\n" <> inputText)
-          , user ("#Save the processing results using " <> toolFunctionName @output <> " function")
-          ]
-    
-    push @p contents
-    call @p >>= callWithValidation @output @StatelessConf
 
 initializePrompt :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> Louter.ChatRequest -> m PromptEnv
 initializePrompt tools customs sessionName req = do
@@ -351,3 +269,111 @@ callWithImage imagePath = do
   context <- getContext
   let contents' = [Content User (Image imageType file) context.contextSessionName time]
   callWithContents @p contents'
+
+-- Only called by calc example.
+
+user :: Text -> Content
+user input = Content User (Message input) "default" defaultUTCTime
+
+generate ::
+  forall input output m p.
+  ( MonadIO m,
+    MonadFail m,
+    p ~ StatelessConf,
+    A.ToJSON input,
+    A.FromJSON input,
+    JSONSchema input,
+    Tool output,
+    A.FromJSON output,
+    A.FromJSON (Output output),
+    A.ToJSON output,
+    A.ToJSON (Output output),
+    HasFunctionObject output,
+    JSONSchema output
+  ) => Contents -> input -> m (Maybe output)
+generate userContext input = do
+  let valid = ToolProxy (Proxy :: Proxy output)
+      req = (fromModel "gpt-4")
+  runPrompt @p [valid] [] "default" req $ do
+    time <- liftIO getCurrentTime
+    context <- getContext
+    let schemaText :: Text
+        schemaText = T.decodeUtf8Lenient $ BS.toStrict $ A.encode $ toAeson (schema @input)
+        inputText :: Text
+        inputText = T.decodeUtf8Lenient $ BS.toStrict $ A.encode input
+        contents = userContext ++
+          [ user ("#User-input format is as follows:\n" <> schemaText)
+          , user ("#User-input is as follows:\n" <> inputText)
+          , user ("#Save the processing results using " <> toolFunctionName @output <> " function")
+          ]
+    
+    push @p contents
+    call @p >>= callWithValidation @output @StatelessConf
+
+runPromptWithValidation ::
+  forall validation p m.
+  ( MonadIO m,
+    MonadFail m,
+    PersistentBackend p,
+    Tool validation,
+    A.FromJSON validation,
+    A.FromJSON (Output validation),
+    A.ToJSON validation,
+    A.ToJSON (Output validation),
+    HasFunctionObject validation,
+    JSONSchema validation
+  ) =>
+  [ToolProxy] ->
+  [CustomInstructionProxy] ->
+  Text ->
+  Louter.ChatRequest ->
+  Text ->
+  m (Maybe validation)
+runPromptWithValidation tools customs sessionName req input = do
+  let valid = ToolProxy (Proxy :: Proxy validation)
+  runPrompt @p (valid : tools) customs sessionName req (callWithText @p input >>= callWithValidation @validation @p)
+
+callWithValidation ::
+  forall validation p m.
+  ( MonadIO m,
+    MonadFail m,
+    PersistentBackend p,
+    Tool validation,
+    A.FromJSON validation,
+    A.FromJSON (Output validation),
+    A.ToJSON validation,
+    A.ToJSON (Output validation),
+    HasFunctionObject validation,
+    JSONSchema validation
+  ) =>
+  Contents ->
+  Prompt m (Maybe validation)
+callWithValidation contents = do
+  let valid = ToolProxy (Proxy :: Proxy validation)
+  case findToolCall valid contents of
+    Just (Content _ (ToolCall _ _ args') _ _) -> do
+      let v = (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String validation)
+      case v of
+        Left err -> do
+          liftIO $ putStrLn err
+          return Nothing
+        Right v' -> return $ Just v'
+    _ -> return Nothing
+
+-- Everything below this line is not called.
+
+{-
+
+switchContext :: (MonadIO m, MonadFail m) => Context -> Prompt m ()
+switchContext context = do
+  env <- get
+  put $ env {context = context}
+  return ()
+
+system :: Text -> Content
+system input = Content System (Message input) "default" defaultUTCTime
+
+assistant :: Text -> Content
+assistant input = Content Assistant (Message input) "default" defaultUTCTime
+-}
+

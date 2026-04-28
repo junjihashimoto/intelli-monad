@@ -33,6 +33,7 @@
 module IntelliMonad.Types where
 
 import qualified Codec.Picture as P
+import Control.Monad (when)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State (StateT)
 import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, Value)
@@ -297,6 +298,8 @@ data PromptEnv = PromptEnv
   -- ^ The backend for prompt logging
   , hooks :: [HookProxy]
   -- ^ The hook functions before or after calling LLM
+  , timeoutSeconds :: Maybe Int
+  -- ^ The timeout in seconds to wait for results. Given to Louter.
   }
 
 type Contents = [Content]
@@ -601,6 +604,8 @@ data ReplCommand
   | EditHeader
   | EditFooter
   | ListSessions
+  | SetModel Text
+  | SetTimeout Int
   | CopySession
       { sessionNameFrom :: Text,
         sessionNameTo :: Text
@@ -650,10 +655,11 @@ class PersistentBackend p where
   deleteKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m ()
 
 
+-- FIXME: use mempty here, instead of providing a model name.
 defaultRequest :: Louter.ChatRequest
 defaultRequest =
   Louter.ChatRequest
-    { Louter.reqModel = "gpt-4"
+    { Louter.reqModel = ""
     , Louter.reqMessages = []
     , Louter.reqTools = []
     , Louter.reqToolChoice = Louter.ToolChoiceAuto
@@ -762,8 +768,8 @@ addTools (tool : tools') req' =
 fromModel :: Text -> Louter.ChatRequest
 fromModel = fromModel_
 
-runRequest :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> a -> IO ((a, FinishReason), Louter.ChatResponse)
-runRequest sessionName defaultReq request = do
+runRequest :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> Maybe Int -> a -> IO ((a, FinishReason), Louter.ChatResponse)
+runRequest sessionName defaultReq timeout request = do
   config <- readConfig
 
   -- Determine backend type (default to OpenAI if not specified)
@@ -788,23 +794,37 @@ runRequest sessionName defaultReq request = do
           , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
           }
 
-  client <- Louter.newClient louterBackend
+  client <- Louter.newClientWithTimeout timeout louterBackend
   let req = toRequest defaultReq request
 
-  lookupEnv "OPENAI_DEBUG" >>= \case
-    Just "1" -> do
+  openai_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_DEBUG"
+  when openai_debug $ do
       liftIO $ do
+        T.putStrLn "========== Request ==========="
         BS.putStr $ BS.toStrict $ encodePretty req
         T.putStrLn ""
-    _ -> return ()
+
+  openai_http_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_HTTP_DEBUG"
+  when openai_http_debug $ do
+      liftIO $ do
+        T.putStrLn "========== Backend ==========="
+        print louterBackend
+        T.putStrLn "========== Request ==========="
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
 
   result <- Louter.chatCompletion client req
   case result of
     Left err -> error $ T.unpack $ "Louter error: " <> err
-    Right res -> return $ (fromResponse sessionName res, res)
+    Right res -> do
+      when openai_http_debug $ do
+        T.putStrLn "========== Response =========="
+        BS.putStr $ BS.toStrict $ encodePretty res
+        T.putStrLn ""
+      return $ (fromResponse sessionName res, res)
 
-runRequestStreaming :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> a -> (Text -> IO ()) -> IO ((a, FinishReason), Louter.ChatResponse)
-runRequestStreaming sessionName defaultReq request contentCallback = do
+runRequestStreaming :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> Maybe Int -> a -> (Text -> IO ()) -> IO ((a, FinishReason), Louter.ChatResponse)
+runRequestStreaming sessionName defaultReq timeout request contentCallback = do
   config <- readConfig
 
   -- Determine backend type (default to OpenAI if not specified)
@@ -829,15 +849,24 @@ runRequestStreaming sessionName defaultReq request contentCallback = do
           , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
           }
 
-  client <- Louter.newClient louterBackend
+  client <- Louter.newClientWithTimeout timeout louterBackend
   let req = toRequest defaultReq request
 
-  lookupEnv "OPENAI_DEBUG" >>= \case
-    Just "1" -> do
+  openai_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_DEBUG"
+  when openai_debug $ do
       liftIO $ do
+        T.putStrLn "========== Request ==========="
         BS.putStr $ BS.toStrict $ encodePretty req
         T.putStrLn ""
-    _ -> return ()
+
+  openai_http_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_HTTP_DEBUG"
+  when openai_http_debug $ do
+      liftIO $ do
+        T.putStrLn "========== Backend ==========="
+        print louterBackend
+        T.putStrLn "========== Request ==========="
+        BS.putStr $ BS.toStrict $ encodePretty req
+        T.putStrLn ""
 
   -- Accumulate response while streaming
   contentRef <- newIORef []
@@ -880,5 +909,10 @@ runRequestStreaming sessionName defaultReq request contentCallback = do
             ]
         , Louter.respUsage = Nothing
         }
+
+  when openai_http_debug $ do
+    T.putStrLn "==== Response (Accumulated) ===="
+    BS.putStr $ BS.toStrict $ encodePretty response
+    T.putStrLn ""
 
   return $ (fromResponse sessionName response, response)

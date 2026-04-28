@@ -91,10 +91,14 @@ runCmd cmd = do
 
 main :: IO ()
 main = do
+  -- Parse our config file. We only use the model, at this point.
+  config <- readConfig
+
+  -- Determine what model to use by default. Use what's in the config file by default, but override with an environment variable (OPENAI_MODEL).
   model <- do
     lookupEnv "OPENAI_MODEL" >>= \case
       Just model -> return $ T.pack model
-      --      Nothing -> return "gpt-4-vision-preview"
-      Nothing -> return "gpt-4"
+      Nothing -> return config.model
+
   cmd <- customExecParser (prefs showHelpOnEmpty) (info (helper <*> opts) (fullDesc <> progDesc "intelli-monad"))
   runCmd @SqliteConf cmd

@@ -50,11 +50,13 @@ parseRepl :: Parser ReplCommand
 parseRepl =
   (try (lexm (string ":quit")) >> pure Quit)
     <|> (try (lexm (string ":clear")) >> pure Clear)
+    <|> (try (lexm (string ":model") >> T.pack <$> lexm modelName) >>= pure . SetModel)
     <|> (try (lexm (string ":show") >> lexm (string "contents")) >> pure ShowContents)
     <|> (try (lexm (string ":show") >> lexm (string "usage")) >> pure ShowUsage)
     <|> (try (lexm (string ":show") >> lexm (string "request")) >> pure ShowRequest)
     <|> (try (lexm (string ":show") >> lexm (string "context")) >> pure ShowContext)
     <|> (try (lexm (string ":show") >> lexm (string "session")) >> pure ShowSession)
+    <|> (try (lexm (string ":set" ) >> lexm (string "timeout") >> L.decimal) >>= pure . SetTimeout)
     <|> (try (lexm (string ":read") >> lexm (string "image") >> lexm imagePath) >>= pure . ReadImage . T.pack)
     <|> (try (lexm (string ":list") >> lexm (string "sessions")) >> pure ListSessions)
     <|> (try (lexm (string ":list")) >> pure ListSessions)
@@ -78,6 +80,7 @@ parseRepl =
     lexm = lexeme sc
     sessionName = many alphaNumChar
     imagePath = many (alphaNumChar <|> char '.' <|> char '/' <|> char '-')
+    modelName = many (alphaNumChar <|> char '-' <|> char '.' <|> char ':' <|> char '/')
 
 getTextInputLine :: (MonadTrans t) => t (InputT IO) (Maybe T.Text)
 getTextInputLine = fmap (fmap T.pack) (lift $ getInputLine "% ")
@@ -159,6 +162,18 @@ runCmd' cmd ret = do
     Right Quit -> return ()
     Right Clear -> do
       clear @p
+      repl
+    Right (SetModel modelName) -> do
+      prev <- getContext
+      let req = prev.contextRequest { Louter.reqModel = modelName }
+          newContext = prev {contextRequest = req}
+      setContext @p newContext
+      liftIO $ T.putStrLn $ "Model set to: " <> modelName
+      repl
+    Right (SetTimeout timeout) -> do
+      env <- get
+      put $ env { timeoutSeconds = Just timeout }
+      liftIO $ T.putStrLn $ "Timeout set to: " <> T.pack (show timeout) <> " seconds"
       repl
     Right ShowContents -> do
       context <- getContext
