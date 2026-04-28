@@ -206,7 +206,8 @@ initializePrompt tools customs sessionName req = do
               tools = tools,
               customInstructions = customs,
               backend = (PersistProxy (config @p)),
-              hooks = []
+              hooks = [],
+              timeoutSeconds = Nothing
             }
       Nothing -> do
         time <- liftIO getCurrentTime
