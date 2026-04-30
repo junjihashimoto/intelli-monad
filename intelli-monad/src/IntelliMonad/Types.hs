@@ -298,8 +298,6 @@ data PromptEnv = PromptEnv
   -- ^ The backend for prompt logging
   , hooks :: [HookProxy]
   -- ^ The hook functions before or after calling LLM
-  , timeoutSeconds :: Maybe Int
-  -- ^ The timeout in seconds to wait for results. Given to Louter.
   }
 
 type Contents = [Content]
@@ -605,7 +603,6 @@ data ReplCommand
   | EditFooter
   | ListSessions
   | SetModel Text
-  | SetTimeout Int
   | CopySession
       { sessionNameFrom :: Text,
         sessionNameTo :: Text
@@ -768,8 +765,8 @@ addTools (tool : tools') req' =
 fromModel :: Text -> Louter.ChatRequest
 fromModel = fromModel_
 
-runRequest :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> Maybe Int -> a -> IO ((a, FinishReason), Louter.ChatResponse)
-runRequest sessionName defaultReq timeout request = do
+runRequest :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> a -> IO ((a, FinishReason), Louter.ChatResponse)
+runRequest sessionName defaultReq request = do
   config <- readConfig
 
   -- Determine backend type (default to OpenAI if not specified)
@@ -794,7 +791,7 @@ runRequest sessionName defaultReq timeout request = do
           , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
           }
 
-  client <- Louter.newClientWithTimeout timeout louterBackend
+  client <- Louter.newClient louterBackend
   let req = toRequest defaultReq request
 
   openai_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_DEBUG"
@@ -823,8 +820,8 @@ runRequest sessionName defaultReq timeout request = do
         T.putStrLn ""
       return $ (fromResponse sessionName res, res)
 
-runRequestStreaming :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> Maybe Int -> a -> (Text -> IO ()) -> IO ((a, FinishReason), Louter.ChatResponse)
-runRequestStreaming sessionName defaultReq timeout request contentCallback = do
+runRequestStreaming :: forall a. (ChatCompletion a) => Text -> Louter.ChatRequest -> a -> (Text -> IO ()) -> IO ((a, FinishReason), Louter.ChatResponse)
+runRequestStreaming sessionName defaultReq request contentCallback = do
   config <- readConfig
 
   -- Determine backend type (default to OpenAI if not specified)
@@ -849,7 +846,7 @@ runRequestStreaming sessionName defaultReq timeout request contentCallback = do
           , Louter.backendRequiresAuth = not (T.null (Config.apiKey config))
           }
 
-  client <- Louter.newClientWithTimeout timeout louterBackend
+  client <- Louter.newClient louterBackend
   let req = toRequest defaultReq request
 
   openai_debug <- maybe False (== "1") <$> lookupEnv "OPENAI_DEBUG"

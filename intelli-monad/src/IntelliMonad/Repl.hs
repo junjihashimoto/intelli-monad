@@ -56,7 +56,6 @@ parseRepl =
     <|> (try (lexm (string ":show") >> lexm (string "request")) >> pure ShowRequest)
     <|> (try (lexm (string ":show") >> lexm (string "context")) >> pure ShowContext)
     <|> (try (lexm (string ":show") >> lexm (string "session")) >> pure ShowSession)
-    <|> (try (lexm (string ":set" ) >> lexm (string "timeout") >> L.decimal) >>= pure . SetTimeout)
     <|> (try (lexm (string ":read") >> lexm (string "image") >> lexm imagePath) >>= pure . ReadImage . T.pack)
     <|> (try (lexm (string ":list") >> lexm (string "sessions")) >> pure ListSessions)
     <|> (try (lexm (string ":list")) >> pure ListSessions)
@@ -169,11 +168,6 @@ runCmd' cmd ret = do
           newContext = prev {contextRequest = req}
       setContext @p newContext
       liftIO $ T.putStrLn $ "Model set to: " <> modelName
-      repl
-    Right (SetTimeout timeout) -> do
-      env <- get
-      put $ env { timeoutSeconds = Just timeout }
-      liftIO $ T.putStrLn $ "Timeout set to: " <> T.pack (show timeout) <> " seconds"
       repl
     Right ShowContents -> do
       context <- getContext
