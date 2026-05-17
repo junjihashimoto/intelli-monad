@@ -19,6 +19,8 @@ import IntelliMonad.Prompt
 import IntelliMonad.Types
 import IntelliMonad.Config
 
+import IntelliMonad.BaseTypes (Content(Content), HasFunctionObject(getFieldDescription, getFunctionDescription, getFunctionName), Tool(Output, toolExec, toolHeader), JSONSchema, Message(Message), User(System), defaultUTCTime)
+
 data ValidateNumber = ValidateNumber
   { number :: Double
   }

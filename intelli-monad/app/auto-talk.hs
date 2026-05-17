@@ -16,6 +16,8 @@ import IntelliMonad.Prompt
 import IntelliMonad.Types
 import IntelliMonad.Config
 
+import IntelliMonad.BaseTypes (CustomInstruction(customHeader, customFooter), CustomInstructionProxy(CustomInstructionProxy), Content(Content, contentUser), CustomInstruction, Message(Message), User(Assistant, System, User), defaultUTCTime)
+
 data Haruhi = Haruhi
 
 instance CustomInstruction Haruhi where

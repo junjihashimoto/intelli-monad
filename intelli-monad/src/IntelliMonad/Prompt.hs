@@ -24,6 +24,7 @@ module IntelliMonad.Prompt
     generate,
     getContext,
     getSessionName,
+    getTools,
     initializePrompt,
     push,
     setContext,
@@ -34,36 +35,67 @@ module IntelliMonad.Prompt
   )
 where
 
-import Control.Monad (forM_)
-import Control.Monad.IO.Class
+import Prelude (Bool(True, False),Either(Left, Right), String, (.), ($), (<>), (>>), (||), (++), (<$>), (>>=), all, concat, error, fmap, fst, map, mapM, putStrLn, return)
+
+import Control.Monad (forM_, when)
+
+import Control.Monad.Fail (MonadFail)
+
+import Control.Monad.IO.Class (MonadIO, liftIO)
+
 import Control.Monad.Trans.State (get, put, runStateT)
-import qualified Data.Aeson as A
-import Data.Aeson.Encode.Pretty (encodePretty)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base64 as Base64
-import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
-import Data.Proxy
+
+import qualified Data.Aeson as A (FromJSON, ToJSON, Value(Null, Object, String), decodeStrictText, eitherDecode, encode)
+
+import qualified Data.Aeson.KeyMap as DAK (elems, null)
+
+import qualified Data.ByteString as BS (fromStrict, readFile, toStrict)
+
+import qualified Data.ByteString.Base64 as Base64 (encode)
+
+import qualified Data.Map as M (fromList, lookup)
+
+import Data.Maybe (Maybe(Just, Nothing))
+
+import Data.Proxy (Proxy(Proxy))
+
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.IO as T
-import Data.Time
+
+import qualified Data.Text as DT (null)
+
+import qualified Data.Text as T (isSuffixOf, pack, unpack, strip)
+
+import qualified Data.Text.Encoding as T (decodeUtf8Lenient, encodeUtf8)
+
+import qualified Data.Text.IO as T (getLine, putStrLn, putStr)
+
+import Data.Time (getCurrentTime)
+
+import qualified Louter.Types.Request as Louter (ChatRequest)
+
+import qualified System.IO as IO (hFlush, stdout)
+
+import IntelliMonad.BaseTypes (Content(Content), Contents, Context(Context, contextBody, contextCreated, contextHeader, contextFooter, contextRequest, contextResponse, contextSessionName, contextToolbox, contextTotalTokens), CustomInstructionProxy, FinishReason(FunctionCall, Length, Stop, ToolCalls), defaultUTCTime, HasFunctionObject, Hook(preHook, postHook), HookProxy(HookProxy), JSONSchema(schema), Message(Message, ToolCall, ToolReturn, Image), PersistProxy(PersistProxy), PersistentBackend(Conn, config, initialize, load, save, saveContents), Prompt, PromptEnv(PromptEnv, backend, context, customInstructions, hooks, inputCallback, outputCallback, timeoutSeconds, tools), Tool(Output, toolFunctionName), ToolProxy(ToolProxy), User(User), userToText)
+
 import IntelliMonad.Config (readConfig)
-import qualified IntelliMonad.Config as Config
-import IntelliMonad.CustomInstructions
-import IntelliMonad.Persist
-import IntelliMonad.Tools
-import IntelliMonad.Types
-import qualified Louter.Types.Request as Louter
-import qualified Louter.Types.Response as Louter
-import Network.HTTP.Client (managerResponseTimeout, newManager, responseTimeoutMicro)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
-import System.Environment (getEnv, lookupEnv)
-import qualified System.IO as IO
+import qualified IntelliMonad.Config as Config (getUseStreaming)
+
+import IntelliMonad.CustomInstructions (toolHeaders, toolFooters, headers, footers)
+
+import IntelliMonad.Persist (StatelessConf, withDB)
+
+import IntelliMonad.Tools.Utils (findToolCall, tryToolExec)
+
+import IntelliMonad.Types (addTools, fromModel, runRequest, runRequestStreaming, toAeson, updateRequest)
+
+import IntelliMonad.ToolPolicy (defaultRegistry, checkPolicy)
 
 getContext :: (MonadIO m, MonadFail m) => Prompt m Context
 getContext = context <$> get
+
+-- The list of all tools available in the REPL.
+getTools :: (MonadIO m, MonadFail m) => Prompt m [ToolProxy]
+getTools = tools <$> get
 
 setContext :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Context -> Prompt m ()
 setContext context = do
@@ -146,7 +178,7 @@ call = loop []
           -- Use streaming with incremental output
           liftIO $ runRequestStreaming prev.contextSessionName prev.contextRequest env.timeoutSeconds
             (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
-            (\chunk -> T.putStr chunk >> IO.hFlush IO.stdout)  -- Stream to stdout
+            env.outputCallback -- Stream to callback
         else do
           -- Use non-streaming
           liftIO $ runRequest prev.contextSessionName prev.contextRequest env.timeoutSeconds
@@ -174,11 +206,15 @@ call = loop []
     callTool next contents ret = do
       showContents contents
       env <- get
-      retTool <- tryToolExec @p env.tools next.contextSessionName contents
-      showContents retTool
-      pushToolReturn @p retTool
+      checkedContents <- mapM (checkPolicy $ next.contextToolbox) contents
+      let toExecute = [c | c@(Content _ (ToolCall _ _ _) _ _) <- checkedContents ]
+      let resolved  = [c | c@(Content _ (ToolReturn _ _ _) _ _) <- checkedContents ]
+      retTool <- tryToolExec @p env.tools next.contextSessionName toExecute
+      let allResults = resolved <> retTool
+      showContents allResults
+      pushToolReturn @p allResults
       v <- call @p
-      return $ ret <> retTool <> v
+      return $ ret <> allResults <> v
 
 callWithText :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Text -> Prompt m Contents
 callWithText input = do
@@ -202,12 +238,14 @@ initializePrompt tools customs sessionName req = do
       Just v ->
         return $
           PromptEnv
-            { context = v,
-              tools = tools,
-              customInstructions = customs,
-              backend = (PersistProxy (config @p)),
-              hooks = [],
-              timeoutSeconds = Nothing
+            { context = v
+            , tools = tools
+            , customInstructions = customs
+            , backend = (PersistProxy (config @p))
+            , hooks = []
+            , timeoutSeconds = Nothing
+            , inputCallback = \prompt -> T.putStr prompt >> IO.hFlush IO.stdout >> fmap Just T.getLine
+            , outputCallback = \text -> T.putStr text >> IO.hFlush IO.stdout
             }
       Nothing -> do
         time <- liftIO getCurrentTime
@@ -222,12 +260,16 @@ initializePrompt tools customs sessionName req = do
                         contextFooter = toolFooters tools ++ footers customs,
                         contextTotalTokens = 0,
                         contextSessionName = sessionName,
-                        contextCreated = time
-                      },
-                  tools = tools,
-                  customInstructions = customs,
-                  backend = (PersistProxy (config @p)),
-                  hooks = []
+                        contextCreated = time,
+                        contextToolbox = defaultRegistry tools
+                      }
+                , tools = tools
+                , customInstructions = customs
+                , backend = (PersistProxy (config @p))
+                , hooks = []
+                , timeoutSeconds = Nothing
+                , inputCallback = \prompt -> T.putStr prompt >> IO.hFlush IO.stdout >> fmap Just T.getLine
+                , outputCallback = \text -> T.putStr text >> IO.hFlush IO.stdout
                 }
         initialize @p conn (init'.context)
         return init'
@@ -240,15 +282,25 @@ runPrompt tools customs sessionName req func = do
 showContents :: (MonadIO m) => Contents -> m ()
 showContents res = do
   forM_ res $ \(Content user message _ _) ->
-    liftIO $
-      T.putStrLn $
-        userToText user
-          <> ": "
-          <> case message of
-            Message t -> t
-            Image _ _ -> "Image: ..."
-            c@(ToolCall _ _ _) -> T.pack $ show c
-            c@(ToolReturn _ _ _) -> T.pack $ show c
+    liftIO $ T.putStrLn $ case message of
+                            Message t -> userToText user <> ": " <> t
+                            Image _ _ -> userToText user <> ": [Image]"
+                            (ToolCall _ tcName tcArgs) -> "[assistant calling " <> tcName <>
+                              if isArgsEmpty tcArgs
+                              then "]"
+                              else (" with " <> tcArgs <> "]")
+                            (ToolReturn _ tcName tcRes) -> "[" <> tcName <> " tool returning " <> tcRes <> "]"
+  where
+    -- Is our children learning?
+    isArgsEmpty :: Text -> Bool
+    isArgsEmpty args = case A.decodeStrictText args of
+                         Just (A.Object obj) -> DAK.null obj || all isEmpty (DAK.elems obj)
+                         Just A.Null         -> True
+                         _                   -> DT.null (T.strip args)
+      where
+        isEmpty A.Null = True
+        isEmpty (A.String str) = DT.null str
+        isEmpty _ = False
 
 clear :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => Prompt m ()
 clear = do
@@ -296,8 +348,6 @@ generate userContext input = do
   let valid = ToolProxy (Proxy :: Proxy output)
       req = (fromModel "gpt-4")
   runPrompt @p [valid] [] "default" req $ do
-    time <- liftIO getCurrentTime
-    context <- getContext
     let schemaText :: Text
         schemaText = T.decodeUtf8Lenient $ BS.toStrict $ A.encode $ toAeson (schema @input)
         inputText :: Text

@@ -36,8 +36,12 @@ library
 
     -- Modules exported by the library.
     exposed-modules:  IntelliMonad.Prompt
+                    , IntelliMonad.BaseTypes
                     , IntelliMonad.Types
                     , IntelliMonad.Tools
+                    , IntelliMonad.ToolPolicy
+                    , IntelliMonad.ToolPolicy.Types
+                    , IntelliMonad.ToolPolicy.Utils
                     , IntelliMonad.Tools.Arxiv
                     , IntelliMonad.Tools.Bash
                     , IntelliMonad.Tools.Utils

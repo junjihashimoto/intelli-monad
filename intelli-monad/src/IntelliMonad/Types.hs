@@ -32,297 +32,59 @@
 
 module IntelliMonad.Types where
 
-import qualified Codec.Picture as P
+import qualified Codec.Picture as P (Image,PixelRGB8)
+
 import Control.Monad (when)
-import Control.Monad.IO.Class
-import Control.Monad.Trans.State (StateT)
-import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode, Value)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef')
-import Data.Map (Map)
-import qualified Data.Aeson as A
-import qualified Data.Aeson.Key as A
-import qualified Data.Aeson.KeyMap as A
-import qualified Data.Aeson.KeyMap as HM
-import qualified Data.Aeson.Text as A
-import Data.List (nub)
-import Data.ByteString (ByteString, fromStrict, toStrict)
-import Data.Coerce
-import Data.Kind (Type)
-import qualified Data.Map as M
-import Data.Proxy
-import Data.Text (Text)
-import Data.Maybe (fromMaybe)
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import Data.Time
-import qualified Data.Vector as V
-import Database.Persist
-import Database.Persist.Sqlite
-import Database.Persist.TH
-import GHC.Generics
-import qualified Louter.Client as Louter
-import qualified Louter.Types.Request as Louter
-import qualified Louter.Types.Response as Louter
-import qualified Louter.Types.Streaming as Louter
-import IntelliMonad.Config (readConfig)
-import qualified IntelliMonad.Config as Config
-import qualified Data.ByteString as BS
-import qualified Data.Text.IO as T
-import System.Environment (lookupEnv)
+
+import Control.Monad.IO.Class (liftIO)
+
+import qualified Data.Aeson as A (Value(Array, Bool, Object, String, Null), decodeStrictText, encode)
+
 import Data.Aeson.Encode.Pretty (encodePretty)
 
-data User = User | System | Assistant | Tool deriving (Eq, Show, Ord, Generic)
+import qualified Data.Aeson.Key as A (fromString)
 
-instance ToJSON User
+import qualified Data.Aeson.KeyMap as A (fromList)
 
-instance FromJSON User
+import qualified Data.Aeson.KeyMap as HM (empty, insert, lookup)
 
-userToText :: User -> Text
-userToText = \case
-  User -> "user"
-  System -> "system"
-  Assistant -> "assistant"
-  Tool -> "tool"
+import qualified Data.Aeson.Text as A (encodeToLazyText)
 
-textToUser :: Text -> User
-textToUser = \case
-  "user" -> User
-  "system" -> System
-  "assistant" -> Assistant
-  "tool" -> Tool
-  v -> error $ T.unpack $ "Undefined role:" <> v
+import qualified Data.ByteString as BS (toStrict, putStr)
+
+import Data.IORef (newIORef, readIORef, writeIORef, modifyIORef')
+
+import Data.Map (Map)
+
+import Data.Proxy (Proxy(Proxy))
+
+import Data.Text (Text)
+
+import qualified Data.Text as T (concat, null, pack, unpack)
+
+import qualified Data.Text.Encoding as T (decodeUtf8)
+
+import qualified Data.Text.IO as T (putStrLn)
+
+import qualified Data.Text.Lazy as TL (toStrict)
+
+import qualified Data.Vector as V (fromList, toList)
+
+import qualified Louter.Client as Louter (ChatRequest(ChatRequest, reqMaxTokens, reqMessages, reqModel, reqStream, reqTemperature, reqTools, reqToolChoice), ChatResponse(ChatResponse, respChoices, respId, respModel, respUsage), Choice(Choice, choiceFinishReason, choiceIndex, choiceMessage, choiceToolCalls), FinishReason(FinishContentFilter, FinishLength, FinishStop, FinishToolCalls), FunctionCall(FunctionCall, functionArguments, functionName), StreamEvent(StreamContent, StreamError, StreamFinish, StreamReasoning, StreamToolCall), Tool(Tool, toolDescription, toolName, toolParameters), ToolCall(toolCallArguments, toolCallId, toolCallName), ToolChoice(ToolChoiceAuto), ResponseToolCall(ResponseToolCall, rtcFunction, rtcId, rtcType), chatCompletion, newClientWithTimeout, streamChatWithCallback, Backend(BackendAnthropic, BackendGemini, BackendOpenAI, backendApiKey, backendBaseUrl, backendRequiresAuth)) 
+import System.Environment (lookupEnv)
+
+
+import IntelliMonad.BaseTypes (SessionName, KeyValue, Content, Contents, ChatCompletion(toRequest, fromResponse), ConstructorSchema(ConstructorSchema), FinishReason, HasFunctionObject, JSONSchema(schema), Schema(Array', Boolean', Enum', Integer', Maybe', Null', Number', Object', OneOfTagged, OneOfUntagged, String'), Tool, ToolProxy(ToolProxy), getFunctionDescription, getFunctionName)
+
+import IntelliMonad.Config (readConfig)
+import qualified IntelliMonad.Config as Config
 
 instance Show (P.Image P.PixelRGB8) where
   show _ = "Image: ..."
 
-data Message
-  = Message
-      {unText :: Text}
-  | Image
-      { imageType :: Text,
-        imageData :: Text
-      }
-  | ToolCall
-      { toolId :: Text,
-        toolName :: Text,
-        toolArguments :: Text
-      }
-  | ToolReturn
-      { toolId :: Text,
-        toolName :: Text,
-        toolContent :: Text
-      }
-  deriving (Eq, Show, Ord, Generic)
-
-data FinishReason
-  = Stop
-  | Length
-  | ToolCalls
-  | FunctionCall
-  | ContentFilter
-  | Null
-  deriving (Eq, Show)
-
-finishReasonToText :: FinishReason -> Text
-finishReasonToText = \case
-  Stop -> "stop"
-  Length -> "length"
-  ToolCalls -> "tool_calls"
-  FunctionCall -> "function_call"
-  ContentFilter -> "content_filter"
-  Null -> "null"
-
-textToFinishReason :: Text -> FinishReason
-textToFinishReason = \case
-  "stop" -> Stop
-  "length" -> Length
-  "tool_calls" -> ToolCalls
-  "function_call" -> FunctionCall
-  "content_filter" -> ContentFilter
-  "null" -> Null
-  _ -> Null
-
-instance ToJSON Message
-
-instance FromJSON Message
-
 newtype Model = Model Text deriving (Eq, Show)
 
-class HasFunctionObject r where
-  getFunctionName :: String
-  getFunctionDescription :: String
-  getFieldDescription :: String -> String
-
--- | Constructor schema for sum types
-data ConstructorSchema = ConstructorSchema
-  { csName :: Text           -- ^ Constructor name
-  , csPayload :: Schema      -- ^ Payload schema
-  , csIsNullary :: Bool      -- ^ True for zero-field constructors
-  } deriving (Show, Eq)
-
-data Schema
-  = Maybe' Schema
-  | String'
-  | Number'
-  | Integer'
-  | Object' [(String, String, Schema)]
-  | Array' Schema
-  | Boolean'
-  | Null'
-  -- Sum type schemas
-  | Enum' [Text]                       -- ^ String enum for nullary constructors
-  | OneOfUntagged [ConstructorSchema]  -- ^ Untagged union (distinguishable shapes)
-  | OneOfTagged [ConstructorSchema]    -- ^ Tagged union with @tag/@value
-  deriving (Show, Eq)
-
-class GSchema s f where
-  gschema :: forall a. f a -> Schema
-
-class JSONSchema r where
-  schema :: Schema
-  default schema :: (HasFunctionObject r, Generic r, GSchema r (Rep r)) => Schema
-  schema = gschema @r (from (undefined :: r))
-
-class ChatCompletion b where
-  toRequest :: Louter.ChatRequest -> b -> Louter.ChatRequest
-  fromResponse :: Text -> Louter.ChatResponse -> (b, FinishReason)
-
-toPV :: (ToJSON a) => a -> PersistValue
-toPV = toPersistValue . toStrict . encode
-
-fromPV :: (FromJSON a) => PersistValue -> Either Text a
-fromPV json = do
-  json' <- fmap fromStrict $ fromPersistValue json
-  case eitherDecode json' of
-    Right v -> return v
-    Left err -> Left $ "Decoding JSON fails : " <> T.pack err
-
-instance PersistField Louter.ChatRequest where
-  toPersistValue = toPV
-  fromPersistValue = fromPV
-
-instance PersistFieldSql Louter.ChatRequest where
-  sqlType _ = sqlType (Proxy @ByteString)
-
-instance PersistField Louter.ChatResponse where
-  toPersistValue = toPV
-  fromPersistValue = fromPV
-
-instance PersistFieldSql Louter.ChatResponse where
-  sqlType _ = sqlType (Proxy @ByteString)
-
-instance PersistField User where
-  toPersistValue = toPV
-  fromPersistValue = fromPV
-
-instance PersistFieldSql User where
-  sqlType _ = sqlType (Proxy @ByteString)
-
-instance PersistField Message where
-  toPersistValue = toPV
-  fromPersistValue = fromPV
-
-instance PersistFieldSql Message where
-  sqlType _ = sqlType (Proxy @ByteString)
-
-
-
-share
-  [mkPersist sqlSettings, mkMigrate "migrateAll"]
-  [persistLowerCase|
-Content
-    user User
-    message Message
-    sessionName Text
-    created UTCTime default=CURRENT_TIME
-    deriving Show
-    deriving Eq
-    deriving Ord
-    deriving ToJSON
-    deriving FromJSON
-    deriving Generic
-Context
-    request Louter.ChatRequest
-    response Louter.ChatResponse Maybe
-    header [Content]
-    body [Content]
-    footer [Content]
-    totalTokens Int
-    sessionName Text
-    created UTCTime default=CURRENT_TIME
-    deriving Show
-    deriving Eq
-KeyValue
-    namespace Text
-    key Text
-    value Text
-    KeyName namespace key
-    deriving Show
-    deriving Eq
-    deriving Ord
-|]
-
--- Manual Ord instance for Context
--- We compare only the fields that have Ord, ignoring request and response
-instance Ord Context where
-  compare c1 c2 =
-    compare (contextHeader c1, contextBody c1, contextFooter c1,
-             contextTotalTokens c1, contextSessionName c1, contextCreated c1)
-            (contextHeader c2, contextBody c2, contextFooter c2,
-             contextTotalTokens c2, contextSessionName c2, contextCreated c2)
-
-data ToolProxy = forall t. (Tool t, A.FromJSON t, A.ToJSON t, A.FromJSON (Output t), A.ToJSON (Output t), HasFunctionObject t, JSONSchema t) => ToolProxy (Proxy t)
-
-class CustomInstruction a where
-  customHeader :: a -> Contents
-  customFooter :: a -> Contents
-
-data CustomInstructionProxy = forall t. (CustomInstruction t) => CustomInstructionProxy t
-
-class Hook a where
-  preHook :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => a -> Prompt m ()
-  postHook :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => a -> Prompt m ()
-
-data HookProxy = forall t. (Hook t) => HookProxy t
-
-data PersistProxy = forall t. (PersistentBackend t) => PersistProxy t
-
-data PromptEnv = PromptEnv
-  { tools :: [ToolProxy]
-  -- ^ The list of function calling
-  , customInstructions :: [CustomInstructionProxy]
-  -- ^ This system sends a prompt that includes headers, bodies and footers. Then the message that LLM outputs is added to bodies. customInstructions generates headers and footers.
-  , context :: Context
-  -- ^ The request settings like model and prompt logs
-  , backend :: PersistProxy
-  -- ^ The backend for prompt logging
-  , hooks :: [HookProxy]
-  -- ^ The hook functions before or after calling LLM
-  , timeoutSeconds :: Maybe Int
-  -- ^ The timeout in seconds to wait for results. Given to Louter.
-  }
-
-type Contents = [Content]
-
-type Prompt = StateT PromptEnv
-
 -- data TypedPrompt tools task output =
-
-type SessionName = Text
-
-class Tool a where
-  data Output a :: Type
-
-  toolFunctionName :: Text
-  default toolFunctionName :: (HasFunctionObject a) => Text
-  toolFunctionName = T.pack $ getFunctionName @a
-
-  toolExec :: forall p m. (MonadIO m, MonadFail m, PersistentBackend p) => a -> Prompt m (Output a)
-
-  toolHeader :: Contents
-  toolHeader = []
-  toolFooter :: Contents
-  toolFooter = []
 
 toAeson :: Schema -> A.Value
 toAeson = \case
@@ -433,42 +195,10 @@ constructorToTaggedSchema (ConstructorSchema name payload isNullary) =
               ("additionalProperties", A.Bool False)
             ]
 
-instance Semigroup Schema where
-  (<>) (Object' a) (Object' b) = Object' (a <> b)
-  (<>) (Array' a) (Array' b) = Array' (a <> b)
-  (<>) _ _ = error "Can not concat json value."
-
 append :: A.Value -> A.Value -> A.Value
 append (A.Object a) (A.Object b) = A.Object (a <> b)
 append (A.Array a) (A.Array b) = A.Array (a <> b)
 append _ _ = error "Can not concat json value."
-
-instance {-# OVERLAPS #-} JSONSchema String where
-  schema = String'
-
-instance JSONSchema Text where
-  schema = String'
-
-instance (JSONSchema a) => JSONSchema (Maybe a) where
-  schema = Maybe' (schema @a)
-
-instance JSONSchema Integer where
-  schema = Integer'
-
-instance JSONSchema Int where
-  schema = Integer'
-
-instance JSONSchema Double where
-  schema = Number'
-
-instance JSONSchema Bool where
-  schema = Boolean'
-
-instance (JSONSchema a) => JSONSchema [a] where
-  schema = Array' (schema @a)
-
-instance JSONSchema () where
-  schema = Null'
 
 -- | Helper functions for sum type schema generation
 
@@ -479,106 +209,6 @@ data SchemaOrConstructors
   | Constructors [ConstructorSchema]  -- ^ Sum type with multiple constructors
   deriving (Show, Eq)
 
--- | Extract constructors from a schema, wrapping non-sum schemas as single-constructor lists
-extractConstructors :: Schema -> [ConstructorSchema]
-extractConstructors (Enum' names) = map (\n -> ConstructorSchema n Null' True) names
-extractConstructors (OneOfUntagged cs) = cs
-extractConstructors (OneOfTagged cs) = cs
-extractConstructors other = [ConstructorSchema "" other (isNullarySchema other)]
-
--- | Normalize constructor name (e.g., "Red" -> "red")
-normalizeConstructorName :: Text -> Text
-normalizeConstructorName = T.toLower
-
--- | Check if a schema represents a nullary constructor
-isNullarySchema :: Schema -> Bool
-isNullarySchema Null' = True
-isNullarySchema _ = False
-
--- | Check if all constructors are nullary (enum pattern)
-isEnum :: [ConstructorSchema] -> Bool
-isEnum = all csIsNullary
-
--- | Extract schema shape for distinguishability check
--- Two schemas are distinguishable if they have different shapes
-schemaShape :: Schema -> Text
-schemaShape String' = "string"
-schemaShape Number' = "number"
-schemaShape Integer' = "integer"
-schemaShape Boolean' = "boolean"
-schemaShape Null' = "null"
-schemaShape (Array' _) = "array"
-schemaShape (Object' fields) = "object:" <> T.intercalate "," (map (\(n,_,_) -> T.pack n) fields)
-schemaShape (Maybe' s) = "maybe:" <> schemaShape s
-schemaShape (Enum' _) = "enum"
-schemaShape (OneOfUntagged _) = "oneof-untagged"
-schemaShape (OneOfTagged _) = "oneof-tagged"
-
--- | Check if constructor shapes are mutually exclusive (distinguishable)
-areShapesDistinguishable :: [ConstructorSchema] -> Bool
-areShapesDistinguishable constructors =
-  let shapes = map (schemaShape . csPayload) constructors
-      uniqueShapes = nub shapes
-  in length shapes == length uniqueShapes
-
--- | Choose appropriate sum type encoding based on constructor analysis
-chooseSumEncoding :: [ConstructorSchema] -> Schema
-chooseSumEncoding constructors
-  | null constructors = Null'  -- Shouldn't happen, but handle gracefully
-  | isEnum constructors = Enum' (map csName constructors)
-  | areShapesDistinguishable constructors = OneOfUntagged constructors
-  | otherwise = OneOfTagged constructors
-
-instance (HasFunctionObject s) => GSchema s U1 where
-  gschema _ = Null'
-
-instance (HasFunctionObject s, JSONSchema c) => GSchema s (K1 i c) where
-  gschema _ = schema @c
-
-instance (HasFunctionObject s, GSchema s a, GSchema s b) => GSchema s (a :*: b) where
-  gschema _ = gschema @s @a undefined <> gschema @s @b undefined
-
--- | Sum type instance - collects all constructors from both branches
-instance (HasFunctionObject s, GSchema s a, GSchema s b) => GSchema s (a :+: b) where
-  gschema _ =
-    let leftSchema = gschema @s @a undefined
-        rightSchema = gschema @s @b undefined
-        leftConstructors = extractConstructors leftSchema
-        rightConstructors = extractConstructors rightSchema
-        allConstructors = leftConstructors ++ rightConstructors
-    in chooseSumEncoding allConstructors
-
--- | Datatype - unwraps single-constructor types to their payload
-instance (HasFunctionObject s, GSchema s f) => GSchema s (M1 D c f) where
-  gschema _ =
-    let innerSchema = gschema @s @f undefined
-    in case innerSchema of
-         -- Single constructor case: unwrap to just the payload
-         Enum' [_] -> Null'  -- Single nullary constructor is just Null
-         OneOfUntagged [ConstructorSchema _ payload _] -> payload
-         -- Multiple constructors: keep as-is
-         _ -> innerSchema
-
--- | Constructor Metadata - captures constructor name and wraps payload
-instance (HasFunctionObject s, GSchema s f, Constructor c) => GSchema s (M1 C c f) where
-  gschema proxy =
-    let name = T.pack $ conName (undefined :: M1 C c f p)
-        normalizedName = normalizeConstructorName name
-        payload = gschema @s @f undefined
-        isNullary = isNullarySchema payload
-    -- Return a single-constructor "sum type" that will be collected by :+:
-    -- or used directly if there's only one constructor
-    in case payload of
-         Null' -> Enum' [normalizedName]  -- Nullary constructor
-         _ -> OneOfUntagged [ConstructorSchema normalizedName payload isNullary]
-
--- | Selector Metadata
-instance (HasFunctionObject s, GSchema s f, Selector c) => GSchema s (M1 S c f) where
-  gschema a =
-    let name = selName a
-        desc = getFieldDescription @s name
-     in Object' [(name, desc, (gschema @s @f undefined))]
-
 toolAdd :: forall a. (Tool a, HasFunctionObject a, JSONSchema a) => Louter.ChatRequest -> Louter.ChatRequest
 toolAdd req =
   let prevTools = case toTools req of
@@ -586,74 +216,6 @@ toolAdd req =
         v -> v
       newTools = prevTools ++ [newTool @a Proxy]
    in fromTools req newTools
-
-defaultUTCTime :: UTCTime
-defaultUTCTime = UTCTime (coerce (0 :: Integer)) 0
-
-data ReplCommand
-  = Quit
-  | Clear
-  | ShowContents
-  | ShowUsage
-  | ShowRequest
-  | ShowContext
-  | ShowSession
-  | Edit
-  | EditRequest
-  | EditContents
-  | EditHeader
-  | EditFooter
-  | ListSessions
-  | SetModel Text
-  | SetTimeout Int
-  | CopySession
-      { sessionNameFrom :: Text,
-        sessionNameTo :: Text
-      }
-  | DeleteSession
-      { sessionName :: Text
-      }
-  | SwitchSession
-      { sessionName :: Text
-      }
-  | ReadImage Text
-  | UserInput Text
-  | Help
-  | Repl
-      { sessionName :: Text
-      }
-  | ListKeys
-  | GetKey
-      { nameSpace :: Maybe Text,
-        keyName :: Text
-      }
-  | SetKey
-      { nameSpace :: Maybe Text,
-        keyName :: Text,
-        value :: Text
-      }
-  | DeleteKey
-      { nameSpace :: Maybe Text,
-        keyName :: Text
-      }
-  deriving (Eq, Show)
-
-class PersistentBackend p where
-  type Conn p
-  config :: p
-  setup :: (MonadIO m, MonadFail m) => p -> m (Maybe (Conn p))
-  initialize :: (MonadIO m, MonadFail m) => Conn p -> Context -> m ()
-  load :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m (Maybe Context)
-  loadByKey :: (MonadIO m, MonadFail m) => Conn p -> (Key Context) -> m (Maybe Context)
-  save :: (MonadIO m, MonadFail m) => Conn p -> Context -> m (Maybe (Key Context))
-  saveContents :: (MonadIO m, MonadFail m) => Conn p -> [Content] -> m ()
-  listSessions :: (MonadIO m, MonadFail m) => Conn p -> m [Text]
-  deleteSession :: (MonadIO m, MonadFail m) => Conn p -> SessionName -> m ()
-  listKeys :: (MonadIO m, MonadFail m) => Conn p -> m [Unique KeyValue]
-  getKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m (Maybe Text)
-  setKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> Text -> m ()
-  deleteKey :: (MonadIO m, MonadFail m) => Conn p -> Unique KeyValue -> m ()
-
 
 -- FIXME: use mempty here, instead of providing a model name.
 defaultRequest :: Louter.ChatRequest
@@ -689,72 +251,16 @@ fromModel_ model =
     }
 
 -- | Read the JSON object and convert it to a Map
-toMap :: Text -> Map Text Value
+toMap :: Text -> Map Text A.Value
 toMap json =
   case A.decodeStrictText json of
     Just v -> v
     Nothing -> error $ T.unpack $ "Decoding JSON fails"
   
 
-fromMap :: Map Text Value -> Text
+fromMap :: Map Text A.Value -> Text
 fromMap txt = TL.toStrict $ A.encodeToLazyText txt
 
-instance ChatCompletion Contents where
-  toRequest orgRequest contents =
-    let messages = flip map contents $ \case
-          Content user (Message message) _ _ ->
-            Louter.Message
-              { Louter.msgRole = case user of
-                  User -> Louter.RoleUser
-                  System -> Louter.RoleSystem
-                  Assistant -> Louter.RoleAssistant
-                  Tool -> Louter.RoleTool
-              , Louter.msgContent = [Louter.TextPart message]
-              }
-          Content user (Image type' img) _ _ ->
-            Louter.Message
-              { Louter.msgRole = case user of
-                  User -> Louter.RoleUser
-                  System -> Louter.RoleSystem
-                  Assistant -> Louter.RoleAssistant
-                  Tool -> Louter.RoleTool
-              , Louter.msgContent = [Louter.ImagePart type' img]
-              }
-          Content user (ToolCall id' name' args') _ _ ->
-            -- Tool calls need to be handled differently - for now, convert to text
-            Louter.Message
-              { Louter.msgRole = Louter.RoleAssistant
-              , Louter.msgContent = [Louter.TextPart $ "Tool call: " <> name' <> " with args: " <> args']
-              }
-          Content user (ToolReturn id' name' ret') _ _ ->
-            Louter.Message
-              { Louter.msgRole = Louter.RoleTool
-              , Louter.msgContent = [Louter.TextPart ret']
-              }
-     in orgRequest { Louter.reqMessages = messages }
-
-  fromResponse sessionName response =
-    let choice = head (Louter.respChoices response)
-        message = Louter.choiceMessage choice
-        toolCalls = Louter.choiceToolCalls choice
-        finishReason = case Louter.choiceFinishReason choice of
-          Just Louter.FinishStop -> Stop
-          Just Louter.FinishLength -> Length
-          Just Louter.FinishToolCalls -> ToolCalls
-          Just Louter.FinishContentFilter -> ContentFilter
-          Nothing -> Null
-        -- If there are tool calls, convert them to Content
-        contents = if null toolCalls
-                   then [Content Assistant (Message message) sessionName defaultUTCTime]
-                   else map (\tc -> Content Assistant
-                                      (ToolCall (Louter.rtcId tc)
-                                                (Louter.functionName $ Louter.rtcFunction tc)
-                                                (Louter.functionArguments $ Louter.rtcFunction tc))
-                                      sessionName
-                                      defaultUTCTime) toolCalls
-     in (contents, finishReason)
-
-    
 updateRequest :: Louter.ChatRequest -> Contents -> Louter.ChatRequest
 updateRequest = toRequest
 
@@ -871,20 +377,38 @@ runRequestStreaming sessionName defaultReq timeout request contentCallback = do
   -- Accumulate response while streaming
   contentRef <- newIORef []
   finishReasonRef <- newIORef "stop"
+  toolCallsRef <- newIORef ([] :: [Louter.ResponseToolCall])
 
   -- Stream with callback
-  Louter.streamChatWithCallback client req $ \event -> case event of
-    Louter.StreamContent txt -> do
-      contentCallback txt  -- Call user callback for incremental output
-      modifyIORef' contentRef (++ [txt])
-    Louter.StreamFinish reason -> do
-      writeIORef finishReasonRef reason
-    Louter.StreamError err -> do
-      error $ T.unpack $ "Louter streaming error: " <> err
-    _ -> pure ()  -- Ignore reasoning and tool calls for now
+  Louter.streamChatWithCallback client req $ \event -> do
+    when openai_http_debug $ liftIO $ putStrLn $ "SSE event: " <> show event
+    case event of
+      Louter.StreamContent txt -> do
+        contentCallback txt  -- Call user callback for incremental output
+        modifyIORef' contentRef (++ [txt])
+      Louter.StreamReasoning _ -> pure () -- Ignore reasoning, for now.
+      Louter.StreamToolCall toolCall -> do
+        let toolCallResponse = Louter.ResponseToolCall
+              {
+                Louter.rtcId = Louter.toolCallId toolCall
+              , Louter.rtcType = "function"
+              , Louter.rtcFunction = Louter.FunctionCall
+                                     {
+                                       Louter.functionName = Louter.toolCallName toolCall
+                                     , Louter.functionArguments = T.decodeUtf8 $ BS.toStrict $ A.encode (Louter.toolCallArguments toolCall)
+                                     }
+              }
+        liftIO $ putStrLn $ "DEBUG: tool call received: " <> show (Louter.toolCallName toolCall)
+        modifyIORef' toolCallsRef (++ [toolCallResponse])
+      Louter.StreamFinish reason -> do
+        writeIORef finishReasonRef reason
+      Louter.StreamError err -> do
+        error $ T.unpack $ "Louter streaming error: " <> err
+      unknown -> liftIO $ putStrLn $ "Unhandled Louter event: " <> show unknown
 
   -- Build response from accumulated content
   fullContent <- T.concat <$> readIORef contentRef
+  accToolCalls <- readIORef toolCallsRef
   finishReasonText <- readIORef finishReasonRef
 
   -- Convert text finish reason to FinishReason type
@@ -903,7 +427,7 @@ runRequestStreaming sessionName defaultReq timeout request contentCallback = do
             [ Louter.Choice
                 { Louter.choiceIndex = 0
                 , Louter.choiceMessage = fullContent
-                , Louter.choiceToolCalls = []
+                , Louter.choiceToolCalls = accToolCalls
                 , Louter.choiceFinishReason = Just finishReason
                 }
             ]

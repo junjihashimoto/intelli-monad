@@ -24,7 +24,7 @@ import Control.Monad.IO.Class
 import qualified Data.Aeson as A
 import GHC.Generics
 import GHC.IO.Exception
-import IntelliMonad.Types
+import IntelliMonad.BaseTypes (JSONSchema, HasFunctionObject(getFunctionName, getFunctionDescription, getFieldDescription), Tool(Output, toolExec))
 import System.Process
 
 data Bash = Bash

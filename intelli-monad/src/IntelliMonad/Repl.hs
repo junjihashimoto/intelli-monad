@@ -16,35 +16,117 @@
 
 module IntelliMonad.Repl where
 
+import Prelude (Bool(True), Either(Left, Right), Eq, IO, Int, Show, (.), ($), (<>), (>>), (<$>), (>>=), fmap, print, pure, putStrLn, return, show)
+
 import Control.Monad (forM_)
-import Control.Monad.IO.Class
+
+import Control.Monad.Fail (MonadFail)
+
+import Control.Monad.IO.Class (MonadIO, liftIO)
+
 import Control.Monad.Trans.Class (MonadTrans, lift)
+
 import Control.Monad.Trans.State (get, put)
-import qualified Data.Aeson as A
+
 import Data.Aeson.Encode.Pretty (encodePretty)
-import qualified Data.Yaml as Y
-import qualified Data.Yaml.Pretty as Y
-import qualified Data.ByteString as BS
+
+import Data.Maybe (Maybe(Just, Nothing))
+
+import qualified Data.ByteString as BS (putStr, toStrict, writeFile)
+
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import Data.Void
-import GHC.IO.Exception
-import IntelliMonad.Persist
-import IntelliMonad.Prompt hiding (user, system, assistant)
-import IntelliMonad.Types
-import qualified Louter.Types.Request as Louter
-import System.Console.Haskeline
+import qualified Data.Text as T (isPrefixOf, pack, unpack)
+import qualified Data.Text.IO as T (putStr, putStrLn, readFile)
+
+import Data.Void (Void)
+
+import qualified Data.Yaml as Y (decodeFileEither)
+import qualified Data.Yaml.Pretty as Y (defConfig, encodePretty)
+
+import GHC.IO.Exception (ExitCode(ExitFailure, ExitSuccess))
+
+import qualified Louter.Types.Request as Louter (ChatRequest, reqModel)
+
+import System.Console.Haskeline (InputT, Settings(Settings, autoAddHistory, complete, historyFile), completeFilename, defaultSettings, getExternalPrint, getInputLine, runInputT)
+
 import System.Environment (lookupEnv)
+
 import System.IO (hClose)
-import System.IO.Temp
-import System.Process
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import Text.Megaparsec.Char.Lexer as L
-import IntelliMonad.Config
+
+import System.IO.Temp (withSystemTempFile)
+
+import System.Process (system)
+
+import Text.Megaparsec (Parsec, ParseErrorBundle, (<|>), anySingle, empty, many, runParser, try)
+
+import Text.Megaparsec.Char (alphaNumChar, char, space1, string)
+
+import Text.Megaparsec.Char.Lexer as L (decimal, lexeme, space)
+
+import IntelliMonad.BaseTypes (ChatCompletion(toRequest), Content(Content), Contents, Context(contextBody, contextFooter, contextHeader, contextRequest, contextSessionName, contextTotalTokens, contextToolbox), CustomInstructionProxy, Message(Message), ToolProxy, PersistentBackend(deleteKey, deleteSession, getKey, listKeys, listSessions, load, save, setKey), Prompt, PromptEnv(context, inputCallback, outputCallback, timeoutSeconds), Unique(KeyName))
+
+import IntelliMonad.Persist (withDB)
+
+import IntelliMonad.Prompt (callWithImage, callWithText, clear, getContext, getSessionName, push, runPrompt, setContext, showContents)
+
+import IntelliMonad.Config (readConfig)
+import qualified IntelliMonad.Config as Config (getUseStreaming)
+
+import IntelliMonad.ToolPolicy (getTools, changeToolPolicy)
+
+import IntelliMonad.ToolPolicy.Types (ToolEntry(ToolEntry), ToolPolicy(Allow,Ask,Deny))
 
 type Parser = Parsec Void Text
+
+data ReplCommand
+  = Quit
+  | Clear
+  | ShowContents
+  | ShowUsage
+  | ShowRequest
+  | ShowContext
+  | ShowSession
+  | Edit
+  | EditRequest
+  | EditContents
+  | EditHeader
+  | EditFooter
+  | ListSessions
+  | ListTools
+  | SetModel Text
+  | SetToolPolicy ToolPolicy Text
+  | SetTimeout Int
+  | CopySession
+      { sessionNameFrom :: Text,
+        sessionNameTo :: Text
+      }
+  | DeleteSession
+      { sessionName :: Text
+      }
+  | SwitchSession
+      { sessionName :: Text
+      }
+  | ReadImage Text
+  | UserInput Text
+  | Help
+  | Repl
+      { sessionName :: Text
+      }
+  | ListKeys
+  | GetKey
+      { nameSpace :: Maybe Text,
+        keyName :: Text
+      }
+  | SetKey
+      { nameSpace :: Maybe Text,
+        keyName :: Text,
+        value :: Text
+      }
+  | DeleteKey
+      { nameSpace :: Maybe Text,
+        keyName :: Text
+      }
+  deriving (Eq, Show)
 
 parseRepl :: Parser ReplCommand
 parseRepl =
@@ -57,9 +139,12 @@ parseRepl =
     <|> (try (lexm (string ":show") >> lexm (string "context")) >> pure ShowContext)
     <|> (try (lexm (string ":show") >> lexm (string "session")) >> pure ShowSession)
     <|> (try (lexm (string ":set" ) >> lexm (string "timeout") >> L.decimal) >>= pure . SetTimeout)
+    <|> (try (lexm (string ":set" ) >> lexm (string "tool") >> (T.pack <$> lexm toolName >>= \name -> lexm (string "allow") >> return (SetToolPolicy Allow name)) ))
+    <|> (try (lexm (string ":set" ) >> lexm (string "tool") >> (T.pack <$> lexm toolName >>= \name -> lexm (string "ask") >> return (SetToolPolicy Ask name)) ))
+    <|> (try (lexm (string ":set" ) >> lexm (string "tool") >> (T.pack <$> lexm toolName >>= \name -> lexm (string "deny") >> lexm (many anySingle) >>= \reason -> return (SetToolPolicy (Deny $ T.pack reason) name)) ))
     <|> (try (lexm (string ":read") >> lexm (string "image") >> lexm imagePath) >>= pure . ReadImage . T.pack)
     <|> (try (lexm (string ":list") >> lexm (string "sessions")) >> pure ListSessions)
-    <|> (try (lexm (string ":list")) >> pure ListSessions)
+    <|> (try (lexm (string ":list") >> lexm (string "tools")) >> pure ListTools)
     <|> ( try
             ( lexm (string ":copy") >> lexm (string "session") >> do
                 from <- T.pack <$> lexm sessionName
@@ -81,8 +166,9 @@ parseRepl =
     sessionName = many alphaNumChar
     imagePath = many (alphaNumChar <|> char '.' <|> char '/' <|> char '-')
     modelName = many (alphaNumChar <|> char '-' <|> char '.' <|> char ':' <|> char '/')
+    toolName = many (alphaNumChar <|> char '-' <|> char '.' <|> char ':' <|> char '/' <|> char '_')
 
-getTextInputLine :: (MonadTrans t) => t (InputT IO) (Maybe T.Text)
+getTextInputLine :: (MonadTrans t) => t (InputT IO) (Maybe Text)
 getTextInputLine = fmap (fmap T.pack) (lift $ getInputLine "% ")
 
 getUserCommand :: forall p t. (PersistentBackend p, MonadTrans t) => t (InputT IO) (Either (ParseErrorBundle Text Void) ReplCommand)
@@ -97,7 +183,7 @@ getUserCommand = do
           Left err -> return $ Left err
         else return $ Right (UserInput input)
 
-editWithEditor :: forall m. (MonadIO m, MonadFail m) => m (Maybe T.Text)
+editWithEditor :: forall m. (MonadIO m, MonadFail m) => m (Maybe Text)
 editWithEditor = do
   liftIO $ withSystemTempFile "tempfile.txt" $ \filePath fileHandle -> do
     hClose fileHandle
@@ -175,6 +261,18 @@ runCmd' cmd ret = do
       put $ env { timeoutSeconds = Just timeout }
       liftIO $ T.putStrLn $ "Timeout set to: " <> T.pack (show timeout) <> " seconds"
       repl
+    Right (SetToolPolicy policy toolName) -> do
+      prev <- getContext
+      let
+        maybeNewRegistry = changeToolPolicy prev.contextToolbox toolName policy
+      case maybeNewRegistry of
+        Nothing -> do
+          liftIO $ T.putStrLn $ "Tool Policy set failed. Could not find tool: " <> toolName <> "."
+        Just newRegistry -> do
+          liftIO $ T.putStrLn $ "\"" <> toolName <> "\" policy set to: " <> T.pack (show policy)
+          env <- get
+          put $ env { context = prev { contextToolbox = newRegistry } }
+      repl
     Right ShowContents -> do
       context <- getContext
       showContents context.contextBody
@@ -185,8 +283,8 @@ runCmd' cmd ret = do
         print context.contextTotalTokens
       repl
     Right ShowRequest -> do
-      prev <- getContext
-      let req = toRequest prev.contextRequest (prev.contextHeader <> prev.contextBody <> prev.contextFooter)
+      context <- getContext
+      let req = toRequest context.contextRequest (context.contextHeader <> context.contextBody <> context.contextFooter)
       liftIO $ do
         BS.putStr $ BS.toStrict $ encodePretty req
         T.putStrLn ""
@@ -205,6 +303,19 @@ runCmd' cmd ret = do
       liftIO $ do
         list <- withDB @p $ \conn -> listSessions @p conn
         forM_ list $ \sessionName' -> T.putStrLn sessionName'
+      repl
+    Right ListTools -> do
+      context <- getContext
+      liftIO $ do
+        putStrLn $ "Policy | Name -- Description" <> "\n" <> "----------------------------"
+        let
+          list = getTools context
+          showToolEntry (name, (ToolEntry desc policy)) =
+            case policy of
+              Allow -> T.putStrLn $ "ALLOW  | " <> name <> " -- " <> desc
+              Ask -> T.putStrLn $ "ASK    | " <> name <> " -- " <> desc
+              (Deny reason) -> T.putStrLn $ "DENY   | " <> name <> " -- " <> desc <> " -- Deny reason: " <> reason
+        forM_ list $ \a -> showToolEntry a
       repl
     Right (CopySession from' to') -> do
       liftIO $ do
@@ -245,19 +356,15 @@ runCmd' cmd ret = do
         putStrLn ":switch session <session name>"
         putStrLn ":help"
       repl
-    Right (UserInput input) -> do
-      callWithText @p input >>= showContents
-      repl
+    Right (UserInput input) -> callInput input >> repl
     Right Edit -> do
       -- Open a temporary file with the default editor of the system.
       -- Then send it as user input.
       editWithEditor >>= \case
-        Just input -> do
-          callWithText @p input >>= showContents
-          repl
+        Just input -> callInput input
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
-          repl
+      repl
     Right EditRequest -> do
       -- Open a json file of request and edit it with the default editor of the system.
       -- Then, read the file and parse it as a request.
@@ -301,7 +408,7 @@ runCmd' cmd ret = do
         Nothing -> do
           liftIO $ putStrLn "Failed to open the editor."
           repl
-    Right (Repl sessionName) -> do
+    Right (Repl _) -> do
       runRepl' @p
     Right (ListKeys) -> do
       liftIO $ do
@@ -331,6 +438,19 @@ runCmd' cmd ret = do
         Nothing -> getSessionName
       withDB @p $ \conn -> deleteKey @p conn (KeyName namespace' keyName)
       repl
+  where
+    callInput :: Text -> Prompt (InputT IO) ()
+    callInput input = do
+      config <- liftIO $ readConfig
+      if Config.getUseStreaming config
+        then do
+          liftIO $ T.putStr "assistant: "
+          _ <- callWithText @p input
+          liftIO $ T.putStrLn ""
+        else do
+          result <- callWithText @p input
+          showContents [con | con@(Content _ (Message _) _ _) <- result]
+
 
 runRepl' :: forall p. (PersistentBackend p) => Prompt (InputT IO) ()
 runRepl' = do
@@ -339,12 +459,22 @@ runRepl' = do
 
 runRepl :: forall p. (PersistentBackend p) => [ToolProxy] -> [CustomInstructionProxy] -> Text -> Louter.ChatRequest -> Contents -> IO ()
 runRepl tools customs sessionName defaultReq contents = do
-  config <- readConfig
   runInputT
     ( Settings
         { complete = completeFilename,
           historyFile = Just "intelli-monad.history",
           autoAddHistory = True
         }
-    )
-    (runPrompt @p tools customs sessionName defaultReq (push @p contents >> runRepl' @p))
+    ) $
+    do
+      output <- getExternalPrint
+      let callbackOut = \text -> output (T.unpack text)
+          callbackIn = \prompt -> runInputT defaultSettings $
+                                  fmap (fmap T.pack) (getInputLine $ T.unpack prompt)
+      runPrompt @p tools customs sessionName defaultReq $ do
+        prev <- get
+        put $ prev { outputCallback = callbackOut
+                   , inputCallback = callbackIn
+                   }
+        push @p contents
+        runRepl' @p

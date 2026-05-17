@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -17,23 +18,36 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module IntelliMonad.Tools.Utils where
+module IntelliMonad.Tools.Utils
+  (
+    findToolCall
+  , tryToolExec
+  )
+where
 
 import Control.Monad (forM)
-import Control.Monad.IO.Class
-import Data.Aeson (encode)
-import qualified Data.Aeson as A
-import qualified Data.ByteString as BS
+
+import Control.Monad.IO.Class (MonadIO, liftIO)
+
+import Data.Aeson (FromJSON, ToJSON, eitherDecode, encode)
+
+import Data.ByteString (fromStrict, toStrict)
+
 import Data.Maybe (catMaybes)
-import Data.Proxy
+
+import Data.Proxy (Proxy(Proxy))
+
 import Data.Text (Text)
-import qualified Data.Text.Encoding as T
-import Data.Time
-import IntelliMonad.Types
+
+import Data.Text.Encoding (encodeUtf8, decodeUtf8Lenient)
+
+import Data.Time (getCurrentTime)
+
+import IntelliMonad.BaseTypes (PersistentBackend, Content(Content), Contents, Message(Message, Image, ToolCall, ToolReturn), Output, Prompt, Tool(toolExec, toolFunctionName), ToolProxy(ToolProxy), User(Tool))
 
 toolExec' ::
   forall t p m.
-  (PersistentBackend p, MonadIO m, MonadFail m, Tool t, A.FromJSON t, A.ToJSON (Output t)) =>
+  (PersistentBackend p, MonadIO m, MonadFail m, Tool t, FromJSON t, ToJSON (Output t)) =>
   Text ->
   Text ->
   Text ->
@@ -41,12 +55,12 @@ toolExec' ::
   Prompt m (Maybe Content)
 toolExec' sessionName id' name' args' = do
   if name' == toolFunctionName @t
-    then case (A.eitherDecode (BS.fromStrict (T.encodeUtf8 args')) :: Either String t) of
+    then case (eitherDecode (fromStrict (encodeUtf8 args')) :: Either String t) of
       Left _ -> return Nothing
       Right input -> do
         output <- toolExec @t @p @m input
         time <- liftIO getCurrentTime
-        return $ Just $ (Content Tool (ToolReturn id' name' (T.decodeUtf8Lenient (BS.toStrict (encode output)))) sessionName time)
+        return $ Just $ (Content Tool (ToolReturn id' name' (decodeUtf8Lenient (toStrict (encode output)))) sessionName time)
     else return Nothing
 
 (<||>) ::

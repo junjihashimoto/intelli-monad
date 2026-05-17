@@ -30,9 +30,10 @@ import GHC.Generics
 import GHC.IO.Exception
 import IntelliMonad.Persist
 import IntelliMonad.Prompt
-import IntelliMonad.Types
 import System.Process
 import Data.Proxy
+
+import IntelliMonad.BaseTypes (HasFunctionObject(getFieldDescription, getFunctionDescription, getFunctionName), JSONSchema, PersistentBackend(deleteKey, getKey, listKeys, setKey), Tool(Output, toolExec), Unique(KeyName))
 
 data GetKey = GetKey
   { key :: Text
@@ -72,6 +73,7 @@ data ListKeys = ListKeys ()
 instance HasFunctionObject ListKeys where
   getFunctionName = "list_keys"
   getFunctionDescription = "List all keys in the key-value store"
+  getFieldDescription _ = ""
 
 instance Tool GetKey where
   data Output GetKey = GetKeyOutput

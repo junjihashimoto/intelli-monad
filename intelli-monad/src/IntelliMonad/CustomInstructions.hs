@@ -20,10 +20,13 @@
 
 module IntelliMonad.CustomInstructions where
 
-import qualified Data.Aeson as A
-import Data.Proxy
-import GHC.Generics
-import IntelliMonad.Types
+import qualified Data.Aeson as A (FromJSON, ToJSON)
+
+import Data.Proxy (Proxy)
+
+import GHC.Generics (Generic)
+
+import IntelliMonad.BaseTypes (Content(Content), Contents, CustomInstruction(customHeader, customFooter), CustomInstructionProxy(CustomInstructionProxy), HasFunctionObject(getFunctionName, getFunctionDescription, getFieldDescription), JSONSchema, Message(Message), Tool(Output, toolExec, toolFooter, toolHeader), ToolProxy(ToolProxy), User(System), defaultUTCTime)
 
 defaultCustomInstructions :: [CustomInstructionProxy]
 defaultCustomInstructions = []
@@ -51,7 +54,7 @@ instance Tool ValidateNumber where
 data Math = Math
 
 instance CustomInstruction Math where
-  customHeader _ = [(Content System (Message "Calcurate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime)]
+  customHeader _ = [(Content System (Message "Calculate user input, then output just the number. Then call 'output_number' function.") "" defaultUTCTime)]
   customFooter _ = []
 
 headers :: [CustomInstructionProxy] -> Contents

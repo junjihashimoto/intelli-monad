@@ -16,34 +16,31 @@
 
 module IntelliMonad.Cmd where
 
-import Control.Monad (forM_)
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Class (MonadTrans, lift)
-import Control.Monad.Trans.State (get, put)
-import qualified Data.Aeson as A
-import Data.Aeson.Encode.Pretty (encodePretty)
-import qualified Data.ByteString as BS
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import Data.Void
+import Prelude (Bool(True), Either(Right), IO, ($), (<>), (<*>), (>>=), (<$>), pure, return)
+
+import Data.Maybe (Maybe(Just, Nothing))
+
+import Data.Text (pack)
+
 import Database.Persist.Sqlite (SqliteConf)
-import GHC.IO.Exception
-import IntelliMonad.Config
-import IntelliMonad.Persist
-import IntelliMonad.Prompt
-import IntelliMonad.Repl
-import IntelliMonad.Tools
-import IntelliMonad.Types
-import Options.Applicative
-import System.Console.Haskeline
+
+import Options.Applicative (Parser, argument, command, customExecParser, fullDesc, helper, info, metavar, optional, prefs, progDesc, showHelpOnEmpty, str, subparser)
+
+import System.Console.Haskeline (Settings(Settings, autoAddHistory, complete, historyFile), completeFilename, runInputT)
+
 import System.Environment (lookupEnv)
-import System.IO (hClose)
-import System.IO.Temp
-import System.Process
-import Text.Megaparsec
-import Text.Megaparsec.Char
-import Text.Megaparsec.Char.Lexer as L
+
+import IntelliMonad.BaseTypes (PersistentBackend)
+
+import IntelliMonad.Config (model, readConfig)
+
+import IntelliMonad.Prompt (runPrompt)
+
+import IntelliMonad.Repl (ReplCommand(Help, Clear, CopySession, DeleteKey, DeleteSession, Edit, EditContents, EditFooter, EditHeader, EditRequest, GetKey, ListKeys, ListSessions, ReadImage, Repl, SetKey, ShowContents, ShowContext, ShowRequest, ShowSession, ShowUsage, SwitchSession, UserInput), runCmd')
+
+import IntelliMonad.Tools (defaultTools)
+
+import IntelliMonad.Types (defaultRequest)
 
 opts :: Options.Applicative.Parser ReplCommand
 opts =
@@ -73,9 +70,9 @@ opts =
         <> command "help" (info (pure Help) (progDesc "Show the help"))
     )
 
+-- FIXME: hard coded defaults.
 runCmd :: forall p. (PersistentBackend p) => ReplCommand -> IO ()
 runCmd cmd = do
-  config <- readConfig
   let tools = defaultTools
       customs = []
       sessionName = "default"
@@ -87,17 +84,18 @@ runCmd cmd = do
           autoAddHistory = True
         }
     )
-    (runPrompt @p [] customs sessionName defaultReq (runCmd' @p (Right cmd) Nothing))
+    (runPrompt @p tools customs sessionName defaultReq (runCmd' @p (Right cmd) Nothing))
 
 main :: IO ()
 main = do
   -- Parse our config file. We only use the model, at this point.
   config <- readConfig
 
+  -- FIXME: has no effect. thread this through.
   -- Determine what model to use by default. Use what's in the config file by default, but override with an environment variable (OPENAI_MODEL).
   model <- do
     lookupEnv "OPENAI_MODEL" >>= \case
-      Just model -> return $ T.pack model
+      Just model -> return $ pack model
       Nothing -> return config.model
 
   cmd <- customExecParser (prefs showHelpOnEmpty) (info (helper <*> opts) (fullDesc <> progDesc "intelli-monad"))

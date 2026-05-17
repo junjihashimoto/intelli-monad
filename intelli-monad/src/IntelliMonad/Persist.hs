@@ -25,17 +25,17 @@
 
 module IntelliMonad.Persist where
 
-import Control.Monad.IO.Class
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.List (maximumBy)
-import qualified Data.Set as S
-import Data.Text (Text)
+import qualified Data.Set as DS (toList, fromList)
 import Database.Persist hiding (get)
 import Database.Persist.Sqlite hiding (get)
-import IntelliMonad.Types
+import IntelliMonad.BaseTypes (Context(contextCreated, contextSessionName), EntityField (ContextSessionName, ContextId), KeyValue(KeyValue, keyValueValue), PersistProxy(PersistProxy), PersistentBackend(Conn, config, deleteKey, deleteSession, getKey, initialize, listKeys, listSessions, load, loadByKey, save, saveContents, setKey, setup), PromptEnv(PromptEnv, backend), Prompt, Unique(KeyName), migrateAll)
 import Control.Monad.Trans.State (get)
 
 data StatelessConf = StatelessConf
 
+-- FIXME: hard coded path, magic number.
 instance PersistentBackend SqliteConf where
   type Conn SqliteConf = ConnectionPool
   config =
@@ -70,7 +70,7 @@ instance PersistentBackend SqliteConf where
 
   listSessions conn = do
     (a :: [Entity Context]) <- liftIO $ runPool (config @SqliteConf) (selectList [] []) conn
-    return $ S.toList $ S.fromList $ map (\(Entity _ v) -> contextSessionName v) a
+    return $ DS.toList $ DS.fromList $ map (\(Entity _ v) -> contextSessionName v) a
 
   deleteSession conn sessionName = do
     liftIO $ runPool (config @SqliteConf) (deleteWhere [ContextSessionName ==. sessionName]) conn
@@ -113,7 +113,7 @@ withDB func =
 
 withBackend :: forall a m. (MonadIO m, MonadFail m) => (forall p. PersistentBackend p => p -> Prompt m a) -> Prompt m a
 withBackend func = do
-  (env :: PromptEnv) <- get
-  case (env) of
-    (PromptEnv _ _ _ (PersistProxy v) _ _) -> func v
+  env <- get
+  case env.backend of
+    PersistProxy p -> func p
 

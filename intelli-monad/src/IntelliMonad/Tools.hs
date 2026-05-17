@@ -18,25 +18,41 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module IntelliMonad.Tools
-  ( module IntelliMonad.Tools.Utils,
-    module IntelliMonad.Tools.Arxiv,
-    module IntelliMonad.Tools.Bash,
+  ( ToolProxy,
+    HasFunctionObject,
     defaultTools,
   )
 where
 
-import Data.Proxy
-import IntelliMonad.Tools.Arxiv
-import IntelliMonad.Tools.Bash
-import IntelliMonad.Tools.Utils
-import IntelliMonad.Types
+import Prelude ()
 
+import Data.Proxy (Proxy(Proxy))
+
+import IntelliMonad.BaseTypes (HasFunctionObject, ToolProxy(ToolProxy))
+
+import IntelliMonad.Tools.Arxiv (Arxiv)
+
+import IntelliMonad.Tools.Bash (Bash)
+
+import IntelliMonad.Tools.KeyValue (DeleteKey, GetKey, ListKeys, SetKey)
+
+getKey, setKey, deleteKey, listKeys :: ToolProxy
+getKey    = ToolProxy (Proxy :: Proxy GetKey)
+setKey    = ToolProxy (Proxy :: Proxy SetKey)
+deleteKey = ToolProxy (Proxy :: Proxy DeleteKey)
+listKeys  = ToolProxy (Proxy :: Proxy ListKeys)
+
+arxiv, bash :: ToolProxy
 arxiv = ToolProxy (Proxy :: Proxy Arxiv)
+bash  = ToolProxy (Proxy :: Proxy Bash)
 
-bash = ToolProxy (Proxy :: Proxy Bash)
-
+-- The list of tools implemented in Intelli-Monad.
 defaultTools :: [ToolProxy]
 defaultTools =
-  [ bash,
-    arxiv
+  [ arxiv
+  , bash
+  , deleteKey
+  , getKey
+  , listKeys
+  , setKey
   ]

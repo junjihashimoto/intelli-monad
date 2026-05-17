@@ -58,12 +58,13 @@ import Database.Persist
 import Database.Persist.Sqlite
 import Database.Persist.TH
 import GHC.Generics
-import IntelliMonad.Types
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import Network.HTTP.Simple (setRequestQueryString)
 import Text.XML
 import Text.XML.Cursor (Axis, Cursor, attributeIs, checkName, content, element, fromDocument, ($//), (&/), (&//))
+
+import IntelliMonad.BaseTypes (HasFunctionObject(getFieldDescription, getFunctionDescription, getFunctionName), JSONSchema, Tool(Output, toolExec))
 
 data Arxiv = Arxiv
   { searchQuery :: Text,
